@@ -24,9 +24,10 @@ dependencies:
 
 library:
   source-dirs: src
-  dependencies: 
+  dependencies:
   - containers
   - lens
+  - relude
 executables:
   busy-beavers-exe:
     main:                Main.hs
@@ -37,6 +38,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - busy-beavers
+    - relude
 
 tests:
   busy-beavers-test:
@@ -48,6 +50,7 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - busy-beavers
+    - relude
 
 default-extensions:
   - ApplicativeDo
