@@ -1,7 +1,7 @@
 module Main where
 
-import Lib
+import Beaver
 import Relude
 
 main :: IO ()
-main = someFunc
+main = print uni4size
