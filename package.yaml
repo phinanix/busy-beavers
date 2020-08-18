@@ -89,6 +89,7 @@ default-extensions:
   - TupleSections
   - TypeApplications
   - TypeOperators
+  - ViewPatterns
 ghc-options:
   - -Wall
   - -Wcompat
