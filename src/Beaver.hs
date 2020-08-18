@@ -61,76 +61,53 @@ simStep (Turing _ trans ) (i, (Zipper l bit r))
         Right $ Right $ (j, Unsafe.fromJust $ zipRight $ Zipper l newBit r)
 
 --
-prevPhase :: Int -> Phase -> Phase
-prevPhase n Halt = Phase (n-1)
-prevPhase _ (Phase 0) = Halt
-prevPhase _ (Phase k) = Phase (k-1)
 
-nextPhase :: Int -> Phase -> Phase
-nextPhase _ Halt = Phase 0
-nextPhase n (Phase k) = if k == n-1 then Halt else Phase $ k+1
+uniDir :: NonEmpty Dir
+uniDir = L :| [R]
 
-nextEdge :: Int -> Edge -> Edge
-nextEdge _ (i, False) = (i, True)
-nextEdge n (i, True) = (if i == n-1 then 0 else i+1, False)
+uniBit :: NonEmpty Bit
+uniBit = False :| [True]
 
-prevEdge :: Int -> Edge -> Edge
-prevEdge n (i, False) = (if i == 0 then n-1 else i-1, True)
-prevEdge _ (i, True) = (i, False)
+--crashes if the Int is not >0, which is true of much of the program
+uniFin :: Int -> NonEmpty Int
+uniFin n = 0 :| [1.. n-1]
 
-firstTrans :: Int -> Trans
-firstTrans _ = (Halt, False, L)
+uniPhase :: Int -> NonEmpty Phase
+uniPhase n = Halt :| toList (Phase <$> uniFin n)
 
-lastTrans :: Int -> Trans
-lastTrans n = (Phase (n-1), True, R)
+uniEdge :: Int -> NonEmpty Edge
+uniEdge n = do
+  i <- uniFin n
+  bit <- uniBit
+  pure (i, bit)
 
-nextTrans :: Int -> Trans -> Trans
-nextTrans _ (phase, False, L) = (phase, False, R)
-nextTrans _ (phase, False, R) = (phase, True, L)
-nextTrans _ (phase, True, L) = (phase, True, R)
-nextTrans n (phase, True, R) = (nextPhase n phase, False, L)
+uniTrans :: Int -> NonEmpty Trans
+uniTrans n = do
+  phase <- uniPhase n
+  bit <- uniBit
+  dir <- uniDir
+  pure (phase, bit, dir)
 
-prevTrans :: Int -> Trans -> Trans
-prevTrans n (phase, False, L) = (prevPhase n phase, True, R)
-prevTrans _ (phase, False, R) = (phase, False, L)
-prevTrans _ (phase, True, L) = (phase, False, R)
-prevTrans _ (phase, True, R) = (phase, True, L)
+--this is where it starts to become obvious universe is a typeclass
+--but many of mine are parameterized on an Int and that sounds annoying to deal with
+--this universe is made of maps that have all the given keys, each associated with
+--every possible value
+uniMap :: forall k v. Ord k => NonEmpty k -> NonEmpty v -> NonEmpty (Map k v)
+uniMap ks vs = foldlM addKey Empty ks where
+  addKey :: Map k v -> k -> NonEmpty (Map k v)
+  addKey m k = do
+    v <- vs
+    pure $ m & at k ?~ v
 
-edgeList :: Int -> [Edge]
-edgeList n = ((,False) <$> [0.. n-1]) ++ ((,True) <$> [0.. n-1])
-
---the lexicographically first turing machine of a certain size
-firstTM :: Int -> Turing
-firstTM n = if n < 1 then error "TM must have at least one state" else
-  Turing n $ fromList $ (\k -> (k, firstTrans n)) <$> edgeList n
-
-lastTM :: Int -> Turing
-lastTM n = if n < 1 then error "TM must have at least one state" else
-  Turing n $ fromList $ (\k -> (k, lastTrans n)) <$> edgeList n
-
---returns "Nothing" exactly when called on lastTM
-nextTM :: Turing -> Maybe Turing
-nextTM t@(Turing n tMap) = if t == (lastTM n) then Nothing else
-  Just $ Turing n $ nextTMap tMap where
-  nextTMap :: Map Edge Trans -> Map Edge Trans
-  nextTMap = nextAtEdge (n-1, True)
-  nextAtEdge :: Edge -> Map Edge Trans -> Map Edge Trans
-  nextAtEdge edge m = case m ^. at edge of
-    Just trans -> if trans == lastTrans n then
-      --wrap around to first trans, and increment the next counter up
-      nextAtEdge (prevEdge n edge) $ m & at edge ?~ firstTrans n else
-      --just increment the current transition
-      m & at edge ?~ nextTrans n trans
-    Nothing -> error "nextTM is only defined on total turing machines"
-universeTM :: Int  -> [Turing]
-universeTM n = recurse $ Just $ firstTM n where
-  --the list starting with t, going until the lastTM, or the empty list
-  recurse :: Maybe Turing -> [Turing]
-  recurse Nothing = []
-  recurse (Just t) = t : recurse (nextTM t)
+uniTuring :: Int -> NonEmpty Turing
+uniTuring n = do
+  let ks = uniEdge n
+      vs = uniTrans n
+  m <- uniMap ks vs
+  pure $ Turing n m
 
 uni3size :: Int
-uni3size = length $ universeTM 3
+uni3size = length $ uniTuring 3
 
 uni4size :: Int
-uni4size = length $ universeTM 4
+uni4size = length $ uniTuring 4
