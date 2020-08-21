@@ -36,8 +36,9 @@ testHalt (phase, _, tape) (Turing stateCount transitions)
           _1 .= newExploreList
           dfsToHalt newPhase
   try phase bit = case transitions ^. at (phase, bit) of
-    --if the current state doesn't lead anywhere then we give up
-    Nothing -> pure False
+    --if the current state leads to an unknown edge, that unknown edge could
+    --be assigned to halt, thus halt is reachable 
+    Nothing -> pure True
     --we found halt
     Just Halt -> pure True
     Just (Step phase1 _ _) -> use (_2 . contains phase1) >>= \case
@@ -128,7 +129,7 @@ simulateHalt steps t = case simStep t initState of --start off Bigstate at initS
     stepsTaken <- get
     pure $ ContinueForever $ Cycle (stepsTaken `div` 2) stepsTaken
   simulateHaltHelper steps (littleState, bigState) t = do
-    --trace ("little then big\n" <> show littleState <> "\n" <> show bigState <> "\n") $ 
+    --trace ("little then big\n" <> show littleState <> "\n" <> show bigState <> "\n") $
     modify (+1)
     --step bigState once
     case simStep t bigState of
