@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5210deb4e9e6e6cc78f6c028b3e22658a3bf471691fdff7f2bff1542e5d38e80
+-- hash: ae2d91acd3f9412e97f5c076761d2c75e0b4a81918d5598a258dd6dec41ff6b9
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -28,6 +28,7 @@ source-repository head
 library
   exposed-modules:
       Beaver
+      HaltProof
       Lib
   other-modules:
       Paths_busy_beavers
@@ -53,6 +54,8 @@ executable busy-beavers-exe
   build-depends:
       base >=4.7 && <5
     , busy-beavers
+    , lens
+    , prettyprinter
     , relude
   default-language: Haskell2010
 

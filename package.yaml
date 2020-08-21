@@ -39,6 +39,8 @@ executables:
     dependencies:
     - busy-beavers
     - relude
+    - lens
+    - prettyprinter
 
 tests:
   busy-beavers-test:
