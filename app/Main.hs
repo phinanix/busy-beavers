@@ -1,18 +1,21 @@
 module Main where
 
-import Relude
+import Relude hiding (state)
 import Relude.Unsafe as Unsafe
 import Control.Lens
 
 import Beaver
 import HaltProof
 
+ones :: Tape -> Int
+ones (Tape ls h rs) = length $ filter (==True) $ ls <> rs <> [h]
+
 aggregateResults :: Foldable t => t (Turing, SimResult) -> Steps -> String
-aggregateResults rs steps = case foldr count (0,[],[],[]) rs of
+aggregateResults rs simSteps = case foldr count (0::Int,[],[],[]) rs of
   (u,s,c,f) -> dispHalts s <> "\n" <> dispContinues c <> "\n" <> dispForevers f <> "\n"
     <> show u <> " machines hit an unknown edge"
   where
-  count (t, Unknown _) (a,b,c,d) = (a+1, b, c, d)
+  count (_, Unknown _) (a,b,c,d) = (a+1, b, c, d)
   count (t, Stop steps tape) (a,b,c,d) = (a, (t,steps,tape):b, c, d)
   count (t, ContinueForever proof) (a,b,c,d) = (a,b,c, (t,proof):d)
   count (t, Continue state) (a,b,c,d) = (a, b, (t,state):c, d)
@@ -31,23 +34,27 @@ aggregateResults rs steps = case foldr count (0,[],[],[]) rs of
     "\nthe longest run machines were: " <>
     (show $ view _2 <$> longestRun) <> "\nand the most ones were:" <>
     (show $ ones . view _3 <$> mostOnes)
-  ones :: Tape -> Int
-  ones (Tape ls h rs) = length $ filter (==True) $ ls <> rs <> [h]
+
   dispContinues :: [(Turing, SimState)] -> String
   dispContinues states = show (length states) <> " machines had not halted after "
-    <> show steps <> " steps\n"
+    <> show simSteps <> " steps\n"
     <> ((\s -> s <> "\n\n") . show <$> take 2 $ states)
   dispForevers :: [(Turing, HaltProof)] -> String
-  dispForevers proofs = case foldr sortProofs ([],[],[]) proofs of
-    (noHalts, cycles, simpleInfs)
+  dispForevers proofs = case foldr sortProofs ([],[],[],[]) proofs of
+    (noHalts, cycles, simpleInfs, complexInfs)
       -> show (length proofs) <> " machines were proven to run forever\n"
       <> show (length noHalts) <> " by the halt state's unreachability\n"
       <> show (length cycles) <> " by the machine cycling\n"
       <> show (length simpleInfs)
       <> " by the machine going off one end of the tape in one state forever\n"
-  sortProofs p@(t, HaltUnreachable _) (nhs, cs, infs) = (p:nhs, cs, infs)
-  sortProofs p@(t, Cycle _ _) (nhs, cs, infs) = (nhs, p:cs, infs)
-  sortProofs p@(t, OffToInfinitySimple _ _) (nhs, cs, infs) = (nhs, cs, p:infs)
+      <> show (length complexInfs)
+      <> " by the machine going off one end of the tape in a short cycle forever\n"
+  --TODO :: rewrite this to use _2 etc. from lens so the tuple is polymorphic
+  --TODO :: figure out if there's some partition function that will do this automatically
+  sortProofs p@(_, HaltUnreachable _) (nhs, cs, infs, infsC) = (p:nhs, cs, infs, infsC)
+  sortProofs p@(_, Cycle _ _) (nhs, cs, infs, infsC) = (nhs, p:cs, infs, infsC)
+  sortProofs p@(_, OffToInfinitySimple _ _) (nhs, cs, infs, infsC) = (nhs, cs, p:infs, infsC)
+  sortProofs p@(_, OffToInfinityN _ _) (nhs, cs, infs, infsC) = (nhs, cs, infs, p : infsC)
 
 bb2 :: Turing
 bb2 = Turing {states = 2, transitions = fromList
@@ -70,7 +77,7 @@ loop2 = Turing {states = 2, transitions = fromList
 main :: IO ()
 main = do
   let machines = uniTuring 2
-      simSteps = 30
+      simSteps = 20
       results = (\t -> (t,
         simulateHalt simSteps t `evalState` 0)) <$> machines
       sims = flip evalState 0 $ flip simulateHalt loop2 10

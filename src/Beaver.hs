@@ -15,6 +15,17 @@ data Turing = Turing
   , transitions :: Map Edge Trans
   } deriving (Eq, Ord, Show)
 
+mirrorDir :: Dir -> Dir
+mirrorDir L = R
+mirrorDir R = L
+
+mirrorTrans :: Trans -> Trans
+mirrorTrans Halt = Halt
+mirrorTrans (Step p b d) = Step p b $ mirrorDir d
+
+mirrorTuring :: Turing -> Turing
+mirrorTuring (Turing stateCount transitions)
+  = Turing stateCount $ mirrorTrans <$> transitions where
 
 uniDir :: NonEmpty Dir
 uniDir = L :| [R]
@@ -80,3 +91,6 @@ tapeRight (Tape ls h (r : rs)) = Tape (h : ls) r rs
 
 dispTape :: Tape -> String
 dispTape (Tape ls h rs) = show (reverse ls) <> "  [" <> show h <> "]  " <> show rs
+
+mirrorTape :: Tape -> Tape
+mirrorTape (Tape ls h rs) = Tape rs h ls
