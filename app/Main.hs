@@ -35,14 +35,19 @@ aggregateResults rs steps = case foldr count (0,[],[],[]) rs of
   ones (Tape ls h rs) = length $ filter (==True) $ ls <> rs <> [h]
   dispContinues :: [(Turing, SimState)] -> String
   dispContinues states = show (length states) <> " machines had not halted after "
-    <> show steps <> " steps"
+    <> show steps <> " steps\n"
+    <> ((\s -> s <> "\n\n") . show <$> take 2 $ states)
   dispForevers :: [(Turing, HaltProof)] -> String
-  dispForevers proofs = case foldr sortProofs ([],[]) proofs of
-    (noHalts, cycles) -> show (length proofs) <> " machines were proven to run forever\n"
+  dispForevers proofs = case foldr sortProofs ([],[],[]) proofs of
+    (noHalts, cycles, simpleInfs)
+      -> show (length proofs) <> " machines were proven to run forever\n"
       <> show (length noHalts) <> " by the halt state's unreachability\n"
-      <> show (length cycles) <> " by the machine cycling"
-  sortProofs p@(t, HaltUnreachable _) (nhs, cs) = (p:nhs, cs)
-  sortProofs p@(t, Cycle _ _) (nhs, cs) = (nhs, p:cs)
+      <> show (length cycles) <> " by the machine cycling\n"
+      <> show (length simpleInfs)
+      <> " by the machine going off one end of the tape in one state forever\n"
+  sortProofs p@(t, HaltUnreachable _) (nhs, cs, infs) = (p:nhs, cs, infs)
+  sortProofs p@(t, Cycle _ _) (nhs, cs, infs) = (nhs, p:cs, infs)
+  sortProofs p@(t, OffToInfinitySimple _ _) (nhs, cs, infs) = (nhs, cs, p:infs)
 
 bb2 :: Turing
 bb2 = Turing {states = 2, transitions = fromList
@@ -64,15 +69,14 @@ loop2 = Turing {states = 2, transitions = fromList
 
 main :: IO ()
 main = do
-  let machines = uniTuring 3
-      simSteps = 40
+  let machines = uniTuring 2
+      simSteps = 30
       results = (\t -> (t,
         simulateHalt simSteps t `evalState` 0)) <$> machines
       sims = flip evalState 0 $ flip simulateHalt loop2 10
   --print sims
   putStrLn $ aggregateResults results simSteps
-
-  --print $ testHalt initState bb2
+  print $ testHalt initState bb2
 
   --for_ [0.. 30] (\i -> print $ testHalt initState $ Unsafe.head $ drop i $ toList $ uniTuring 1)
   --print $ Unsafe.head $ drop 0 $ toList $ uniTuring 1

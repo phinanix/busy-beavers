@@ -67,10 +67,15 @@ data Tape = Tape
 --returning nothing if the list ends
 tapeLeft :: Tape -> Tape
 tapeLeft (Tape [] h rs) = Tape [] False (h : rs)
+--when we'd stack an false bit onto the implicitly infinite stack of False,
+--drop it instead
+--tapeLeft (Tape (l : ls) False []) = Tape ls l []
 tapeLeft (Tape (l : ls) h rs) = Tape ls l (h : rs)
 
 tapeRight :: Tape -> Tape
 tapeRight (Tape ls h []) = Tape (h : ls) False []
+--analagous to above
+--tapeRight (Tape [] False (r : rs)) = Tape [] r rs
 tapeRight (Tape ls h (r : rs)) = Tape (h : ls) r rs
 
 dispTape :: Tape -> String

@@ -9,35 +9,46 @@ import Beaver
 --   and any states it transitions to
 -- - Cycle means that the state reached after a number of steps and a greater number
 --   of steps is identical
-data HaltProof = HaltUnreachable Phase | Cycle Steps Steps deriving (Eq, Ord, Show)
+-- - OffToInfinitySimple means that after the given number of steps, the machine will
+--   continue off in the given direction infintitely, never changing states
+data HaltProof
+  = HaltUnreachable Phase
+  | Cycle Steps Steps
+  | OffToInfinitySimple Steps Dir
+  deriving (Eq, Ord, Show)
 
 
 testHalt :: SimState -> Turing -> Maybe HaltProof
-testHalt (phase, _, tape) (Turing stateCount transitions)
-  = if evalState (dfsToHalt phase) (Empty, Empty)
-    then --we can find halt!
-      Nothing
-    else --we can't find halt
-      Just $ HaltUnreachable phase
-    where
+testHalt state@(phase, _, tape) t@(Turing stateCount transitions)
+  =
+    infiniteLeft state t
+  <|> infiniteRight state t
+  <|>
+  evalState (dfsToHalt phase phase) (Empty, Empty)
+  where
   --starts at a phase, maintains a list to explore, and a set of visited phases,
-  --returns true if Halt is reachable ie if there is no proof
-  --    current             to explore next, seen
-  dfsToHalt :: Phase -> State ([Phase], Set Phase) Bool
-  dfsToHalt current = do
+  --returns a proof of Halt's unreachability, if available
+  -- Note that "first" is the very starting phase, used for the proof only
+  --          first      current      to explore next, seen
+  dfsToHalt :: Phase -> Phase -> State ([Phase], Set Phase) (Maybe HaltProof)
+  dfsToHalt first current = do
     b1 <- try current False
     b2 <- try current True
-    if b1 || b2 then pure True else do
-      _2 . contains current .= True
-      use _1 >>= \case
-        --we won't find halt because there is no more to explore
-        [] -> pure False
-        (newPhase : newExploreList) -> do
-          _1 .= newExploreList
-          dfsToHalt newPhase
+    if b1 || b2
+      then pure Nothing --they found halt, so we have no proof
+      else do
+        _2 . contains current .= True
+        use _1 >>= \case
+          --we won't find halt because there is no more to explore
+          [] -> pure $ Just $ HaltUnreachable first
+          (newPhase : newExploreList) -> do
+            _1 .= newExploreList
+            dfsToHalt first newPhase
+  --returns true if it has proven halt is reachable, else false
+  try :: Phase -> Bool -> State ([Phase], Set Phase) Bool
   try phase bit = case transitions ^. at (phase, bit) of
     --if the current state leads to an unknown edge, that unknown edge could
-    --be assigned to halt, thus halt is reachable 
+    --be assigned to halt, thus halt is reachable
     Nothing -> pure True
     --we found halt
     Just Halt -> pure True
@@ -49,12 +60,26 @@ testHalt (phase, _, tape) (Turing stateCount transitions)
       False -> do
         _1 %= ((:) phase1)
         pure False
-
-
-  phaseToTrans :: Phase -> Set Trans
-  phaseToTrans phase = fromList $ fromMaybe Empty $ sequenceA
-    [transitions ^. at (phase, False), transitions ^. at (phase, True)]
-
+  infiniteLeft :: SimState -> Turing -> Maybe HaltProof
+  --suppse we are all the way at the left side of the tape, looking at a False
+  infiniteLeft (phase, steps, Tape [] False rs) (Turing{transitions = trans}) =
+  --and when we transition from this phase and a false, we step left, and stay in the
+  --same phase (doesn't matter what we write)
+      case trans ^. at (phase,False) of
+        --then this pattern repeats forever and we never halt
+        --TODO :: this phase name overwrites the previous phase
+        Just (Step (((==) phase) -> True) _ L) -> Just $ OffToInfinitySimple steps L
+        --else give up
+        _ -> Nothing
+  infiniteLeft _ _ = Nothing
+  --this is analagous to the other case, but mirrored
+  -- TODO :: refactor this to not duplicate so much code
+  infiniteRight :: SimState -> Turing -> Maybe HaltProof
+  infiniteRight (phase, steps, Tape ls False []) (Turing{transitions = trans}) =
+    case trans ^. at (phase, False) of
+      Just (Step (((==) phase) -> True) _ R) -> Just $ OffToInfinitySimple steps R
+      _ -> Nothing
+  infiniteRight _ _ = Nothing
 --
 --the number of steps a machine has taken
 type Steps = Int
