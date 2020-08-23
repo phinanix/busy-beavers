@@ -82,7 +82,7 @@ simpleInfiniteRight simState turing = mirrorHaltProof <$>
   simpleInfiniteLeft (mirrorSimState simState) (mirrorTuring turing)
 
 infiniteSimLimit :: Int
-infiniteSimLimit = 5
+infiniteSimLimit = 20
 
 --suppose the machine is at the RHS of the tape, in some phase, and after i steps
 --returns to the RHS of the tape, in that phase. Further, suppose the machine traveled
@@ -145,8 +145,15 @@ type SimState = (Phase, Steps, Tape)
 mirrorSimState :: SimState -> SimState
 mirrorSimState = fmap mirrorTape
 
+showInt3Wide :: Int -> String
+showInt3Wide i@((\i -> i < 10) -> True) = "  " <> show i
+showInt3Wide i@((\i -> i < 100) -> True) = " " <> show i
+showInt3Wide i = show i
+
 dispSimState :: SimState -> String
-dispSimState (phase, steps, tape) = "after " <> show steps <> " steps, state: " <> show phase <> " tape: " <> dispTape tape
+dispSimState (phase, steps, tape) = "step: " <> showInt3Wide steps
+  <> " state: " <> show phase
+  <> " tape: " <> dispTape tape
 
 eqStates :: SimState -> SimState -> Bool
 eqStates (p, _, t) (p', _, t') = (p == p') && (t == t')
@@ -161,9 +168,13 @@ data SimResult = Unknown Edge | Stop Steps Tape
 initState :: SimState
 initState = (Phase 0, 0, Tape [] False [])
 
+dispStartState :: SimState
+dispStartState = (Phase 0, 0, Tape falses False falses) where
+  falses = take 12 $ repeat False
+
 simStepWithDir :: Turing -> SimState -> (SimResult, Maybe Dir)
 simStepWithDir (Turing _ trans ) (i, steps, (Tape ls bit rs))
-  = case trans ^. at (i, bit) of
+  = case trans ^. a`t (i, bit) of
     Nothing -> (Unknown (i, bit), Nothing)
     --we assume WLOG that the machine goes left and writes True when it halts
     Just Halt ->
@@ -238,7 +249,8 @@ simulateHalt steps t = case simStep t initState of --start off Bigstate at initS
               _ -> error "small state didn't continue, but we already checked it does"
 
 dispResult :: SimResult -> String
-dispResult (Unknown edge) = "Simulating got stuck on " <> show edge
-dispResult (Stop steps tape) = "Simulating finished after " <> show steps <> " steps, with the tape: " <> dispTape tape
-dispResult (Continue state) = "Simulating didn't finish, we reached state: " <> dispSimState state
+dispResult (Unknown edge) = "Edge: " <> show edge <> " was unknown"
+dispResult (Stop steps tape) = "After " <> show steps
+  <> " steps, the machine halted with the tape: \n" <> dispTape tape
+dispResult (Continue state) = "continue: " <> dispSimState state
 dispResult (ContinueForever proof) = "we proved the machine will go forever via: " <> show proof

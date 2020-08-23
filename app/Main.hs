@@ -10,6 +10,14 @@ import HaltProof
 ones :: Tape -> Int
 ones (Tape ls h rs) = length $ filter (==True) $ ls <> rs <> [h]
 
+takeNeveryM :: Int -> Int -> [a] -> [a]
+takeNeveryM n m xs = go n m 0 xs where
+  go :: Int -> Int -> Int -> [a] -> [a]
+  go _ _ _ [] = []
+  go 0 _ _ _ = []
+  go n m 0 (x : xs) = x : go (n - 1) m 1 xs
+  go n m i (_ : xs) = go n m ((i+1) `mod` m) xs
+
 aggregateResults :: Foldable t => t (Turing, SimResult) -> Steps -> String
 aggregateResults rs simSteps = case foldr count (0::Int,[],[],[]) rs of
   (u,s,c,f) -> dispHalts s <> "\n" <> dispContinues c <> "\n" <> dispForevers f <> "\n"
@@ -38,7 +46,9 @@ aggregateResults rs simSteps = case foldr count (0::Int,[],[],[]) rs of
   dispContinues :: [(Turing, SimState)] -> String
   dispContinues states = show (length states) <> " machines had not halted after "
     <> show simSteps <> " steps\n"
-    <> ((\s -> s <> "\n\n") . show <$> take 2 $ states)
+    <> mconcat (--(\i -> show i <> "\n")
+                (\(t,s) -> dispTuring t <> "\n" <> dispSimState s <> "\n\n")
+                <$> takeNeveryM 5 5 states)
   dispForevers :: [(Turing, HaltProof)] -> String
   dispForevers proofs = case foldr sortProofs ([],[],[],[]) proofs of
     (noHalts, cycles, simpleInfs, complexInfs)
@@ -55,6 +65,12 @@ aggregateResults rs simSteps = case foldr count (0::Int,[],[],[]) rs of
   sortProofs p@(_, Cycle _ _) (nhs, cs, infs, infsC) = (nhs, p:cs, infs, infsC)
   sortProofs p@(_, OffToInfinitySimple _ _) (nhs, cs, infs, infsC) = (nhs, cs, p:infs, infsC)
   sortProofs p@(_, OffToInfinityN _ _) (nhs, cs, infs, infsC) = (nhs, cs, infs, p : infsC)
+
+showOneMachine :: Turing -> Steps -> String
+showOneMachine t n = dispTuring t <> "\n" <> (mconcat $
+  (\steps -> dispResult (simulate steps dispStartState t `evalState` 0) <> "\n") <$>
+  [0.. n]
+  )
 
 bb2 :: Turing
 bb2 = Turing {states = 2, transitions = fromList
@@ -74,17 +90,38 @@ loop2 = Turing {states = 2, transitions = fromList
   ,((Phase {unPhase = 1},True),Halt)
   ]}
 
+--this halted after a bit more time to simulate the OffToInfinityN proof
+not_halt3 :: Turing
+not_halt3 = Turing {states = 3, transitions = fromList [((Phase {unPhase = 0},False),Step (Phase {unPhase = 1}) False L),((Phase {unPhase = 0},True),Halt),((Phase {unPhase = 1},False),Step (Phase {unPhase = 0}) True R),((Phase {unPhase = 1},True),Step (Phase {unPhase = 2}) False L),((Phase {unPhase = 2},False),Step (Phase {unPhase = 1}) True R),((Phase {unPhase = 2},True),Step (Phase {unPhase = 0}) True L)]}
+
+--woah, this is a counting machine !!!
+weird3 :: Turing
+weird3 = Turing {states = 3, transitions = fromList
+  [((Phase {unPhase = 0},False),Step (Phase {unPhase = 1}) False L)
+  ,((Phase {unPhase = 0},True) ,Step (Phase {unPhase = 0}) False R)
+  ,((Phase {unPhase = 1},False),Step (Phase {unPhase = 2}) True L)
+  ,((Phase {unPhase = 1},True ),Halt)
+  ,((Phase {unPhase = 2},False),Step (Phase {unPhase = 0}) True R)
+  ,((Phase {unPhase = 2},True ),Step (Phase {unPhase = 2}) True L)
+  ]}
+
+almostweird3 :: Turing
+almostweird3 = Turing {states = 3, transitions = fromList
+  [((Phase {unPhase = 0},False),Step (Phase {unPhase = 2}) False L)
+  ,((Phase {unPhase = 0},True) ,Step (Phase {unPhase = 0}) False R)
+  ,((Phase {unPhase = 1},False),Step (Phase {unPhase = 2}) True L)
+  ,((Phase {unPhase = 1},True ),Halt)
+  ,((Phase {unPhase = 2},False),Step (Phase {unPhase = 0}) True R)
+  ,((Phase {unPhase = 2},True ),Step (Phase {unPhase = 2}) True L)
+  ]}
+
+
 main :: IO ()
 main = do
   let machines = uniTuring 2
-      simSteps = 20
+      simSteps = 12
       results = (\t -> (t,
         simulateHalt simSteps t `evalState` 0)) <$> machines
-      sims = flip evalState 0 $ flip simulateHalt loop2 10
-  --print sims
   putStrLn $ aggregateResults results simSteps
-  print $ testHalt initState bb2
-
-  --for_ [0.. 30] (\i -> print $ testHalt initState $ Unsafe.head $ drop i $ toList $ uniTuring 1)
-  --print $ Unsafe.head $ drop 0 $ toList $ uniTuring 1
-  --print $ Unsafe.head $ drop 6 $ toList $ uniTuring 1
+  --print $ testHalt initState bb2
+  --putStrLn $ showOneMachine almostweird3 201
