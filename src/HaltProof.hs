@@ -174,7 +174,7 @@ dispStartState = (Phase 0, 0, Tape falses False falses) where
 
 simStepWithDir :: Turing -> SimState -> (SimResult, Maybe Dir)
 simStepWithDir (Turing _ trans ) (i, steps, (Tape ls bit rs))
-  = case trans ^. a`t (i, bit) of
+  = case trans ^. at (i, bit) of
     Nothing -> (Unknown (i, bit), Nothing)
     --we assume WLOG that the machine goes left and writes True when it halts
     Just Halt ->
