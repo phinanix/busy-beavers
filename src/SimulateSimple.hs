@@ -1,4 +1,4 @@
-module HaltProof where
+module SimulateSimple where
 import Relude hiding (state)
 import Control.Lens
 

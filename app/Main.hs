@@ -7,6 +7,7 @@ import Control.Lens
 import Beaver
 import HaltProof
 import Display
+
 bb2 :: Turing
 bb2 = Turing {states = 2, transitions = fromList
   [((Phase {unPhase = 0},False),Step (Phase {unPhase = 1}) True L)
