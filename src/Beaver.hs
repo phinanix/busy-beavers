@@ -3,17 +3,22 @@ import Control.Lens
 import Relude hiding (state)
 import Relude.Unsafe as Unsafe (init, last)
 --the Phase a turing machine is in, to not conflict with State
-newtype Phase = Phase { unPhase :: Int} deriving (Eq, Ord, Show)
-data Dir = L | R deriving (Eq, Ord, Show)
+newtype Phase = Phase { unPhase :: Int} deriving (Eq, Ord, Show, Generic)
+data Dir = L | R deriving (Eq, Ord, Show, Generic)
 type Bit = Bool
 type Edge = (Phase, Bit)
-data Trans = Halt | Step Phase Bit Dir deriving (Eq, Ord, Show)
+data Trans = Halt | Step Phase Bit Dir deriving (Eq, Ord, Show, Generic)
 
 --a Turing machine
 data Turing = Turing
   { states :: Int --the number of states a machine has
   , transitions :: Map Edge Trans
-  } deriving (Eq, Ord, Show)
+  } deriving (Eq, Ord, Show, Generic)
+
+instance NFData Phase
+instance NFData Dir
+instance NFData Trans
+instance NFData Turing
 
 dispBit :: Bit -> String
 dispBit False = "0"
@@ -72,9 +77,9 @@ uniTrans n = Halt :| toList (do
 --this universe is made of maps that have all the given keys, each associated with
 --every possible value
 uniMap :: forall k v. Ord k => NonEmpty k -> NonEmpty v -> NonEmpty (Map k v)
-uniMap ks vs = foldlM addKey Empty ks where
+uniMap ks vs = foldlM (addKey) Empty ks where
   addKey :: Map k v -> k -> NonEmpty (Map k v)
-  addKey m k = do
+  addKey !m k = do
     v <- vs
     pure $ m & at k ?~ v
 
@@ -89,7 +94,8 @@ data Tape = Tape
   { left :: [Bit]
   , point :: Bit
   , right :: [Bit]
-  } deriving (Eq, Ord, Show)
+  } deriving (Eq, Ord, Show, Generic)
+instance NFData Tape
 
 
 --TODO:: modify this so that it never accumulates zeros where it should not

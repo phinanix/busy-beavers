@@ -31,17 +31,17 @@ aggregateResults rs simSteps = case foldr count (0::Int,[],[],[]) rs of
   dispHalts halts =
     let
     numHalted = length halts
-    --longestRun = take 10 $ sortOn (Down . fst) halts
+    --TODO :: don't store this in memory to avoid memory leak!
     longestRun = take 10 $ sortOn (Down . view _2) halts
     mostOnes = take 10 $ sortOn (Down . ones . view _3) halts
     in
-    show numHalted <> " machines halted, with the most steps being: " <>
-    (show $ view _2 <$> take 1 longestRun) <> " and the most ones being: " <>
-    (show $ ones . view _3 <$> take 1 mostOnes) <> " by the respective machines:\n" <>
-    (show $ view _1 <$> take 1 longestRun) <> "\n\n" <> (show $ view _1 <$> take 1 mostOnes) <>
-    "\nthe longest run machines were: " <>
-    (show $ view _2 <$> longestRun) <> "\nand the most ones were:" <>
-    (show $ ones . view _3 <$> mostOnes)
+    show numHalted <> " machines halted, with the most steps being: "
+    -- <> (show $ view _2 <$> take 1 longestRun) <> " and the most ones being: " <>
+    -- (show $ ones . view _3 <$> take 1 mostOnes) <> " by the respective machines:\n" <>
+    -- (show $ view _1 <$> take 1 longestRun) <> "\n\n" <> (show $ view _1 <$> take 1 mostOnes) <>
+    -- "\nthe longest run machines were: " <>
+    -- (show $ view _2 <$> longestRun) <> "\nand the most ones were:" <>
+    -- (show $ ones . view _3 <$> mostOnes)
 
   dispContinues :: [(Turing, SimState)] -> String
   dispContinues states = show (length states) <> " machines had not halted after "
@@ -115,12 +115,11 @@ almostweird3 = Turing {states = 3, transitions = fromList
   ,((Phase {unPhase = 2},True ),Step (Phase {unPhase = 2}) True L)
   ]}
 
-
 main :: IO ()
 main = do
-  let machines = uniTuring 2
-      simSteps = 12
-      results = (\t -> (t,
+  let machines = uniTuring 3
+      simSteps = 25
+      results = (\t -> force (t,
         simulateHalt simSteps t `evalState` 0)) <$> machines
   putStrLn $ aggregateResults results simSteps
   --print $ testHalt initState bb2

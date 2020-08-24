@@ -19,7 +19,8 @@ data HaltProof
   | Cycle Steps Steps
   | OffToInfinitySimple Steps Dir
   | OffToInfinityN Steps Dir
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic)
+instance NFData HaltProof
 
 mirrorHaltProof :: HaltProof -> HaltProof
 mirrorHaltProof (OffToInfinityN s d) = OffToInfinityN s $ mirrorDir d
@@ -41,7 +42,7 @@ dfsToHalt t@(Turing _ transitions) first current = do
       use _1 >>= \case
       --we won't find halt because there is no more to explore
         [] -> pure $ Just $ HaltUnreachable first
-        (newPhase : newExploreList) -> do
+        ((!newPhase) : (!newExploreList)) -> do
           _1 .= newExploreList
           dfsToHalt t first newPhase
   where
@@ -136,7 +137,6 @@ testHalt s@(phase, _, _) t
   <|> evalState (dfsToHalt t phase phase) (Empty, Empty)
   <|> infiniteLeft s t
   <|> infiniteRight s t
-  where
 --
 --the number of steps a machine has taken
 type Steps = Int
@@ -163,7 +163,9 @@ eqStates (p, _, t) (p', _, t') = (p == p') && (t == t')
 --Continue means the machine hasn't halted and the current state is given
 --ContinueForever means the machine has been proven to run forever
 data SimResult = Unknown Edge | Stop Steps Tape
-  | Continue SimState | ContinueForever HaltProof deriving (Eq, Ord, Show)
+  | Continue SimState | ContinueForever HaltProof deriving (Eq, Ord, Show, Generic)
+
+instance NFData SimResult
 
 initState :: SimState
 initState = (Phase 0, 0, Tape [] False [])

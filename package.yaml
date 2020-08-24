@@ -87,6 +87,7 @@ default-extensions:
   - QuasiQuotes
   - RankNTypes
   - ScopedTypeVariables
+  - StrictData
   - StandaloneDeriving
   - TupleSections
   - TypeApplications
