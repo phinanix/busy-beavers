@@ -20,23 +20,6 @@ instance NFData Dir
 instance NFData Trans
 instance NFData Turing
 
-dispBit :: Bit -> String
-dispBit False = "0"
-dispBit True = "1"
-
-dispEdge :: Edge -> String
-dispEdge (p, b) = show p <> " " <> show b
-
-dispTrans :: Trans -> String
-dispTrans Halt = "Halt"
-dispTrans (Step p b d) = show p <> " " <> show b <> " " <> show d
-
-dispET :: Edge -> Trans -> String
-dispET e t = dispEdge e <> " | " <> dispTrans t <> "\n"
-
-dispTuring :: Turing -> String
-dispTuring (Turing states transitions) = (ifoldMap dispET transitions) <> "\n"
-
 mirrorDir :: Dir -> Dir
 mirrorDir L = R
 mirrorDir R = L
@@ -115,13 +98,6 @@ tapeRight (Tape [] False []) = Tape [] False []
 tapeRight (Tape [] False (r : rs)) = Tape [] r rs
 tapeRight (Tape ls h []) = Tape (h : ls) False []
 tapeRight (Tape ls h (r : rs)) = Tape (h : ls) r rs
-
-dispTape :: Tape -> String
-dispTape (Tape ls h rs) = dispBits (reverse ls) <> ">" <> dispBit h <> "<" <> dispBits rs where
-  dispBits :: [Bit] -> String
-  dispBits [] = ""
-  dispBits bits = mconcat ((\i -> dispBit i <> " ") <$> Unsafe.init bits)
-    <> dispBit (Unsafe.last bits)
 
 mirrorTape :: Tape -> Tape
 mirrorTape (Tape ls h rs) =  Tape rs h ls

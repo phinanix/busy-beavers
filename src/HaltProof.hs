@@ -145,16 +145,6 @@ type SimState = (Phase, Steps, Tape)
 mirrorSimState :: SimState -> SimState
 mirrorSimState = fmap mirrorTape
 
-showInt3Wide :: Int -> String
-showInt3Wide i@((\i -> i < 10) -> True) = "  " <> show i
-showInt3Wide i@((\i -> i < 100) -> True) = " " <> show i
-showInt3Wide i = show i
-
-dispSimState :: SimState -> String
-dispSimState (phase, steps, tape) = "step: " <> showInt3Wide steps
-  <> " state: " <> show phase
-  <> " tape: " <> dispTape tape
-
 eqStates :: SimState -> SimState -> Bool
 eqStates (p, _, t) (p', _, t') = (p == p') && (t == t')
 --Unknown means we don't know how to make progress
@@ -249,10 +239,3 @@ simulateHalt steps t = case simStep t initState of --start off Bigstate at initS
               (Continue littleState1)
                 -> simulateHaltHelper (steps - 1) (littleState1, bigState2) t
               _ -> error "small state didn't continue, but we already checked it does"
-
-dispResult :: SimResult -> String
-dispResult (Unknown edge) = "Edge: " <> show edge <> " was unknown"
-dispResult (Stop steps tape) = "After " <> show steps
-  <> " steps, the machine halted with the tape: \n" <> dispTape tape
-dispResult (Continue state) = "continue: " <> dispSimState state
-dispResult (ContinueForever proof) = "we proved the machine will go forever via: " <> show proof
