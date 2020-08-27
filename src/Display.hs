@@ -8,7 +8,6 @@ import Relude.Unsafe as Unsafe (init, last)
 import Beaver
 import SimulateSimple
 
-
 showInt3Wide :: Int -> String
 showInt3Wide i@((\i -> i < 10) -> True) = "  " <> show i
 showInt3Wide i@((\i -> i < 100) -> True) = " " <> show i
@@ -29,7 +28,7 @@ dispET :: Edge -> Trans -> String
 dispET e t = dispEdge e <> " | " <> dispTrans t <> "\n"
 
 dispTuring :: Turing -> String
-dispTuring (Turing states transitions) = (ifoldMap dispET transitions) <> "\n"
+dispTuring (Turing _ transitions) = (ifoldMap dispET transitions) <> "\n"
 
 dispTape :: Tape -> String
 dispTape (Tape ls h rs) = dispBits (reverse ls) <> ">" <> dispBit h <> "<" <> dispBits rs where
@@ -55,9 +54,8 @@ showOneMachine t n = dispTuring t <> "\n" <> (mconcat $
   [0.. n]
   )
 
---
-aggregateResults :: Foldable t => t (Turing, SimResult) -> Steps -> String
-aggregateResults rs simSteps = case foldr count ([],[],[]) rs of
+aggregateResultList :: Foldable t => t (Turing, SimResult) -> Steps -> String
+aggregateResultList rs simSteps = case foldr count ([],[],[]) rs of
   (s,c,f) -> dispHalts s <> "\n" <> dispContinues c <> "\n" <> dispForevers f <> "\n"
   where
   count (t, Halted steps tape) (b,c,d) = ((t,steps,tape):b, c, d)
@@ -101,6 +99,13 @@ aggregateResults rs simSteps = case foldr count ([],[],[]) rs of
   sortProofs p@(_, Cycle _ _) (nhs, cs, infs, infsC) = (nhs, p:cs, infs, infsC)
   sortProofs p@(_, OffToInfinitySimple _ _) (nhs, cs, infs, infsC) = (nhs, cs, p:infs, infsC)
   sortProofs p@(_, OffToInfinityN _ _) (nhs, cs, infs, infsC) = (nhs, cs, infs, p : infsC)
+
+--first arg is how many states the TMs have, second arg is the step limit to stop at
+simpleSimulator :: Int -> Int -> String
+simpleSimulator universe limit = let
+    results = (\t -> force (t,
+      simulateHalt limit t)) <$> uniTuring universe
+    in aggregateResultList results limit
 
 takeNeveryM :: Int -> Int -> [a] -> [a]
 takeNeveryM n m xs = go n m 0 xs where
