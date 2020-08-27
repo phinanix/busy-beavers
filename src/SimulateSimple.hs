@@ -103,21 +103,16 @@ infiniteRight startState@(startPhase, originalSteps, Tape startLs False []) t
   --we hit our step limit
   step ((\i -> i >= infiniteSimLimit) -> True) _ _ _ = Nothing
   --here, distance is negative, so we just simulate another step
-  step steps dist@((\d -> d <= 0) -> True) maxL s = case simStepWithDir t s of
-    --here, distance is positive, so we have a chance to fulfull the conditions
-    (Continue s', Just L) -> step (steps + 1) (dist - 1) (newMax maxL (dist - 1)) s'
-    (Continue s', Just R) -> step (steps + 1) (dist + 1) maxL s'
-    _ -> Nothing
+  step steps dist@((\d -> d <= 0) -> True) maxL s = stepRecurse steps dist maxL s
+  --here, distance is positive, so we have a chance to fulfull the conditions
   --to prove infinite rightward movement
   step steps dist maxL s@(((==) startPhase) -> True, _, Tape ls False []) =
     if take maxL ls == take maxL startLs then Just $ OffToInfinityN originalSteps R
-    else case simStepWithDir t s of
-      (Continue s', Just L) -> step (steps + 1) (dist - 1) (newMax maxL (dist - 1)) s'
-      (Continue s', Just R) -> step (steps + 1) (dist + 1) maxL s'
-      _ -> Nothing
-  step steps dist maxL s = case simStepWithDir t s of
-    (Continue s', Just L) -> step (steps + 1) (dist - 1) (newMax maxL (dist - 1)) s'
-    (Continue s', Just R) -> step (steps + 1) (dist + 1) maxL s'
+    else stepRecurse steps dist maxL s
+  step steps dist maxL s = stepRecurse steps dist maxL s
+  stepRecurse steps dist maxL s = case simStepWithDir t s of
+    (Stepped s', L) -> step (steps + 1) (dist - 1) (newMax maxL (dist - 1)) s'
+    (Stepped s', R) -> step (steps + 1) (dist + 1) maxL s'
     _ -> Nothing
   --first arg is old max, second arg is (signed) distance
   --max can only be beaten by a negative distance, since it's the farthest left
@@ -145,17 +140,21 @@ type SimState = (Phase, Steps, Tape)
 mirrorSimState :: SimState -> SimState
 mirrorSimState = fmap mirrorTape
 
-eqStates :: SimState -> SimState -> Bool
-eqStates (p, _, t) (p', _, t') = (p == p') && (t == t')
+data TotalStepResult = Stopped Steps Tape | Stepped SimState
+
 --Unknown means we don't know how to make progress
 --from the current state, because it isn't in the transition map
 --Stop means the machine halted with the given tape
 --Continue means the machine hasn't halted and the current state is given
 --ContinueForever means the machine has been proven to run forever
-data SimResult = Unknown Edge | Stop Steps Tape
+data SimResult = Halted Steps Tape
   | Continue SimState | ContinueForever HaltProof deriving (Eq, Ord, Show, Generic)
 
 instance NFData SimResult
+
+stepRtoSimR :: TotalStepResult -> SimResult
+stepRtoSimR (Stopped steps tape) = Halted steps tape
+stepRtoSimR (Stepped s) = Continue s
 
 initState :: SimState
 initState = (Phase 0, 0, Tape [] False [])
@@ -164,78 +163,56 @@ dispStartState :: SimState
 dispStartState = (Phase 0, 0, Tape falses False falses) where
   falses = take 12 $ repeat False
 
-simStepWithDir :: Turing -> SimState -> (SimResult, Maybe Dir)
+simStepWithDir :: Turing -> SimState -> (TotalStepResult, Dir)
 simStepWithDir (Turing _ trans ) (i, steps, (Tape ls bit rs))
   = case trans ^. at (i, bit) of
-    Nothing -> (Unknown (i, bit), Nothing)
+    Nothing -> error "Total Turing machine wasn't total"
     --we assume WLOG that the machine goes left and writes True when it halts
     Just Halt ->
-      (Stop (steps + 1) $ tapeLeft $ Tape ls True rs, Just L)
+      (Stopped (steps + 1) $ tapeLeft $ Tape ls True rs, L)
     Just (Step j newBit L) ->
-      (Continue $ (j, steps + 1, tapeLeft $ Tape ls newBit rs), Just L)
+      (Stepped (j, steps + 1, tapeLeft $ Tape ls newBit rs), L)
     Just (Step j newBit R) ->
-      (Continue $ (j, steps + 1, tapeRight $ Tape ls newBit rs), Just R)
+      (Stepped (j, steps + 1, tapeRight $ Tape ls newBit rs), R)
 
-simStep :: Turing -> SimState -> SimResult
+simStep :: Turing -> SimState -> TotalStepResult
 simStep t s = fst $ simStepWithDir t s
 
---
 --simulates a machine for the given number of steps, where the state is the number
 --of steps taken so far
-simulate :: Int -> SimState -> Turing -> State Steps SimResult
-simulate ( (\i -> i <= 0) -> True) state _ = pure $ Continue state
-simulate steps state turing = do
-  modify (+1)
-  case simStep turing state of
-    result@(Unknown _) -> pure result
-    result@(Stop _ _) -> pure result
-    (Continue newState) -> simulate (steps - 1) newState turing
+simulate :: Int -> SimState -> Turing -> SimResult
+simulate limit state@(_, (\i -> i > limit) -> True, _) _ = Continue state
+simulate limit state turing = case simStep turing state of
+    result@(Stopped _ _) -> stepRtoSimR result
+    (Stepped newState) -> simulate limit newState turing
 
+--checks if the slow simulation has run into the fast simulation, which of course
+--is trivially true at t=0 but we want rule that out
+collision :: SimState -> SimState -> Bool
+collision (p, steps, t) (p', _, t') = (p == p') && (t == t') && (steps > 0)
 
---simulates a machine for the given number of steps, working to prove it runs forever
-
-simulateHalt :: Int -> Turing -> State Steps SimResult
-simulateHalt steps t = case simStep t initState of --start off Bigstate at initState
-  result@(Unknown _) -> pure result
-  result@(Stop _ _) -> pure result
-  (Continue bigState1) -> do
-    modify (+1)
-    --step bigState again
-    case simStep t bigState1 of --step bigState again
-      result@(Unknown _) -> pure result
-      result@(Stop _ _) -> pure result
-      (Continue bigState2) -> case testHalt bigState2 t of
-        Just haltProof -> pure $ ContinueForever haltProof
-        --step littleState once
-        Nothing -> case simStep t initState of --start off littleState at initState
-          (Continue littleState1)
-            -> simulateHaltHelper (steps - 1) (littleState1, bigState2) t
-          _ -> error "small state didn't continue, but we already checked it does"
-  where
+--simulates a machine for at most the given limit steps, working to prove it runs forever
+simulateHalt :: Int -> Turing -> SimResult
+simulateHalt limit t = simulateHaltHelper limit (initState, initState) t where
   --first element of tuple is smallStep, second is bigStep, advancing at twice the rate
   --if smallStep ever == bigstep, then we have found a cycle
-  simulateHaltHelper :: Int -> (SimState, SimState) -> Turing -> State Steps SimResult
-  simulateHaltHelper ( (\i -> i <= 0) -> True) (_, state) _ = pure $ Continue state
-  simulateHaltHelper _ (uncurry eqStates -> True) _ = do
-    stepsTaken <- get
-    pure $ ContinueForever $ Cycle (stepsTaken `div` 2) stepsTaken
-  simulateHaltHelper steps (littleState, bigState) t = do
-    --trace ("little then big\n" <> show littleState <> "\n" <> show bigState <> "\n") $
-    modify (+1)
+  simulateHaltHelper :: Int -> (SimState, SimState) -> Turing -> SimResult
+  simulateHaltHelper limit (_, state@(_, (\i -> i > limit) -> True, _)) _ = Continue state
+  simulateHaltHelper _ states@(uncurry collision -> True) _ = let
+    ((_, smallSteps, _), (_, largeSteps, _)) = states in
+    ContinueForever $ Cycle smallSteps largeSteps
+  simulateHaltHelper limit (littleState, bigState) t =
     --step bigState once
     case simStep t bigState of
-      result@(Unknown _) -> pure result
-      result@(Stop _ _) -> pure result
-      (Continue bigState1) -> do
-        modify (+1)
+      result@(Stopped _ _) -> stepRtoSimR result
+      (Stepped bigState1) ->
         --step bigState again
         case simStep t bigState1 of
-          result@(Unknown _) -> pure result
-          result@(Stop _ _) -> pure result
-          (Continue bigState2) -> case testHalt bigState2 t of
-            Just haltProof -> pure $ ContinueForever haltProof
+          result@(Stopped _ _) -> stepRtoSimR result
+          (Stepped bigState2) -> case testHalt bigState2 t of
+            Just haltProof -> ContinueForever haltProof
             --step littleState once
             Nothing -> case simStep t littleState of
-              (Continue littleState1)
-                -> simulateHaltHelper (steps - 1) (littleState1, bigState2) t
+              (Stepped littleState1)
+                -> simulateHaltHelper limit (littleState1, bigState2) t
               _ -> error "small state didn't continue, but we already checked it does"

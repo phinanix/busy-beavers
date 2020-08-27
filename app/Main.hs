@@ -54,9 +54,9 @@ almostweird3 = Turing {states = 3, transitions = fromList
 main :: IO ()
 main = do
   let machines = uniTuring 3
-      simSteps = 25
+      simSteps = 50
       results = (\t -> force (t,
-        simulateHalt simSteps t `evalState` 0)) <$> machines
+        simulateHalt simSteps t)) <$> machines
   putStrLn $ aggregateResults results simSteps
   --print $ testHalt initState bb2
   --putStrLn $ showOneMachine almostweird3 201

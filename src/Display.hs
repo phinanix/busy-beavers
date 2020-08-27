@@ -44,28 +44,25 @@ dispSimState (phase, steps, tape) = "step: " <> showInt3Wide steps
   <> " tape: " <> dispTape tape
 
 dispResult :: SimResult -> String
-dispResult (Unknown edge) = "Edge: " <> show edge <> " was unknown"
-dispResult (Stop steps tape) = "After " <> show steps
+dispResult (Halted steps tape) = "After " <> show steps
   <> " steps, the machine halted with the tape: \n" <> dispTape tape
 dispResult (Continue state) = "continue: " <> dispSimState state
 dispResult (ContinueForever proof) = "we proved the machine will go forever via: " <> show proof
 
 showOneMachine :: Turing -> Steps -> String
 showOneMachine t n = dispTuring t <> "\n" <> (mconcat $
-  (\steps -> dispResult (simulate steps dispStartState t `evalState` 0) <> "\n") <$>
+  (\steps -> dispResult (simulate steps dispStartState t) <> "\n") <$>
   [0.. n]
   )
 
 --
 aggregateResults :: Foldable t => t (Turing, SimResult) -> Steps -> String
-aggregateResults rs simSteps = case foldr count (0::Int,[],[],[]) rs of
-  (u,s,c,f) -> dispHalts s <> "\n" <> dispContinues c <> "\n" <> dispForevers f <> "\n"
-    <> show u <> " machines hit an unknown edge"
+aggregateResults rs simSteps = case foldr count ([],[],[]) rs of
+  (s,c,f) -> dispHalts s <> "\n" <> dispContinues c <> "\n" <> dispForevers f <> "\n"
   where
-  count (_, Unknown _) (a,b,c,d) = (a+1, b, c, d)
-  count (t, Stop steps tape) (a,b,c,d) = (a, (t,steps,tape):b, c, d)
-  count (t, ContinueForever proof) (a,b,c,d) = (a,b,c, (t,proof):d)
-  count (t, Continue state) (a,b,c,d) = (a, b, (t,state):c, d)
+  count (t, Halted steps tape) (b,c,d) = ((t,steps,tape):b, c, d)
+  count (t, ContinueForever proof) (b,c,d) = (b,c, (t,proof):d)
+  count (t, Continue state) (b,c,d) = (b, (t,state):c, d)
   dispHalts :: [(Turing, Steps, Tape)] -> String
   dispHalts halts =
     let
@@ -75,12 +72,12 @@ aggregateResults rs simSteps = case foldr count (0::Int,[],[],[]) rs of
     mostOnes = take 10 $ sortOn (Down . ones . view _3) halts
     in
     show numHalted <> " machines halted, with the most steps being: "
-    -- <> (show $ view _2 <$> take 1 longestRun) <> " and the most ones being: " <>
-    -- (show $ ones . view _3 <$> take 1 mostOnes) <> " by the respective machines:\n" <>
-    -- (show $ view _1 <$> take 1 longestRun) <> "\n\n" <> (show $ view _1 <$> take 1 mostOnes) <>
-    -- "\nthe longest run machines were: " <>
-    -- (show $ view _2 <$> longestRun) <> "\nand the most ones were:" <>
-    -- (show $ ones . view _3 <$> mostOnes)
+    <> (show $ view _2 <$> take 1 longestRun) <> " and the most ones being: " <>
+    (show $ ones . view _3 <$> take 1 mostOnes) <> " by the respective machines:\n" <>
+    (show $ view _1 <$> take 1 longestRun) <> "\n\n" <> (show $ view _1 <$> take 1 mostOnes) <>
+    "\nthe longest run machines were: " <>
+    (show $ view _2 <$> longestRun) <> "\nand the most ones were:" <>
+    (show $ ones . view _3 <$> mostOnes)
 
   dispContinues :: [(Turing, SimState)] -> String
   dispContinues states = show (length states) <> " machines had not halted after "
