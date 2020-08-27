@@ -101,9 +101,6 @@ aggregateResults rs simSteps = case foldr count ([],[],[]) rs of
   sortProofs p@(_, Cycle _ _) (nhs, cs, infs, infsC) = (nhs, p:cs, infs, infsC)
   sortProofs p@(_, OffToInfinitySimple _ _) (nhs, cs, infs, infsC) = (nhs, cs, p:infs, infsC)
   sortProofs p@(_, OffToInfinityN _ _) (nhs, cs, infs, infsC) = (nhs, cs, infs, p : infsC)
---
-ones :: Tape -> Int
-ones (Tape ls h rs) = length $ filter (==True) $ ls <> rs <> [h]
 
 takeNeveryM :: Int -> Int -> [a] -> [a]
 takeNeveryM n m xs = go n m 0 xs where

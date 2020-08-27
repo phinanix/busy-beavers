@@ -101,3 +101,6 @@ tapeRight (Tape ls h (r : rs)) = Tape (h : ls) r rs
 
 mirrorTape :: Tape -> Tape
 mirrorTape (Tape ls h rs) =  Tape rs h ls
+
+ones :: Tape -> Int
+ones (Tape ls h rs) = length $ filter (==True) $ ls <> rs <> [h]
