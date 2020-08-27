@@ -1,4 +1,4 @@
-module Display where
+module DisplaySimple where
 --functions for displaying my types nicely
 
 import Control.Lens
