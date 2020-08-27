@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 47158af4a003044d56945bd8311066e14790f61b1da5268d8d27f0bf07fc9b96
+-- hash: 775d612192cb04367b6c8452bb58a48f53bd5b99940ec32635cad1fe3fdeae5b
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -28,8 +28,9 @@ source-repository head
 library
   exposed-modules:
       Beaver
-      HaltProof
-      Lib
+      Display
+      Simulate
+      SimulateSimple
   other-modules:
       Paths_busy_beavers
   hs-source-dirs:

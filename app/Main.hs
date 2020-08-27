@@ -5,7 +5,7 @@ import Relude.Unsafe as Unsafe
 import Control.Lens
 
 import Beaver
-import HaltProof
+import SimulateSimple
 import Display
 
 bb2 :: Turing

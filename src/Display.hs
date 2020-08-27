@@ -3,9 +3,11 @@ module Display where
 
 import Control.Lens
 import Relude hiding (state)
+import Relude.Unsafe as Unsafe (init, last)
 
 import Beaver
-import HaltProof
+import SimulateSimple
+
 
 showInt3Wide :: Int -> String
 showInt3Wide i@((\i -> i < 10) -> True) = "  " <> show i
