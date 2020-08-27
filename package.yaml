@@ -96,6 +96,8 @@ default-extensions:
   - ViewPatterns
 ghc-options:
   - -Wall
+  - -Wno-name-shadowing
+  - -Wno-unused-imports
   - -Wcompat
   - -Wredundant-constraints
   - -Wincomplete-record-updates

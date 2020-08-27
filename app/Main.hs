@@ -1,12 +1,11 @@
 module Main where
 
-import Relude hiding (state)
-import Relude.Unsafe as Unsafe
-import Control.Lens
+import Relude
 
 import Beaver
 import SimulateSimple
-import Display
+import Simulate
+import DisplaySimple
 
 bb2 :: Turing
 bb2 = Turing {states = 2, transitions = fromList
@@ -53,10 +52,6 @@ almostweird3 = Turing {states = 3, transitions = fromList
 
 main :: IO ()
 main = do
-  let machines = uniTuring 3
-      simSteps = 50
-      results = (\t -> force (t,
-        simulateHalt simSteps t)) <$> machines
-  putStrLn $ aggregateResults results simSteps
-  --print $ testHalt initState bb2
-  --putStrLn $ showOneMachine almostweird3 201
+  putStrLn $ simpleSimulator 2 20
+  putStrLn $ mconcat $ toList $ dispTuring <$>
+    branchOnEdge (Phase 1, False) (startMachine1 4)
