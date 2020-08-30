@@ -121,3 +121,76 @@ Productivity  46.5% of total user, 49.1% of total elapsed
   Alloc rate    894,936,572 bytes per MUT second
 
   Productivity  39.3% of total user, 41.5% of total elapsed
+
+simulate steplimit 10 universe 6 result:
+time stack exec busy-beavers-exe
+checked: 1708377372 machines.
+71095492 machines halted
+the most steps was 10, performed by
+0 False | 1 True R
+0 True | 1 False L
+1 False | 2 False L
+1 True | 0 False L
+2 False | Halt
+2 True | 3 False L
+3 False | 4 False L
+4 False | 5 False L
+5 False | 0 True L
+final tape: >1<1 1 1 1 1 1 1
+the most ones was 8, performed by
+0 False | 1 True R
+1 False | 2 False R
+1 True | Halt
+2 False | 3 True L
+3 False | 4 True L
+4 False | 0 True L
+4 True | 5 True L
+5 False | 2 True L
+final tape:>1<1 1 1 1 1 1 1
+0 machines were proven to run forever
+0 by lack of halt-reachability
+0 by cycling
+0 by simple running off the tape
+0 by running off the tape in a cycle
+
+1637281880 machines were not proven to halt, including:
+0 False | 1 True R
+0 True | 0 False L
+1 False | 2 False L
+1 True | 0 False L
+2 True | 3 False L
+3 False | 4 False L
+4 False | 5 False L
+5 False | 0 True L
+
+
+final state: phase: 2 tape: >1<
+
+
+0 False | 1 True R
+1 False | 2 False L
+2 True | 3 False L
+3 False | 4 False L
+4 False | 5 False L
+5 False | 0 False R
+
+
+final state: phase: 5 tape: >0<
+
+
+0 False | 1 True R
+1 False | 2 False L
+2 True | 3 False L
+3 False | 4 False L
+4 False | 5 False L
+5 False | 0 False L
+
+
+final state: phase: 5 tape: >0<
+
+
+
+
+real	56m7.000s
+user	142m0.304s
+sys	24m40.729s

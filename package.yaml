@@ -41,6 +41,7 @@ executables:
     - relude
     - lens
     - prettyprinter
+    - text
 
 tests:
   busy-beavers-test:
