@@ -17,18 +17,21 @@ dispBit :: Bit -> String
 dispBit False = "0"
 dispBit True = "1"
 
+dispPhase :: Phase -> String
+dispPhase (Phase i) = show i
+
 dispEdge :: Edge -> String
-dispEdge (p, b) = show p <> " " <> show b
+dispEdge (p, b) = dispPhase p <> " " <> show b
 
 dispTrans :: Trans -> String
 dispTrans Halt = "Halt"
-dispTrans (Step p b d) = show p <> " " <> show b <> " " <> show d
+dispTrans (Step p b d) = dispPhase p <> " " <> show b <> " " <> show d
 
 dispET :: Edge -> Trans -> String
 dispET e t = dispEdge e <> " | " <> dispTrans t <> "\n"
 
 dispTuring :: Turing -> String
-dispTuring (Turing _ transitions) = (ifoldMap dispET transitions) <> "\n"
+dispTuring (Turing _ transitions) = ifoldMap dispET transitions
 
 dispTape :: Tape -> String
 dispTape (Tape ls h rs) = dispBits (reverse ls) <> ">" <> dispBit h <> "<" <> dispBits rs where
@@ -72,7 +75,8 @@ aggregateResultList rs simSteps = case foldr count ([],[],[]) rs of
     show numHalted <> " machines halted, with the most steps being: "
     <> (show $ view _2 <$> take 1 longestRun) <> " and the most ones being: " <>
     (show $ ones . view _3 <$> take 1 mostOnes) <> " by the respective machines:\n" <>
-    (show $ view _1 <$> take 1 longestRun) <> "\n\n" <> (show $ view _1 <$> take 1 mostOnes) <>
+    (mconcat $ dispTuring <$> view _1 <$> take 1 longestRun) <> "\n\n" <>
+    (mconcat $ dispTuring <$> view _1 <$> take 1 mostOnes) <>
     "\nthe longest run machines were: " <>
     (show $ view _2 <$> longestRun) <> "\nand the most ones were:" <>
     (show $ ones . view _3 <$> mostOnes)

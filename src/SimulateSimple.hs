@@ -85,6 +85,9 @@ simpleInfiniteRight simState turing = mirrorHaltProof <$>
 infiniteSimLimit :: Int
 infiniteSimLimit = 20
 
+infiniteCycle :: SimState -> Turing -> Maybe HaltProof
+infiniteCycle s t = infiniteRight s t <|> infiniteLeft s t
+
 --suppose the machine is at the RHS of the tape, in some phase, and after i steps
 --returns to the RHS of the tape, in that phase. Further, suppose the machine traveled
 --at most l steps to the left of its starting point throughout those i steps, and
@@ -130,8 +133,7 @@ testHalt s@(phase, _, _) t
   = simpleInfiniteLeft s t
   <|> simpleInfiniteRight s t
   <|> evalState (dfsToHalt t phase phase) (Empty, Empty)
-  <|> infiniteLeft s t
-  <|> infiniteRight s t
+  <|> infiniteCycle s t
 --
 --the number of steps a machine has taken
 type Steps = Int
