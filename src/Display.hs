@@ -3,14 +3,23 @@ module Display where
 import Relude
 import Control.Lens
 
-import Beaver
+import Turing
+import Tape
 import Simulate
-import DisplaySimple (dispTuring, dispTape)
+import Simple.Simulate as Simple (simulate, dispStartState)
+import Simple.Display as Simple (dispResult)
+
+showOneMachine :: Turing -> Steps -> Text
+showOneMachine t n =
+  dispTuring t <> "\n" <> (mconcat $
+  (\steps -> dispResult (Simple.simulate steps dispStartState t) <> "\n") <$>
+  [0.. n]
+  )
 
 totalMachines :: Results -> Int
 totalMachines r = r ^. haltCount + r ^. provenForever + r ^. unproven
 
-dispResults :: Results -> String
+dispResults :: Results -> Text
 dispResults r = "checked: " <> show (totalMachines r) <> " machines.\n"
   <> show (r ^. haltCount) <> " machines halted\n"
   <> "the most steps was " <> show (r ^? longestRun . _Just . _1) <> ", performed by\n"
@@ -27,7 +36,7 @@ dispResults r = "checked: " <> show (totalMachines r) <> " machines.\n"
   <> show (r ^. unproven) <> " machines were not proven to halt, including:\n"
   <> (mconcat $ dispUnproven <$> r ^. unprovenExamples)
   where
-    dispUnproven :: (Turing, SimState) -> String
+    dispUnproven :: (Turing, SimState) -> Text
     dispUnproven (t, (SimState steps _ finalState)) = "after: " <> show steps <> " steps,\n"
       <> dispTuring t <> "\nwas not shown to halt or run forever\n"
       <> "final state: " <> dispTMState finalState <> "\n\n\n"

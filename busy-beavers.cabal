@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 2715d5900fc09bb493c75f5c181a37eabb4efeeabe6ac2f1be8502a1a5f2e827
+-- hash: 3acd9a90f59c7c85b71236843ab94efd229914b6a97ef609cf26f7e6a11a75f3
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -27,11 +27,14 @@ source-repository head
 
 library
   exposed-modules:
-      Beaver
       Display
-      DisplaySimple
+      Simple.Display
+      Simple.Simulate
+      Simple.Tape
       Simulate
-      SimulateSimple
+      Tape
+      Turing
+      Util
   other-modules:
       Paths_busy_beavers
   hs-source-dirs:

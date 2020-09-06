@@ -7,12 +7,9 @@ import Data.Text as T (length)
 import Data.Text.Read
 import System.IO (hSetBuffering, stdout, BufferMode(..))
 
-import Beaver
-import SimulateSimple
+import Turing
 import Simulate
-import DisplaySimple
 import Display
-
 
 bb2 :: Turing
 bb2 = Turing {states = 2, transitions = fromList
@@ -69,8 +66,8 @@ fullsim_not_halt3 = Turing {states = 3, transitions = fromList
 simProgram :: IO ()
 simProgram = do
   hSetBuffering stdout NoBuffering
-  let results = Simulate.simulate 20 $ startMachine1 3
-  putStrLn $ dispResults $ results
+  let results = Simulate.simulate 120 $ startMachine1 4
+  putTextLn $ dispResults $ results
   interact results where
   interact r = do
     putText "Would you like to run a machine listed above?\n If so, enter it's index, else hit enter to exit:"
@@ -79,7 +76,7 @@ simProgram = do
       Left _ -> return ()
       Right (i::Int, _) -> case r ^? unprovenExamples . ix i . _1 of
         Nothing -> do
-          putStrLn "indexNotFound"
+          putTextLn "indexNotFound"
           interact r
         Just machine -> showMachine r where
           showMachine r = do
@@ -89,7 +86,7 @@ simProgram = do
               Left _ -> showMachine r
               Right (steps::Int, _) -> do
                 putTextLn $ "simulating machine: " <> show i
-                putStrLn $ showOneMachine machine steps
+                putTextLn $ showOneMachine machine steps
                 interact r
 
 --TODO:: make exponential notation for tape

@@ -5,9 +5,9 @@ import Control.Lens hiding ((<|))
 import Control.Lens.Extras
 import Data.List.NonEmpty ((<|))
 
-import Beaver
-import SimulateSimple (Steps, HaltProof(..), mirrorHaltProof)
-import DisplaySimple (dispTuring, dispTape, showInt3Wide)
+import Util
+import Turing
+import Tape
 
 --Pieces: turing machines with unknown edges
 -- a simulator that does the usual simulate forward, while branching on unknown edges, according to
@@ -118,7 +118,7 @@ addResult _ (ContinueForever proof) r =
   r & provenForever +~ 1 & proof2lens proof +~ 1 where
     proof2lens (HaltUnreachable _) = haltUnreachable
     proof2lens (Cycle _ _) = cycledCount
-    proof2lens (OffToInfinitySimple _ _) = infinitySimple
+--    proof2lens (OffToInfinitySimple _ _) = infinitySimple
     proof2lens (OffToInfinityN _ _) = infinityN
 addResult turing (Continue state) r = let r' = r & unproven +~ 1 in
   if r' ^. unproven > keepNum then r'
@@ -178,7 +178,6 @@ collision (SimState steps slow fast) = steps > 1 && slow == fast
 getSteps :: SimState -> (Steps, Steps)
 getSteps (SimState steps _ _) = (steps `div` 2, steps)
 
---TODO: cyclechecking, haltingproofs
 --step limit, machine to start with
 simulate :: Int -> Turing -> Results
 simulate limit startMachine = loop (startMachine, initSimState) [] Empty where
@@ -187,7 +186,7 @@ simulate limit startMachine = loop (startMachine, initSimState) [] Empty where
   loop (t, s@(collision -> True)) todoList !rs
     = --trace "added cycle" $
       recurse todoList $ addResult t (ContinueForever $ uncurry Cycle $ getSteps s) rs
-  loop (t, s@(SimState ( steps@((\stepsTaken -> stepsTaken > limit) -> True)) _ _)) todoList !rs =
+  loop (t, s@(SimState ( ((\stepsTaken -> stepsTaken > limit) -> True)) _ _)) todoList !rs =
     -- if rs ^. unprovenExamples == [] then trace (show steps <> "\n") $
     --     recurse todoList $ addResult t (Continue s) rs
     --   else
@@ -252,10 +251,10 @@ infiniteRight _ _ = Nothing
 infiniteLeft :: Turing -> SimState -> Maybe HaltProof
 infiniteLeft t s = mirrorHaltProof <$> infiniteRight (mirrorTuring t) (mirrorSimState s)
 
-dispTMState :: TMState -> String
+dispTMState :: TMState -> Text
 dispTMState (TMState (Phase i) tape) = "phase: " <> show i <> " tape: " <> dispTape tape
 
-dispSimState :: SimState -> String
+dispSimState :: SimState -> Text
 dispSimState (SimState steps slow fast) = "steps: " <> showInt3Wide steps
   <> "\nslow: " <> dispTMState slow
   <> "\nfast: " <> dispTMState fast

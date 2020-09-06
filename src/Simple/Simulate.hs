@@ -1,8 +1,9 @@
-module SimulateSimple where
+module Simple.Simulate where
 import Relude hiding (state)
 import Control.Lens
 
-import Beaver
+import Turing
+import Simple.Tape
 
 --the type of proofs that a TM will not halt
 -- - HaltUnreachable means the Halt state is never transitioned to from the current state
@@ -134,9 +135,8 @@ testHalt s@(phase, _, _) t
   <|> simpleInfiniteRight s t
   <|> evalState (dfsToHalt t phase phase) (Empty, Empty)
   <|> infiniteCycle s t
---
+
 --the number of steps a machine has taken
-type Steps = Int
 type SimState = (Phase, Steps, Tape)
 
 mirrorSimState :: SimState -> SimState
