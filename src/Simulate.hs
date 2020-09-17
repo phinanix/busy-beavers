@@ -1,6 +1,7 @@
 module Simulate where
 
 import Relude hiding (cycle, state)
+import Relude.Extra.Bifunctor
 import Control.Lens hiding ((<|))
 import Control.Lens.Extras
 import Data.List.NonEmpty ((<|))
@@ -8,6 +9,9 @@ import Data.List.NonEmpty ((<|))
 import Util
 import Turing
 import Tape
+import ExpTape (ExpTape(..))
+import qualified ExpTape as E
+import Skip
 
 --Pieces: turing machines with unknown edges
 -- a simulator that does the usual simulate forward, while branching on unknown edges, according to
@@ -15,33 +19,33 @@ import Tape
 -- a more powerful infinity prover
 -- a Results type and an aggregator that adds to the results
 
-data TMState = TMState { _phase :: Phase, _tape :: Tape} deriving (Eq, Ord, Show, Generic)
-instance NFData TMState
+data TMState a = TMState { _phase :: Phase, _tape :: a} deriving (Eq, Ord, Show, Generic)
+instance NFData a => NFData (TMState a)
 
-initTMState :: TMState
+initTMState :: TMState Tape
 initTMState = TMState (Phase 0) (Tape [] False [])
 
-data PartialStepResult = Unknown Edge | Stopped Dir Tape | Stepped Dir TMState
+data PartialStepResult a = Unknown Edge | Stopped Dir a | Stepped Dir (TMState a)
 
-data SimState = SimState
+data SimState a = SimState
   --positive
   { _stepCount :: Int
   --(stepCount `div` 2) steps after initTMState
-  , _slowState :: TMState
+  , _slowState :: (TMState a)
   --stepCount steps after initTMState
-  , _fastState :: TMState
+  , _fastState :: (TMState a)
   } deriving (Eq, Ord, Show, Generic)
-instance NFData SimState
+instance NFData a => NFData (SimState a)
 
-initSimState :: SimState
+initSimState :: SimState Tape
 initSimState = SimState 0 initTMState initTMState
 
-data SimResult = Halted Steps Tape
-               | Continue SimState
+data SimResult a = Halted Steps a
+               | Continue (SimState a)
                | ContinueForever HaltProof
                deriving (Eq, Ord, Show)
 
-simStep :: Turing -> TMState -> PartialStepResult
+simStep :: Turing -> TMState Tape -> PartialStepResult Tape
 simStep (Turing _ trans ) (TMState p (Tape ls bit rs))
   = case trans ^. at (p, bit) of
     Nothing -> Unknown (p,bit)
@@ -53,6 +57,20 @@ simStep (Turing _ trans ) (TMState p (Tape ls bit rs))
     Just (Step q newBit R) ->
       (Stepped R (TMState q $ tapeRight $ Tape ls newBit rs))
 
+simExpStep :: Turing -> TMState (ExpTape Bit Int) -> PartialStepResult (ExpTape Bit Int)
+simExpStep (Turing _ trans) (TMState p tape@(ExpTape ls (bit, num, headDir) rs))
+  = case trans ^. at (p, bit) of
+    Nothing -> Unknown (p, bit)
+    Just Halt -> Stopped L $ E.modify L True tape
+    --we can skip to the end of the block when the new phase is the same as the old phase,
+    --plus the dir is opposite the original dir (if you're on the L and go R)
+    --TODO :: notice if this tries to skip to the end of the world
+    Just (Step newP newBit moveDir) -> if newP == p && moveDir /= headDir then
+      --we're about to move off the point, in block terms, not bit terms, so the side on which the point is is irrelevant
+      Stepped moveDir (TMState newP $ E.tapeMove moveDir $ ExpTape ls (newBit, num, error "unused") rs)
+      else Stepped moveDir (TMState newP $ E.modify moveDir newBit tape)
+
+
 --the results should be
 --  how many machines halted
 --    the longest running N machines
@@ -60,32 +78,31 @@ simStep (Turing _ trans ) (TMState p (Tape ls bit rs))
 --  how many ran forever, with which kind of proof
 --  how many ran out of time
 --  and keep a certain number thereof
-data Results = Results
+data Results a = Results
   { _haltCount :: Int
-    , _longestRun :: Maybe (Int, Turing, Tape)
-    , _mostOnes :: Maybe (Int, Turing, Tape)
+    , _longestRun :: Maybe (Int, Turing, a)
+    , _mostOnes :: Maybe (Int, Turing, a)
   , _provenForever :: Int
     , _haltUnreachable :: Int
     , _cycledCount :: Int
-    , _infinitySimple :: Int
     , _infinityN :: Int
   , _unproven :: Int
-    , _unprovenExamples :: [(Turing, SimState)]
+    , _unprovenExamples :: [(Turing, SimState a)]
   } deriving (Show, Eq, Ord, Generic)
-instance NFData Results
+instance NFData a => NFData (Results a)
 
 $(makeLenses ''TMState)
 $(makeLenses ''SimState)
 $(makeLenses ''Results)
 
-mirrorTMState :: TMState -> TMState
+mirrorTMState :: TMState Tape -> TMState Tape
 mirrorTMState (TMState p t) = TMState p $ mirrorTape t
 
-mirrorSimState :: SimState -> SimState
+mirrorSimState :: SimState Tape -> SimState Tape
 mirrorSimState (SimState steps slow fast)
   = SimState steps (mirrorTMState slow) (mirrorTMState fast)
 
-instance AsEmpty Results where
+instance Eq a => AsEmpty (Results a) where
   _Empty = only $ Results
     { _haltCount = 0
       , _longestRun = Nothing
@@ -93,7 +110,6 @@ instance AsEmpty Results where
     , _provenForever = 0
       , _haltUnreachable = 0
       , _cycledCount = 0
-      , _infinitySimple = 0
       , _infinityN = 0
     , _unproven = 0
       , _unprovenExamples = []
@@ -102,7 +118,7 @@ instance AsEmpty Results where
 keepNum :: Int
 keepNum = 3
 
-addResult :: Turing -> SimResult -> Results -> Results
+addResult :: Turing -> SimResult Tape -> Results Tape -> Results Tape
 addResult turing (Halted steps tape) r =
   addHalter $ addLongest $ addOnesiest (ones tape) r where
     addLongest r = case r ^. longestRun of
@@ -118,7 +134,6 @@ addResult _ (ContinueForever proof) r =
   r & provenForever +~ 1 & proof2lens proof +~ 1 where
     proof2lens (HaltUnreachable _) = haltUnreachable
     proof2lens (Cycle _ _) = cycledCount
---    proof2lens (OffToInfinitySimple _ _) = infinitySimple
     proof2lens (OffToInfinityN _ _) = infinityN
 addResult turing (Continue state) r = let r' = r & unproven +~ 1 in
   if r' ^. unproven > keepNum then r'
@@ -129,16 +144,17 @@ addResult turing (Continue state) r = let r' = r & unproven +~ 1 in
 -- in the specified unknown edge, reducing via symmetry - if there are multiple
 -- unused states, only sends us to the lowest numbered one
 -- does not check that the edge is unknown, a precondition of correctness
-branchOnEdge :: Edge -> Turing -> NonEmpty Turing
-branchOnEdge e@(Phase newPhase, _) (Turing n m) = Turing n <$> addTrans <$> possibleTrans where
+branchOnEdge :: Edge -> Turing -> [Turing]
+branchOnEdge e@(Phase newPhase, _) (Turing n m) = filter (not . isSmallerMachine) candidates where
+  candidates = Turing n <$> addTrans <$> possibleTrans
   addTrans t = m & at e ?~ t
   --if we're assigned the last unknown transition, we have to halt
   possibleTrans = if length m == 2*n - 1 then one Halt else
     --we have to use every state at least once, so when the last unused state (n-1) is
     --being assigned, or it has already been, we have to consider (not require) halting
-    if used (n-2) then Halt <| continueTrans else continueTrans
+    if used (n-2) then Halt : continueTrans else continueTrans
   --we use nondeterminism to pick all possibilities
-  continueTrans = do
+  continueTrans = toList $ do
     p <- validStates
     bit <- uniBit
     dir <- uniDir
@@ -157,6 +173,17 @@ branchOnEdge e@(Phase newPhase, _) (Turing n m) = Turing n <$> addTrans <$> poss
   used i = is _Just (m ^. at (Phase i, False))
         || is _Just (m ^. at (Phase i, True))
         || i == newPhase
+  equalJusts (Just a) (Just b) = a == b
+  equalJusts _ _ = False
+  equalStates m i j =
+    (m ^. at (i, False)) `equalJusts` (m ^. at (j, False))
+    &&
+    (m ^. at (i, True)) `equalJusts` (m ^. at (j, True))
+  isSmallerMachine (Turing s m) = any (uncurry (equalStates m)) $
+    bimapBoth Phase <$> allpairs s
+  --j can't equal i because that would produce (i,i), but of course state i is always the same as
+  --state i and this does not disqualify a machine
+  allpairs n = [(i,j) | i <- [0.. n-1], j <- [0.. i-1] ]
 
 --the two "symmetry broken" machines that can be started with
 --one only need use the "1" machine to prove the function that counts 1s, but
@@ -172,17 +199,17 @@ startMachine1 n = Turing n $ one ((Phase 0, False), (Step (Phase 1) True R))
 uni1Machine :: Turing
 uni1Machine = Turing 1 $ one ((Phase 0, False), Halt)
 
-collision :: SimState -> Bool
+collision :: Eq a => SimState a -> Bool
 collision (SimState steps slow fast) = steps > 1 && slow == fast
 
-getSteps :: SimState -> (Steps, Steps)
+getSteps :: SimState a -> (Steps, Steps)
 getSteps (SimState steps _ _) = (steps `div` 2, steps)
 
 --step limit, machine to start with
-simulate :: Int -> Turing -> Results
+simulate :: Int -> Turing -> Results Tape
 simulate limit startMachine = loop (startMachine, initSimState) [] Empty where
   -- current machine and state, next (machine&state)s, previous Results, returns updated Results
-  loop :: (Turing, SimState) -> [(Turing, SimState)] -> Results -> Results
+  loop :: (Turing, SimState Tape) -> [(Turing, SimState Tape)] -> Results Tape -> Results Tape
   loop (t, s@(collision -> True)) todoList !rs
     = --trace "added cycle" $
       recurse todoList $ addResult t (ContinueForever $ uncurry Cycle $ getSteps s) rs
@@ -210,23 +237,23 @@ simulate limit startMachine = loop (startMachine, initSimState) [] Empty where
   recurse [] result = result
   recurse (x : xs) result = loop x xs result
 
-proveForever :: Turing -> SimState -> Maybe HaltProof
+proveForever :: Turing -> SimState Tape -> Maybe HaltProof
 proveForever = infiniteCycle
 
 infiniteSimLimit :: Steps
 infiniteSimLimit = 20
 
-infiniteCycle :: Turing -> SimState -> Maybe HaltProof
+infiniteCycle :: Turing -> SimState Tape -> Maybe HaltProof
 infiniteCycle t s = infiniteRight t s <|> infiniteLeft t s
 
-infiniteRight :: Turing -> SimState -> Maybe HaltProof
+infiniteRight :: Turing -> SimState Tape -> Maybe HaltProof
 infiniteRight t (SimState originalSteps _ mState@(TMState startPhase (Tape startLs False [])))
   = step 0 0 0 mState where
   -- first arg counts number of steps taken in this halting proof
   -- second arg counts distance left or right from our starting point,
   -- left is negative, right is positive
   -- third arg counts max leftward distance (in positive terms)
-  step :: Steps -> Int -> Int -> TMState -> Maybe HaltProof
+  step :: Steps -> Int -> Int -> TMState Tape -> Maybe HaltProof
   --we hit our step limit
   step ((\i -> i >= infiniteSimLimit) -> True) _ _ _ = Nothing
   --here, distance is negative, so we just simulate another step
@@ -248,13 +275,13 @@ infiniteRight t (SimState originalSteps _ mState@(TMState startPhase (Tape start
   newMax oldMax (negate -> newPosDist) = max oldMax newPosDist
 infiniteRight _ _ = Nothing
 
-infiniteLeft :: Turing -> SimState -> Maybe HaltProof
+infiniteLeft :: Turing -> SimState Tape -> Maybe HaltProof
 infiniteLeft t s = mirrorHaltProof <$> infiniteRight (mirrorTuring t) (mirrorSimState s)
 
-dispTMState :: TMState -> Text
+dispTMState :: TMState Tape -> Text
 dispTMState (TMState (Phase i) tape) = "phase: " <> show i <> " tape: " <> dispTape tape
 
-dispSimState :: SimState -> Text
+dispSimState :: SimState Tape -> Text
 dispSimState (SimState steps slow fast) = "steps: " <> showInt3Wide steps
   <> "\nslow: " <> dispTMState slow
   <> "\nfast: " <> dispTMState fast

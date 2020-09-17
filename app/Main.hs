@@ -66,7 +66,7 @@ fullsim_not_halt3 = Turing {states = 3, transitions = fromList
 simProgram :: IO ()
 simProgram = do
   hSetBuffering stdout NoBuffering
-  let results = Simulate.simulate 120 $ startMachine1 4
+  let results = Simulate.simulate 25 $ startMachine1 3
   putTextLn $ dispResults $ results
   interact results where
   interact r = do

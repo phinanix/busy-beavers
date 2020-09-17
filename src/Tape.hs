@@ -58,7 +58,6 @@ dispTape (Tape ls h rs) = dispBits (reverse ls) <> ">" <> dispBit h <> "<" <> di
 data HaltProof
   = HaltUnreachable Phase
   | Cycle Steps Steps
---  | OffToInfinitySimple Steps Dir
   | OffToInfinityN Steps Dir
   deriving (Eq, Ord, Show, Generic)
 instance NFData HaltProof
