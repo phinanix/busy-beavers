@@ -4,6 +4,7 @@ import Relude
 import Control.Lens
 
 import Turing
+import Skip
 
 data ExpTape s c = ExpTape
   { left :: [(s, c)]
@@ -45,3 +46,23 @@ tapeRight (ExpTape ls (bit, num, _) ((rbit, rnum):rs)) = ExpTape ((bit,num):ls) 
 tapeMove :: Dir -> ExpTape Bit Int -> ExpTape Bit Int
 tapeMove L = tapeLeft
 tapeMove R = tapeRight
+
+--TODO:: this function tells us we should probably be using Seq instead of list
+--appends two lists, keeping the ExpTape invariant that there are never contiguous
+--blocks of the same symbol
+etApp :: (Eq s, Semigroup c) => [(s, c)] -> [(s, c)] -> [(s, c)]
+etApp [] ys = ys
+etApp xs [] = xs
+etApp (fromList -> xs) (y : ys) = if fst (last xs) == fst y
+  then init xs <> [(fst y, snd (last xs) <> snd y)] <> ys
+  else toList $ xs <> (y :| ys)
+
+glomPointLeft :: (Eq s, Semigroup c) => ExpTape s c -> ExpTape s c
+glomPointLeft (ExpTape ((s_l, c_l):ls) (s_p, c_p, dir) rs) | s_l == s_p =
+  ExpTape ls (s_p, c_p <> c_l, dir) rs
+glomPointLeft e = e
+
+glomPointRight :: (Eq s, Semigroup c) => ExpTape s c -> ExpTape s c
+glomPointRight (ExpTape ls (s_p, c_p, dir) ((s_r, c_r):rs)) | s_p == s_r =
+  ExpTape ls (s_p, c_p <> c_r, dir) rs
+glomPointRight e = e

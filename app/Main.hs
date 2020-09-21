@@ -93,7 +93,10 @@ simProgram = do
 --TODO:: make simple induction
 --TODO:: make macro machine simulator
 main :: IO ()
-main = simProgram
+main = do
+  --simProgram
+  putTextLn $ show $ backwardSearch weird3
+
   --
   --putStrLn $ showOneMachine fullsim_not_halt3 100
   -- putStrLn $ force $ simpleSimulator 2 20

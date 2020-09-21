@@ -44,25 +44,3 @@ dispTape (Tape ls h rs) = dispBits (reverse ls) <> ">" <> dispBit h <> "<" <> di
   dispBits [] = ""
   dispBits bits = mconcat ((\i -> dispBit i <> " ") <$> Unsafe.init bits)
     <> dispBit (Unsafe.last bits)
-
---the type of proofs that a TM will not halt
--- - HaltUnreachable means the Halt state is never transitioned to from the current state
---   and any states it transitions to
--- - Cycle means that the state reached after a number of steps and a greater number
---   of steps is identical
--- - OffToInfinitySimple means that after the given number of steps, the machine will
---   continue off in the given direction infintitely, never changing states
--- - OffToInfinityN means that after the given number of steps, the machine will
---   continue off in the given direction infinitely, in a short loop, which is checked
---   up to a specified bound N
-data HaltProof
-  = HaltUnreachable Phase
-  | Cycle Steps Steps
-  | OffToInfinityN Steps Dir
-  deriving (Eq, Ord, Show, Generic)
-instance NFData HaltProof
-
-mirrorHaltProof :: HaltProof -> HaltProof
-mirrorHaltProof (OffToInfinityN s d) = OffToInfinityN s $ mirrorDir d
---mirrorHaltProof (OffToInfinitySimple s d) = OffToInfinitySimple s $ mirrorDir d
-mirrorHaltProof h = h

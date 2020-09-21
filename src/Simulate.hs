@@ -5,11 +5,16 @@ import Relude.Extra.Bifunctor
 import Control.Lens hiding ((<|))
 import Control.Lens.Extras
 import Data.List.NonEmpty ((<|))
+import qualified Data.List.NonEmpty as NE (filter)
+import Data.Map.Monoidal (MonoidalMap(..), findMin, deleteMin, deleteFindMin)
+import Data.Semigroup (Min(..), getMin)
+import Data.Map.Strict (assocs)
+--import Data.Witherable
 
 import Util
 import Turing
 import Tape
-import ExpTape (ExpTape(..))
+import ExpTape (ExpTape(..), glomPointLeft, glomPointRight, etApp)
 import qualified ExpTape as E
 import Skip
 
@@ -24,6 +29,9 @@ instance NFData a => NFData (TMState a)
 
 initTMState :: TMState Tape
 initTMState = TMState (Phase 0) (Tape [] False [])
+
+initExpTMState :: s -> TMState (ExpTape s Int)
+initExpTMState s = TMState (Phase 0) (ExpTape [] (s, 1, L) [])
 
 data PartialStepResult a = Unknown Edge | Stopped Dir a | Stepped Dir (TMState a)
 
@@ -40,10 +48,37 @@ instance NFData a => NFData (SimState a)
 initSimState :: SimState Tape
 initSimState = SimState 0 initTMState initTMState
 
+initExpSimState :: s -> SimState (ExpTape s Int)
+initExpSimState s = SimState 0 (initExpTMState s) (initExpTMState s)
+
 data SimResult a = Halted Steps a
                | Continue (SimState a)
                | ContinueForever HaltProof
                deriving (Eq, Ord, Show)
+
+--the type of proofs that a TM will not halt
+-- - HaltUnreachable means the Halt state is never transitioned to from the current state
+--   and any states it transitions to
+-- - Cycle means that the state reached after a number of steps and a greater number
+--   of steps is identical
+-- - OffToInfinitySimple means that after the given number of steps, the machine will
+--   continue off in the given direction infintitely, never changing states
+-- - OffToInfinityN means that after the given number of steps, the machine will
+--   continue off in the given direction infinitely, in a short loop, which is checked
+--   up to a specified bound N
+data HaltProof
+  = HaltUnreachable Phase
+  | Cycle Steps Steps
+  | OffToInfinityN Steps Dir
+  | BackwardSearch
+--  | SkipOffEnd (Skip Bit)
+  deriving (Eq, Ord, Show, Generic)
+instance NFData HaltProof
+
+mirrorHaltProof :: HaltProof -> HaltProof
+mirrorHaltProof (OffToInfinityN s d) = OffToInfinityN s $ mirrorDir d
+--mirrorHaltProof (OffToInfinitySimple s d) = OffToInfinitySimple s $ mirrorDir d
+mirrorHaltProof h = h
 
 simStep :: Turing -> TMState Tape -> PartialStepResult Tape
 simStep (Turing _ trans ) (TMState p (Tape ls bit rs))
@@ -57,6 +92,7 @@ simStep (Turing _ trans ) (TMState p (Tape ls bit rs))
     Just (Step q newBit R) ->
       (Stepped R (TMState q $ tapeRight $ Tape ls newBit rs))
 
+--WARNING :: this function is probably messy and kind of bad
 simExpStep :: Turing -> TMState (ExpTape Bit Int) -> PartialStepResult (ExpTape Bit Int)
 simExpStep (Turing _ trans) (TMState p tape@(ExpTape ls (bit, num, headDir) rs))
   = case trans ^. at (p, bit) of
@@ -70,6 +106,53 @@ simExpStep (Turing _ trans) (TMState p tape@(ExpTape ls (bit, num, headDir) rs))
       Stepped moveDir (TMState newP $ E.tapeMove moveDir $ ExpTape ls (newBit, num, error "unused") rs)
       else Stepped moveDir (TMState newP $ E.modify moveDir newBit tape)
 
+--either we skipped ahead to a new Phase and Tape or we might've proved infinity
+data SkipResult s c = Skipped Phase (ExpTape s c) | SkippedOffEnd (Skip s)
+
+--returns nothing if the skip is inapplicable, else returns a new tape
+--the fact that the type is bit is only used when running off the tape, but for now I don't want to
+--generalize that out (also ExpTape would have to be generalized)
+applySkip :: Skip Bit -> (Phase, ExpTape Bit Count) -> Maybe (SkipResult Bit Count)
+applySkip (Skip s e) (p, ExpTape leftTape tapePoint rightTape) | s ^. cstate == p
+  = matchPoints (s^.c_point) tapePoint >>= \case
+      --if we don't match the whole point, we can't care about the stuff on
+      --the other side of the point, or we fail immediately
+      Lremains remainP -> guard (s^.ls == []) >> matchBitTape (s^.rs) rightTape
+        <&> \case
+          Infinite -> SkippedOffEnd (Skip s e)
+          --we only have to glom once because remainP can't match leftTape since
+          --that would violate the input invariant
+          NewTape t -> Skipped (e^.cstate) $ glomPointLeft $
+            ExpTape (remainP:leftTape) (e^.c_point) ((e^.rs) `etApp` t)
+      Rremains remainP -> guard (s^.rs == []) >> matchBitTape (s^.ls) leftTape
+        <&> \case
+          Infinite -> SkippedOffEnd (Skip s e)
+          NewTape t -> Skipped (e^.cstate) $ glomPointRight $
+            ExpTape ((e^.ls) `etApp` t) (e^.c_point) (remainP:rightTape)
+      PerfectP -> bisequence (matchBitTape (s^.ls) leftTape, matchBitTape (s^.rs) rightTape)
+        <&> \case
+          (Infinite, _) -> SkippedOffEnd (Skip s e)
+          (_, Infinite) -> SkippedOffEnd (Skip s e)
+          (NewTape newL, NewTape newR) -> Skipped (e^.cstate) $
+            ExpTape ((e^.ls) `etApp` newL) (e^.c_point) ((e^.rs) `etApp` newR)
+--if the phases don't match, we fail right away
+applySkip _ _ = Nothing
+
+--we want to be able to apply a skip of counts to an ExpTape _ Count but also a
+--skip of counts to an ExpTape _ Nat
+
+-- the data type storing various proven skips associated with a machine
+type SkipBook s = Map (Phase, s) (Skip s)
+
+initTransSkip :: Edge -> Trans -> Set (Skip Bit)
+initTransSkip (p, b) Halt = undefined
+initTransSkip (p, b) (Step q c d) | p == q = undefined
+initTransSkip (p, b) (Step q c d) = one $ Skip
+  (Config p [] (b, Specific 1, L) [])
+  undefined
+
+initBook :: Turing -> SkipBook Bit
+initBook t = undefined
 
 --the results should be
 --  how many machines halted
@@ -236,6 +319,14 @@ simulate limit startMachine = loop (startMachine, initSimState) [] Empty where
     _ -> error "forceAdvanced a state that doesn't advance"
   recurse [] result = result
   recurse (x : xs) result = loop x xs result
+
+simulateWithSkips :: Int -> Turing -> Results (ExpTape Bit Int)
+simulateWithSkips limit startMachine = loop (startMachine, initExpSimState False, initBook startMachine) [] Empty where
+  loop :: (Turing, SimState (ExpTape Bit Int), SkipBook Bit)
+    -> [(Turing, SimState (ExpTape Bit Int), SkipBook Bit)]
+    -> Results (ExpTape Bit Int) -> Results (ExpTape Bit Int)
+  loop = undefined
+
 
 proveForever :: Turing -> SimState Tape -> Maybe HaltProof
 proveForever = infiniteCycle
