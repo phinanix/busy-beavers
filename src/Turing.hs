@@ -21,6 +21,10 @@ instance NFData Dir
 instance NFData Trans
 instance NFData Turing
 
+getPhase :: Trans -> Maybe Phase
+getPhase Halt = Nothing
+getPhase (Step p _ _) = Just p
+
 mirrorDir :: Dir -> Dir
 mirrorDir L = R
 mirrorDir R = L
