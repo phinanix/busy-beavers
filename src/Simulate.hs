@@ -17,6 +17,8 @@ import Tape
 import ExpTape (ExpTape(..), glomPointLeft, glomPointRight, etApp)
 import qualified ExpTape as E
 import Skip
+import Config
+import Count
 
 --Pieces: turing machines with unknown edges
 -- a simulator that does the usual simulate forward, while branching on unknown edges, according to
@@ -112,43 +114,44 @@ data SkipResult s c = Skipped Phase (ExpTape s c) | SkippedOffEnd (Skip s)
 --returns nothing if the skip is inapplicable, else returns a new tape
 --the fact that the type is bit is only used when running off the tape, but for now I don't want to
 --generalize that out (also ExpTape would have to be generalized)
-applySkip :: Skip Bit -> (Phase, ExpTape Bit Count) -> Maybe (SkipResult Bit Count)
-applySkip (Skip s e) (p, ExpTape leftTape tapePoint rightTape) | s ^. cstate == p
-  = matchPoints (s^.c_point) tapePoint >>= \case
-      --if we don't match the whole point, we can't care about the stuff on
-      --the other side of the point, or we fail immediately
-      Lremains remainP -> guard (s^.ls == []) >> matchBitTape (s^.rs) rightTape
-        <&> \case
-          Infinite -> SkippedOffEnd (Skip s e)
-          --we only have to glom once because remainP can't match leftTape since
-          --that would violate the input invariant
-          NewTape t -> Skipped (e^.cstate) $ glomPointLeft $
-            ExpTape (remainP:leftTape) (e^.c_point) ((e^.rs) `etApp` t)
-      Rremains remainP -> guard (s^.rs == []) >> matchBitTape (s^.ls) leftTape
-        <&> \case
-          Infinite -> SkippedOffEnd (Skip s e)
-          NewTape t -> Skipped (e^.cstate) $ glomPointRight $
-            ExpTape ((e^.ls) `etApp` t) (e^.c_point) (remainP:rightTape)
-      PerfectP -> bisequence (matchBitTape (s^.ls) leftTape, matchBitTape (s^.rs) rightTape)
-        <&> \case
-          (Infinite, _) -> SkippedOffEnd (Skip s e)
-          (_, Infinite) -> SkippedOffEnd (Skip s e)
-          (NewTape newL, NewTape newR) -> Skipped (e^.cstate) $
-            ExpTape ((e^.ls) `etApp` newL) (e^.c_point) ((e^.rs) `etApp` newR)
---if the phases don't match, we fail right away
-applySkip _ _ = Nothing
+--TODO:: this is an old implementation from before Counts had vars, so I don't think it works
+-- applySkip :: Skip Bit -> (Phase, ExpTape Bit Count) -> Maybe (SkipResult Bit Count)
+-- applySkip (Skip s e) (p, ExpTape leftTape tapePoint rightTape) | s ^. cstate == p
+--   = matchPoints (s^.c_point) tapePoint >>= \case
+--       --if we don't match the whole point, we can't care about the stuff on
+--       --the other side of the point, or we fail immediately
+--       Lremains remainP -> guard (s^.ls == []) >> matchBitTape (s^.rs) rightTape
+--         <&> \case
+--           Infinite -> SkippedOffEnd (Skip s e)
+--           --we only have to glom once because remainP can't match leftTape since
+--           --that would violate the input invariant
+--           NewTape t -> Skipped (e^.cstate) $ glomPointLeft $
+--             ExpTape (remainP:leftTape) (e^.c_point) ((e^.rs) `etApp` t)
+--       Rremains remainP -> guard (s^.rs == []) >> matchBitTape (s^.ls) leftTape
+--         <&> \case
+--           Infinite -> SkippedOffEnd (Skip s e)
+--           NewTape t -> Skipped (e^.cstate) $ glomPointRight $
+--             ExpTape ((e^.ls) `etApp` t) (e^.c_point) (remainP:rightTape)
+--       PerfectP -> bisequence (matchBitTape (s^.ls) leftTape, matchBitTape (s^.rs) rightTape)
+--         <&> \case
+--           (Infinite, _) -> SkippedOffEnd (Skip s e)
+--           (_, Infinite) -> SkippedOffEnd (Skip s e)
+--           (NewTape newL, NewTape newR) -> Skipped (e^.cstate) $
+--             ExpTape ((e^.ls) `etApp` newL) (e^.c_point) ((e^.rs) `etApp` newR)
+-- --if the phases don't match, we fail right away
+-- applySkip _ _ = Nothing
 
 --we want to be able to apply a skip of counts to an ExpTape _ Count but also a
 --skip of counts to an ExpTape _ Nat
 
--- the data type storing various proven skips associated with a machine
+--the data type storing various proven skips associated with a machine
 type SkipBook s = Map (Phase, s) (Skip s)
 
 initTransSkip :: Edge -> Trans -> Set (Skip Bit)
 initTransSkip (p, b) Halt = undefined
 initTransSkip (p, b) (Step q c d) | p == q = undefined
 initTransSkip (p, b) (Step q c d) = one $ Skip
-  (Config p [] (b, Specific 1, L) [])
+  (Config p [] (b, finiteCount 1, L) [])
   undefined
 
 initBook :: Turing -> SkipBook Bit
@@ -169,6 +172,8 @@ data Results a = Results
     , _haltUnreachable :: Int
     , _cycledCount :: Int
     , _infinityN :: Int
+    , _backwardSearches :: Int
+    , _backwardExamples :: [Turing]
   , _unproven :: Int
     , _unprovenExamples :: [(Turing, SimState a)]
   } deriving (Show, Eq, Ord, Generic)
@@ -194,15 +199,17 @@ instance Eq a => AsEmpty (Results a) where
       , _haltUnreachable = 0
       , _cycledCount = 0
       , _infinityN = 0
+      , _backwardSearches = 0
+      , _backwardExamples = []
     , _unproven = 0
       , _unprovenExamples = []
     }
---number of unproven examples to keep
+--number of unproven examples to keep, used also for backward Examples
 keepNum :: Int
 keepNum = 3
 
 addResult :: Turing -> SimResult Tape -> Results Tape -> Results Tape
-addResult turing (Halted steps tape) r =
+addResult turing h@(Halted steps tape) r = (if turing == bb3test then traceShow h else id)
   addHalter $ addLongest $ addOnesiest (ones tape) r where
     addLongest r = case r ^. longestRun of
       Nothing -> r & longestRun ?~ (steps, turing, tape)
@@ -213,22 +220,40 @@ addResult turing (Halted steps tape) r =
       Just (mostOneCount, _, _) -> if ones > mostOneCount
       then r & mostOnes ?~ (ones, turing, tape) else r
     addHalter = haltCount +~ 1
-addResult _ (ContinueForever proof) r =
-  r & provenForever +~ 1 & proof2lens proof +~ 1 where
+addResult turing (ContinueForever proof) r = -- (if turing == bb3test then trace "found1" else id)
+  r & provenForever +~ 1 & proof2lens proof +~ 1 & special proof where
     proof2lens (HaltUnreachable _) = haltUnreachable
     proof2lens (Cycle _ _) = cycledCount
     proof2lens (OffToInfinityN _ _) = infinityN
-addResult turing (Continue state) r = let r' = r & unproven +~ 1 in
+    proof2lens (BackwardSearch) = backwardSearches
+    special BackwardSearch = --if r ^. backwardSearches > keepNum then id else
+      backwardExamples %~ ((:) turing)
+    special _ = id
+addResult turing (Continue state) r = --(if turing == bb3test then trace "found2" else id) $
+  let r' = r & unproven +~ 1 in
   if r' ^. unproven > keepNum then r'
     else r' & unprovenExamples %~ ((:) (turing,state))
 
+--
+bb3test :: Turing
+bb3test = Turing {states = 3, transitions = fromList
+  [((Phase 0, False), Step (Phase 1) True  R)
+  ,((Phase 0, True ), Halt)                   -- check check check
+  ,((Phase 1, False), Step (Phase 1) True  L) --                 - 3 --check
+  ,((Phase 1, True ), Step (Phase 2) False L) --                 - 2 --check
+  ,((Phase 2, False), Step (Phase 0) True  R) -- second-to-last  - 1 --check
+  ,((Phase 2, True ), Step (Phase 2) True  R) --last trans added - 0 --check
+  ]}
 -- low priority todo :: filter out the machines which have duplicate states
 -- creates a list of the various Turing machines that could result from filling
 -- in the specified unknown edge, reducing via symmetry - if there are multiple
 -- unused states, only sends us to the lowest numbered one
 -- does not check that the edge is unknown, a precondition of correctness
 branchOnEdge :: Edge -> Turing -> [Turing]
-branchOnEdge e@(Phase newPhase, _) (Turing n m) = filter (not . isSmallerMachine) candidates where
+branchOnEdge e@(Phase newPhase, _) (Turing n m) = if elem bb3test out
+  then (trace $ toString $ dispTuring (Turing n m)) out
+  else out where
+  out = filter (not . isSmallerMachine) candidates
   candidates = Turing n <$> addTrans <$> possibleTrans
   addTrans t = m & at e ?~ t
   --if we're assigned the last unknown transition, we have to halt
@@ -318,27 +343,31 @@ simulate limit startMachine = loop (startMachine, initSimState) [] Empty where
     Stepped _ newState -> newState
     _ -> error "forceAdvanced a state that doesn't advance"
   recurse [] result = result
-  recurse (x : xs) result = loop x xs result
+  recurse ((t,s) : xs) result = case staticAnalyze t of
+    Just proof -> recurse xs $ addResult t (ContinueForever proof) result
+    Nothing -> loop (t,s) xs result
 
-simulateWithSkips :: Int -> Turing -> Results (ExpTape Bit Int)
-simulateWithSkips limit startMachine = loop (startMachine, initExpSimState False, initBook startMachine) [] Empty where
-  loop :: (Turing, SimState (ExpTape Bit Int), SkipBook Bit)
-    -> [(Turing, SimState (ExpTape Bit Int), SkipBook Bit)]
-    -> Results (ExpTape Bit Int) -> Results (ExpTape Bit Int)
-  loop = undefined
+-- simulateWithSkips :: Int -> Turing -> Results (ExpTape Bit Int)
+-- simulateWithSkips limit startMachine = loop (startMachine, initExpSimState False, initBook startMachine) [] Empty where
+--   loop :: (Turing, SimState (ExpTape Bit Int), SkipBook Bit)
+--     -> [(Turing, SimState (ExpTape Bit Int), SkipBook Bit)]
+--     -> Results (ExpTape Bit Int) -> Results (ExpTape Bit Int)
+--   loop = undefined
 
+--halting analyses that can be performed without simulating the machine
+staticAnalyze :: Turing -> Maybe HaltProof
+staticAnalyze = backwardSearch
+-- staticAnalyze = const Nothing
 
+--attempting to prove the machine runs forever starting at a given state
 proveForever :: Turing -> SimState Tape -> Maybe HaltProof
-proveForever = infiniteCycle
+proveForever t s@(SimState stepsTaken _ _) = infiniteCycle (min stepsTaken infiniteSimLimit) t s
 
-infiniteSimLimit :: Steps
-infiniteSimLimit = 20
+infiniteCycle :: Int -> Turing -> SimState Tape -> Maybe HaltProof
+infiniteCycle limit t s = infiniteRight limit t s <|> infiniteLeft limit t s
 
-infiniteCycle :: Turing -> SimState Tape -> Maybe HaltProof
-infiniteCycle t s = infiniteRight t s <|> infiniteLeft t s
-
-infiniteRight :: Turing -> SimState Tape -> Maybe HaltProof
-infiniteRight t (SimState originalSteps _ mState@(TMState startPhase (Tape startLs False [])))
+infiniteRight :: Int -> Turing -> SimState Tape -> Maybe HaltProof
+infiniteRight limit t (SimState originalSteps _ mState@(TMState startPhase (Tape startLs False [])))
   = step 0 0 0 mState where
   -- first arg counts number of steps taken in this halting proof
   -- second arg counts distance left or right from our starting point,
@@ -346,7 +375,7 @@ infiniteRight t (SimState originalSteps _ mState@(TMState startPhase (Tape start
   -- third arg counts max leftward distance (in positive terms)
   step :: Steps -> Int -> Int -> TMState Tape -> Maybe HaltProof
   --we hit our step limit
-  step ((\i -> i >= infiniteSimLimit) -> True) _ _ _ = Nothing
+  step ((\i -> i >= limit) -> True) _ _ _ = Nothing
   --here, distance is negative, so we just simulate another step
   step steps dist@((\d -> d <= 0) -> True) maxL s = stepRecurse steps dist maxL s
   --here, distance is positive, so we have a chance to fulfull the conditions
@@ -364,10 +393,10 @@ infiniteRight t (SimState originalSteps _ mState@(TMState startPhase (Tape start
   newMax :: Int -> Int -> Int
   newMax oldMax ((\i -> i >= 0) -> True) = oldMax
   newMax oldMax (negate -> newPosDist) = max oldMax newPosDist
-infiniteRight _ _ = Nothing
+infiniteRight _ _ _ = Nothing
 
-infiniteLeft :: Turing -> SimState Tape -> Maybe HaltProof
-infiniteLeft t s = mirrorHaltProof <$> infiniteRight (mirrorTuring t) (mirrorSimState s)
+infiniteLeft :: Int -> Turing -> SimState Tape -> Maybe HaltProof
+infiniteLeft limit t s = mirrorHaltProof <$> infiniteRight limit (mirrorTuring t) (mirrorSimState s)
 
 dispTMState :: TMState Tape -> Text
 dispTMState (TMState (Phase i) tape) = "phase: " <> show i <> " tape: " <> dispTape tape
@@ -377,21 +406,16 @@ dispSimState (SimState steps slow fast) = "steps: " <> showInt3Wide steps
   <> "\nslow: " <> dispTMState slow
   <> "\nfast: " <> dispTMState fast
 
-backwardSearchSingleLimit :: Int
-backwardSearchSingleLimit = 8
-
-backwardSearchGlobalLimit :: Int
-backwardSearchGlobalLimit = 30
-
 --runs a backward search from each halting state to see if it can reach a contradiction
 --if we show that all ways to halt don't have paths leading into them from valid tapes
 --then the halt state will never be reached
 --of course no such procedure can be complete, so we put a finite depth on the search and
 --give up after a while
 backwardSearch :: Turing -> Maybe HaltProof
+backwardSearch (Turing n trans) | length trans < (n*2) - 1 = Nothing
 backwardSearch (Turing n trans) = recurse 0 $ fromList $ (, Min 0) <$> (initState <$> unusedEdges) where
   unusedEdges :: [Edge]
-  unusedEdges = NE.filter (\e -> (at e . _Nothing) `has` trans) $ uniEdge n
+  unusedEdges = NE.filter (\e -> let t = trans ^. at e in t == Nothing || t == Just Halt) $ uniEdge n
   initState :: Edge -> (Phase,Tape)
   initState (p, b) = (p, Tape [] b [])
   loop :: Int -> ((Phase, Tape), Int) -> MonoidalMap (Phase, Tape) (Min Int) -> Maybe HaltProof
@@ -405,6 +429,9 @@ backwardSearch (Turing n trans) = recurse 0 $ fromList $ (, Min 0) <$> (initStat
   recurse _globalSteps Empty = Just $ BackwardSearch
   recurse globalSteps (deleteFindMin -> (f, rest)) = loop globalSteps (second getMin f) rest
 
+  --this is subtle: it doesn't account for getting to your current undefined transition
+  --by taking another undefined transition, but you must be able to reach _some_ undefined transition
+  --by taking only real transitions or you will stay taking defined transitions forever, thus never halting
   transList = assocs trans
   candidateTrans :: Phase -> [(Edge, Trans)]
   candidateTrans p = filter ((== Just p) . getPhase . snd) transList

@@ -63,10 +63,49 @@ fullsim_not_halt3 = Turing {states = 3, transitions = fromList
   ,((Phase 2,True ),Step (Phase 0) True  L)
   ]}
 
+--0 False | 1 True R\n0 True | Halt\n1 False | 1 True L\n1 True | 2 False L\n2 False | 0 True R\n2 True | 2 True R\n
+bb3 :: Turing
+bb3 = Turing {states = 3, transitions = fromList
+  [((Phase 0, False), Step (Phase 1) True R)
+  ,((Phase 0, True ), Halt)
+  ,((Phase 1, False), Step (Phase 2) False R)
+  ,((Phase 1, True ), Step (Phase 1) True  R)
+  ,((Phase 2, False), Step (Phase 2) True  L)
+  ,((Phase 2, True ), Step (Phase 0) True  L)
+  ]}
+
+false_backward_search :: Turing
+false_backward_search = Turing {states = 3, transitions = fromList
+  [((Phase 0, False), Step (Phase 1) True R)
+  -- ,((Phase 0, True ), Halt)
+  ,((Phase 1, False), Step (Phase 2) False R)
+  -- ,((Phase 1, True ), Step (Phase 1) True  R)
+  -- ,((Phase 2, False), Step (Phase 2) True  L)
+  -- ,((Phase 2, True ), Step (Phase 0) True  L)
+  ]}
+
+-- the most ones was Just 6, performed by
+-- 0 False | 1 True R
+-- 0 True | Halt
+-- 1 False | 2 False R
+-- 1 True | 1 True R
+-- 2 False | 2 True L
+-- 2 True | 0 True L
+-- final tape:Just "1>1<1 1 1 1"
+
+
+--the most ones was Just 5
+-- 0 False | 1 True R
+-- 0 True | Halt
+-- 1 False | 1 True L
+-- 1 True | 2 False L
+-- 2 False | 0 True R
+-- 2 True | 2 True R
+
 simProgram :: IO ()
 simProgram = do
   hSetBuffering stdout NoBuffering
-  let results = Simulate.simulate 25 $ startMachine1 3
+  let results = Simulate.simulate 310 $ startMachine1 4
   putTextLn $ dispResults $ results
   interact results where
   interact r = do
@@ -92,11 +131,13 @@ simProgram = do
 --TODO:: make exponential notation for tape
 --TODO:: make simple induction
 --TODO:: make macro machine simulator
+--TODO:: make database that stores results of machines, so that results can be compared between different runs
 main :: IO ()
 main = do
-  --simProgram
-  putTextLn $ show $ backwardSearch weird3
-
-  --
-  --putStrLn $ showOneMachine fullsim_not_halt3 100
+  simProgram
+  -- print $ backwardSearch $ startMachine1 3 --this returns a proof which is bad
+  -- print $ backwardSearch $ false_backward_search
+  -- traverse_ putTextLn $ show <$> backwardSearch <$> tnfPrecursors 25 bb3
+  -- traverse_ putTextLn $ dispTuring <$> tnfPrecursors 25 bb3
+  --putTextLn $ showOneMachine bb3 100
   -- putStrLn $ force $ simpleSimulator 2 20

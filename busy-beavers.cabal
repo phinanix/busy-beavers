@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 497cc2e291940490539b30407ef952bf4c18bd2dd3960b16a782dc3c9c7374c1
+-- hash: 9a6f1d8d51f6031e45be833cdf1b6e4b3e4e2e3190cbcb168c049b475b452640
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -27,6 +27,8 @@ source-repository head
 
 library
   exposed-modules:
+      Config
+      Count
       Display
       ExpTape
       Simple.Display
