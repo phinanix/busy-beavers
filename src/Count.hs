@@ -2,7 +2,11 @@ module Count where
 
 import Relude
 import Control.Lens
+import Data.Map.Merge.Strict (mergeA, zipWithAMatched, preserveMissing)
 import Data.Map.Monoidal (MonoidalMap(..))
+import Data.Witherable
+
+import Util
 
 data Count = Count
   { num :: Natural
@@ -32,7 +36,7 @@ matchCount (Count _ Empty) (Count _ _not_empty) = Nothing
 --something with vars can match a bare number or something with vars, as long as
 --the numbers added to the vars are compatible
 -- x can match y, and x can match x+1, but x+1 can't match z, because what if z = 1?
-matchCount (Count n vs) (Count m ws) = if n <= m
+matchCount (Count n _vs) (Count m _ws) = if n <= m
   then Just (Count 0 Empty)
   else Nothing
 
@@ -43,7 +47,38 @@ varCount :: Natural -> Count
 varCount n = Count 0 $ MonoidalMap (one (n,Sum 1))
 
 --fails when the equation is inconsistent with what we already know
-addEquation :: (Count, Count) -> Map Count Count -> Maybe (Map Count Count)
-addEquation (l, r) m = case m ^. at l of
+addEquationToMap :: (Count, Count) -> Map Count Count -> Maybe (Map Count Count)
+addEquationToMap (l, r) m = case m ^. at l of
   Nothing -> Just $ m & at l ?~ r
   Just r' -> guard (r == r') >> Just m
+
+addEquation :: (Count, Count) -> EquationState a -> EquationState a
+addEquation eqn (EquationState (Just (m, a))) = case addEquationToMap eqn m of
+  Nothing -> EquationState Nothing
+  (Just m') -> EquationState (Just (m',a))
+addEquation _ _ = EquationState Nothing
+
+mergeEqns :: Map Count Count -> Map Count Count -> Maybe (Map Count Count)
+mergeEqns = mergeA preserveMissing preserveMissing
+  (zipWithAMatched (\_k v1 v2 -> if v1 == v2 then Just v1 else Nothing))
+
+newtype EquationState s = EquationState {getEquationState :: Maybe (Map Count Count, s)}
+  deriving newtype (Eq, Ord, Show)
+
+mergeApp :: (Map Count Count, a -> b) -> (Map Count Count, a) -> Maybe (Map Count Count, b)
+mergeApp (eqns, f) (moreEqns, a) = (, f a) <$> mergeEqns eqns moreEqns
+
+instance Functor EquationState where
+  fmap f (EquationState e) = EquationState $ fmap (fmap f) e
+instance Applicative EquationState where
+  pure s = EquationState $ Just (Empty, s)
+  (EquationState f) <*> (EquationState a) = EquationState $ join $ mergeApp <$> f <*> a
+
+instance Monad EquationState where
+  (EquationState k) >>= f = EquationState $ bind combine $ getEquationState . f <$$> k
+    where
+    combine (eqns, Just (moreEqns, b)) = (,b) <$> mergeEqns eqns moreEqns
+    combine (_, Nothing) = Nothing
+
+instance Filterable EquationState where
+  mapMaybe fm (EquationState (Just (eqns, a))) = EquationState $ (eqns,) <$> fm a

@@ -1,7 +1,8 @@
 module Skip where
 
-import Relude
+import Relude hiding (mapMaybe)
 import Control.Lens
+import Data.Witherable
 
 import Turing
 import Count
@@ -62,19 +63,19 @@ data TapeMatch s = Perfect | TapeLeft (NonEmpty (s, Count)) | SkipLeft (NonEmpty
 --fails, returning nothing
 --example :: matchBitTape [(F, 2), (T, 1)] [(F, 2), (T, 3), (F, x)] == [(T, 2), (F, x)]
 --returns Nothing if the match fails, else the match
-matchTape :: (Eq s) => [(s, Count)] -> [(s, Count)] -> Maybe (TapeMatch s, Map Count Count)
-matchTape [] [] = Just $ (Perfect, Empty)
-matchTape [] (t:ts) = Just $ (TapeLeft (t :| ts), Empty)
-matchTape (s:rest) []  = Just $ (SkipLeft (s :| rest), Empty)
+matchTape :: (Eq s) => [(s, Count)] -> [(s, Count)] -> EquationState (TapeMatch s)
+matchTape [] [] = pure Perfect
+matchTape [] (t:ts) = pure $ TapeLeft (t :| ts)
+matchTape (s:rest) []  = pure $ SkipLeft (s :| rest)
 --else we can match the heads
 matchTape (skipHead:restSkip) (tapeHead:restTape) = case matchTapeHeads skipHead tapeHead of
   --if the heads don't match, the whole match fails
-  Nothing -> Nothing
+  Nothing -> EquationState Nothing
   --if the heads perfectly square off, we can just recurse
-  Just (PerfectH, eqn) -> matchTape restSkip restTape >>= traverse (addEquation eqn) where
+  Just (PerfectH, eqn) -> addEquation eqn $ matchTape restSkip restTape
   --else we have a leftover bit of tape and match against it
   --TODO:: I think we can short circuit and skip the rest of the match here if the skip has the invariant
-  Just (TapeHLeft tapeHead, eqn) -> matchTape restSkip (tapeHead:restTape) >>= traverse (addEquation eqn)
+  Just (TapeHLeft tapeHead, eqn) -> addEquation eqn $ matchTape restSkip (tapeHead:restTape)
 
 data TapeOrInf s = Infinite | NewTape [(s, Count)]
 
@@ -83,8 +84,8 @@ data TapeOrInf s = Infinite | NewTape [(s, Count)]
 --fails if there is skip left-over
 --first line is some seriously ugly munging but I'm not sure off the top of my head how to do better
 --the function's type is (a -> Maybe b) -> Maybe (a,c) -> Maybe (b,c)
-matchBitTape :: [(Bit, Count)] -> [(Bit, Count)] -> Maybe (TapeOrInf Bit, Map Count Count)
-matchBitTape skip tape = bind (bitraverse matchToTapeOrInf pure) $ matchTape skip tape where
+matchBitTape :: [(Bit, Count)] -> [(Bit, Count)] -> EquationState (TapeOrInf Bit)
+matchBitTape skip tape = mapMaybe matchToTapeOrInf $ matchTape skip tape where
   matchToTapeOrInf :: TapeMatch Bit -> Maybe (TapeOrInf Bit)
   matchToTapeOrInf = \case
     Perfect -> Just $ NewTape []
@@ -108,6 +109,3 @@ matchPoints (skipS, skipC, skipD) (tapeS, pointC, tapeD)
         L -> Just $ Lremains (tapeS, remainC)
         R -> Just $ Rremains (tapeS, remainC))
 matchPoints _ _ = Nothing
---
--- -- generalizePoint :: (s, Int, Dir) -> (s, Count, Dir)
--- -- generalizePoint (s, i, d) = (s, Specific i, d)

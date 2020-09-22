@@ -147,15 +147,15 @@ data SkipResult s c = Skipped Phase (ExpTape s c) | SkippedOffEnd (Skip s)
 --the data type storing various proven skips associated with a machine
 type SkipBook s = Map (Phase, s) (Skip s)
 
-initTransSkip :: Edge -> Trans -> Set (Skip Bit)
-initTransSkip (p, b) Halt = undefined
-initTransSkip (p, b) (Step q c d) | p == q = undefined
-initTransSkip (p, b) (Step q c d) = one $ Skip
-  (Config p [] (b, finiteCount 1, L) [])
-  undefined
-
-initBook :: Turing -> SkipBook Bit
-initBook t = undefined
+-- initTransSkip :: Edge -> Trans -> Set (Skip Bit)
+-- initTransSkip (p, b) Halt = undefined
+-- initTransSkip (p, b) (Step q c d) | p == q = undefined
+-- initTransSkip (p, b) (Step q c d) = one $ Skip
+--   (Config p [] (b, finiteCount 1, L) [])
+--   undefined
+--
+-- initBook :: Turing -> SkipBook Bit
+-- initBook t = undefined
 
 --the results should be
 --  how many machines halted

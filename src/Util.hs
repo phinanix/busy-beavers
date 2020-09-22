@@ -9,3 +9,8 @@ showInt3Wide i = show i
 
 bind :: Monad m => (a -> m b) -> m a -> m b
 bind = flip (>>=)
+
+(<$$>) :: (Functor f, Functor g) => (a -> b) -> f (g a) -> f (g b)
+(<$$>) = fmap . fmap
+
+infixl 4 <$$>
