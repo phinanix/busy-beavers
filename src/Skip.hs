@@ -41,12 +41,14 @@ data HeadMatch s = PerfectH | TapeHLeft (s, Count) deriving (Eq, Ord, Show)
 
 --we take the start of a skip and the start of a tape, and return Nothing if they
 --don't match, and the match if they do
-matchTapeHeads :: (Eq s) => (s, Count) -> (s, Count) -> Maybe (HeadMatch s, (Count, Count))
-matchTapeHeads (sb, skipC) (tb, tapeC) | sb == tb = matchCount skipC tapeC >>= \case
-  Empty -> Just (PerfectH, (skipC, tapeC))
-  newCount -> Just $ (TapeHLeft (tb, newCount), (skipC, tapeC))
+matchTapeHeads :: (Eq s) => (s, Count) -> (s, Count) -> EquationState (HeadMatch s)
+matchTapeHeads (sb, skipC) (tb, tapeC) | sb == tb = case matchCount skipC tapeC of
+  Nothing -> nothingES
+  Just countMatch -> case countMatch of
+    Empty -> addEquation (skipC, tapeC) $ pure PerfectH
+    newCount -> addEquation (skipC, tapeC) $ pure (TapeHLeft (tb, newCount))
 --if the bits fail to match, the match fails all together
-matchTapeHeads _ _ = Nothing
+matchTapeHeads _ _ = nothingES
 
 --when you match a skip and a tape, either they perfectly annihilate, the tape
 --has at least one thing left, or the skip matches the whole tape and has at least
@@ -68,14 +70,12 @@ matchTape [] [] = pure Perfect
 matchTape [] (t:ts) = pure $ TapeLeft (t :| ts)
 matchTape (s:rest) []  = pure $ SkipLeft (s :| rest)
 --else we can match the heads
-matchTape (skipHead:restSkip) (tapeHead:restTape) = case matchTapeHeads skipHead tapeHead of
-  --if the heads don't match, the whole match fails
-  Nothing -> EquationState Nothing
+matchTape (skipHead:restSkip) (tapeHead:restTape) = matchTapeHeads skipHead tapeHead >>= \case
   --if the heads perfectly square off, we can just recurse
-  Just (PerfectH, eqn) -> addEquation eqn $ matchTape restSkip restTape
+  PerfectH -> matchTape restSkip restTape
   --else we have a leftover bit of tape and match against it
   --TODO:: I think we can short circuit and skip the rest of the match here if the skip has the invariant
-  Just (TapeHLeft tapeHead, eqn) -> addEquation eqn $ matchTape restSkip (tapeHead:restTape)
+  (TapeHLeft tapeHead) ->matchTape restSkip (tapeHead:restTape)
 
 data TapeOrInf s = Infinite | NewTape [(s, Count)]
 
@@ -98,14 +98,14 @@ matchBitTape skip tape = mapMaybe matchToTapeOrInf $ matchTape skip tape where
 --remain on one side
 data PointMatch s = PerfectP | Lremains (s, Count) | Rremains (s, Count)
 
-matchPoints :: (Eq s) => (s, Count, Dir) -> (s, Count, Dir) -> Maybe (PointMatch s, (Count, Count))
+matchPoints :: (Eq s) => (s, Count, Dir) -> (s, Count, Dir) -> EquationState (PointMatch s)
 matchPoints (skipS, skipC, skipD) (tapeS, pointC, tapeD)
   | (skipS == tapeS) && (skipD == tapeD)
-  = (, (skipC, pointC)) <$> (matchCount skipC pointC >>= \case --passing through the maybe
-      Empty -> Just PerfectP
+  = addEquation (skipC, pointC) $ maybeES $ matchCount skipC pointC >>= \case --passing through the maybe
+      Empty -> pure PerfectP
       --if some of the tape's point is not matched, then it remains on the tape
       --if we start matching from the right, the unmatched point is on the left
       remainC -> case mirrorDir tapeD of
-        L -> Just $ Lremains (tapeS, remainC)
-        R -> Just $ Rremains (tapeS, remainC))
-matchPoints _ _ = Nothing
+        L -> pure $ Lremains (tapeS, remainC)
+        R -> pure $ Rremains (tapeS, remainC)
+matchPoints _ _ = nothingES

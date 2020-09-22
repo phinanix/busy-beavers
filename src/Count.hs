@@ -3,7 +3,7 @@ module Count where
 import Relude
 import Control.Lens
 import Data.Map.Merge.Strict (mergeA, zipWithAMatched, preserveMissing)
-import Data.Map.Monoidal (MonoidalMap(..))
+import Data.Map.Monoidal (MonoidalMap(..), assocs)
 import Data.Witherable
 
 import Util
@@ -13,6 +13,12 @@ data Count = Count
   , vars :: MonoidalMap Natural (Sum Natural)
   } deriving (Eq, Ord, Show, Generic)
 instance NFData Count
+
+dispCount :: Count -> Text
+dispCount (Count n vars) = show n <> " + " <> (mconcat $ dispVar <$> assocs vars)
+
+dispVar :: (Natural, Sum Natural) -> Text
+dispVar (n, Sum count) =  show count <> "*x_" <> show n <> " "
 
 instance Semigroup Count where
   (Count n vs) <> (Count m ws) = Count (n+m) (vs <> ws)
@@ -48,9 +54,20 @@ varCount n = Count 0 $ MonoidalMap (one (n,Sum 1))
 
 --fails when the equation is inconsistent with what we already know
 addEquationToMap :: (Count, Count) -> Map Count Count -> Maybe (Map Count Count)
-addEquationToMap (l, r) m = case m ^. at l of
-  Nothing -> Just $ m & at l ?~ r
-  Just r' -> guard (r == r') >> Just m
+addEquationToMap eqn m = case admissible eqn of
+  WrongEqn -> Nothing
+  Tautology -> Just m
+  Equation (l,r) -> case m ^. at l of
+    Nothing -> Just $ m & at l ?~ r
+    Just r' -> guard (r == r') >> Just m
+
+data EquationStatus = WrongEqn | Tautology | Equation (Count, Count) deriving (Eq, Ord, Show, Generic)
+instance NFData EquationStatus
+
+admissible :: (Count, Count) -> EquationStatus
+admissible (Count m Empty, Count n Empty) | m == n = Tautology
+admissible (Count m Empty, Count n Empty) | m /= n = WrongEqn
+admissible eqn = Equation eqn
 
 addEquation :: (Count, Count) -> EquationState a -> EquationState a
 addEquation eqn (EquationState (Just (m, a))) = case addEquationToMap eqn m of
@@ -64,6 +81,12 @@ mergeEqns = mergeA preserveMissing preserveMissing
 
 newtype EquationState s = EquationState {getEquationState :: Maybe (Map Count Count, s)}
   deriving newtype (Eq, Ord, Show)
+
+nothingES :: EquationState s
+nothingES = EquationState Nothing
+
+maybeES :: Maybe s -> EquationState s
+maybeES = EquationState . fmap (Empty,)
 
 mergeApp :: (Map Count Count, a -> b) -> (Map Count Count, a) -> Maybe (Map Count Count, b)
 mergeApp (eqns, f) (moreEqns, a) = (, f a) <$> mergeEqns eqns moreEqns
@@ -80,5 +103,9 @@ instance Monad EquationState where
     combine (eqns, Just (moreEqns, b)) = (,b) <$> mergeEqns eqns moreEqns
     combine (_, Nothing) = Nothing
 
+instance MonadFail EquationState where
+  fail _ = EquationState Nothing
+
 instance Filterable EquationState where
   mapMaybe fm (EquationState (Just (eqns, a))) = EquationState $ (eqns,) <$> fm a
+  mapMaybe _ (EquationState Nothing) = EquationState Nothing

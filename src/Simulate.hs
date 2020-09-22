@@ -109,7 +109,11 @@ simExpStep (Turing _ trans) (TMState p tape@(ExpTape ls (bit, num, headDir) rs))
       else Stepped moveDir (TMState newP $ E.modify moveDir newBit tape)
 
 --either we skipped ahead to a new Phase and Tape or we might've proved infinity
-data SkipResult s c = Skipped Phase (ExpTape s c) | SkippedOffEnd (Skip s)
+data SkipResult s c = Skipped Phase (ExpTape s c) | SkippedOffEnd (Skip s) deriving (Eq, Ord, Show, Generic)
+
+dispSkipResult :: SkipResult Bit Count -> Text
+dispSkipResult (SkippedOffEnd _) = "skipped off end!"
+dispSkipResult (Skipped p tape) = "skipped to phase: " <> dispPhase p <> " and tape " <> E.dispExpTape tape
 
 --returns nothing if the skip is inapplicable, else returns a new tape
 --the fact that the type is bit is only used when running off the tape, but for now I don't want to
@@ -138,8 +142,39 @@ data SkipResult s c = Skipped Phase (ExpTape s c) | SkippedOffEnd (Skip s)
 --           (_, Infinite) -> SkippedOffEnd (Skip s e)
 --           (NewTape newL, NewTape newR) -> Skipped (e^.cstate) $
 --             ExpTape ((e^.ls) `etApp` newL) (e^.c_point) ((e^.rs) `etApp` newR)
--- --if the phases don't match, we fail right away
+--if the phases don't match, we fail right away
 -- applySkip _ _ = Nothing
+
+applySkip :: Skip Bit -> (Phase, ExpTape Bit Count) -> Maybe (SkipResult Bit Count)
+applySKip skip@(Skip s e) (p, ExpTape leftT pointT rightT) | s ^. cstate == p = packageResult foo where
+  foo :: EquationState (ExpTape Bit Count -> ExpTape Bit Count, TapeOrInf Bit, TapeOrInf Bit)
+  foo = matchPoints (s^.c_point) pointT >>= \case
+    Lremains remainP -> (,,) <$> pure glomPointLeft
+      <*> pure (NewTape leftT)
+      <*> (mfailGuard (s^.ls == []) "ls not empty" >> matchBitTape (s^.rs) rightT)
+    Rremains remainP -> (,,) <$> pure glomPointRight
+      <*> (mfailGuard (s^.rs == []) "rs not empty" >> matchBitTape (s^.ls) leftT)
+      <*> pure (NewTape rightT)
+    PerfectP -> (\(a,b) -> (id,a,b)) <$> (bisequence
+      (matchBitTape (s^.ls) leftT,
+       matchBitTape (s^.rs) rightT))
+  packageResult (EquationState (Just (eqns, (invariant, tapeInfL, tapeInfR)))) = case (tapeInfL, tapeInfR) of
+    (Infinite, _) -> Just $ SkippedOffEnd skip
+    (_, Infinite) -> Just $ SkippedOffEnd skip
+    (NewTape newLs, NewTape newRs) -> Just $ Skipped (e^.cstate) $ invariant $ ExpTape
+      ((updateList eqns $ e^.ls) `etApp` newLs)
+      (updatePoint eqns $ e ^. c_point)
+      ((updateList eqns $ e^.rs) `etApp` newRs)
+  packageResult _ = Nothing
+  updateCount :: Map Count Count -> Count -> Count
+  updateCount m c = case m^.at c of
+    Just c' -> c'
+    Nothing -> error "a var wasn't mapped in a skip"
+  updatePoint :: Map Count Count -> (s, Count, Dir) -> (s, Count, Dir)
+  updatePoint m = _2 %~ updateCount m
+  updateList :: Map Count Count -> [(s, Count)] -> [(s, Count)]
+  updateList = fmap . fmap . updateCount
+applySkip _ _ = Nothing
 
 --we want to be able to apply a skip of counts to an ExpTape _ Count but also a
 --skip of counts to an ExpTape _ Nat

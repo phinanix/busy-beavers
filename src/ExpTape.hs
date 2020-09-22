@@ -4,6 +4,7 @@ import Relude
 import Control.Lens
 
 import Turing
+import Count
 import Skip
 
 data ExpTape s c = ExpTape
@@ -66,3 +67,18 @@ glomPointRight :: (Eq s, Semigroup c) => ExpTape s c -> ExpTape s c
 glomPointRight (ExpTape ls (s_p, c_p, dir) ((s_r, c_r):rs)) | s_p == s_r =
   ExpTape ls (s_p, c_p <> c_r, dir) rs
 glomPointRight e = e
+
+dispBitCount :: (Bit, Count) -> Text
+dispBitCount (b, c) = "(" <> dispBit b <> ", " <> dispCount c <> ") "
+
+dispExpTape :: ExpTape Bit Count -> Text
+dispExpTape (ExpTape ls (bit_p, count_p, L) rs)
+  = (mconcat $ dispBitCount <$> reverse ls)
+  <> "|>"
+  <> dispBitCount (bit_p, count_p)
+  <> (mconcat $ dispBitCount <$> rs)
+dispExpTape (ExpTape ls (bit_p, count_p, R) rs)
+  = (mconcat $ dispBitCount <$> reverse ls)
+  <> dispBitCount (bit_p, count_p)
+  <> "<|"
+  <> (mconcat $ dispBitCount <$> rs)
