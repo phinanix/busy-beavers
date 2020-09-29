@@ -42,11 +42,9 @@ data HeadMatch s = PerfectH | TapeHLeft (s, Count) deriving (Eq, Ord, Show)
 --we take the start of a skip and the start of a tape, and return Nothing if they
 --don't match, and the match if they do
 matchTapeHeads :: (Eq s) => (s, Count) -> (s, Count) -> EquationState (HeadMatch s)
-matchTapeHeads (sb, skipC) (tb, tapeC) | sb == tb = case matchCount skipC tapeC of
-  Nothing -> nothingES
-  Just countMatch -> case countMatch of
-    Empty -> addEquation (skipC, tapeC) $ pure PerfectH
-    newCount -> addEquation (skipC, tapeC) $ pure (TapeHLeft (tb, newCount))
+matchTapeHeads (sb, skipC) (tb, tapeC) | sb == tb = matchCount skipC tapeC >>= \case
+    Empty -> pure PerfectH
+    newCount -> pure (TapeHLeft (tb, newCount))
 --if the bits fail to match, the match fails all together
 matchTapeHeads _ _ = nothingES
 
@@ -75,7 +73,7 @@ matchTape (skipHead:restSkip) (tapeHead:restTape) = matchTapeHeads skipHead tape
   PerfectH -> matchTape restSkip restTape
   --else we have a leftover bit of tape and match against it
   --TODO:: I think we can short circuit and skip the rest of the match here if the skip has the invariant
-  (TapeHLeft tapeHead) ->matchTape restSkip (tapeHead:restTape)
+  (TapeHLeft tapeHead) -> matchTape restSkip (tapeHead:restTape)
 
 data TapeOrInf s = Infinite | NewTape [(s, Count)] deriving (Eq, Ord, Show, Generic)
 
@@ -88,9 +86,13 @@ matchBitTape :: [(Bit, Count)] -> [(Bit, Count)] -> EquationState (TapeOrInf Bit
 matchBitTape skip tape = mapMaybe matchToTapeOrInf $ matchTape skip tape where
   matchToTapeOrInf :: TapeMatch Bit -> Maybe (TapeOrInf Bit)
   matchToTapeOrInf = \case
-    Perfect -> Just $ NewTape []
+    Perfect -> pure $ NewTape []
     TapeLeft (toList -> newTape) -> Just $ NewTape newTape
-    SkipLeft ((False, Count _ Empty) :| []) -> Just $ NewTape []
+    --if there's a count without any foralls, like a+3 where a is free, then
+    --it just matches the infinite zeros
+    SkipLeft ((False, Count _ _ Empty) :| []) -> Just $ NewTape []
+    -- _notEmpty thereby must have foralls, and thus it matches the whole infinite
+    -- rest of the tape
     SkipLeft ((False, _notEmpty) :| []) -> Just Infinite
     SkipLeft _ -> Nothing
 
@@ -101,15 +103,13 @@ data PointMatch s = PerfectP | Lremains (s, Count) | Rremains (s, Count) derivin
 matchPoints :: (Eq s) => (s, Count, Dir) -> (s, Count, Dir) -> EquationState (PointMatch s)
 matchPoints (skipS, skipC, skipD) (tapeS, pointC, tapeD)
   | (skipS == tapeS) && (skipD == tapeD)
-  = addEquation (skipC, pointC) $ maybeES $ matchCount skipC pointC >>= \case --passing through the maybe
+  = matchCount skipC pointC >>= \case --passing through the maybe
       Empty -> pure PerfectP
       --if some of the tape's point is not matched, then it remains on the tape
       --if we start matching from the right, the unmatched point is on the left
       remainC -> case mirrorDir tapeD of
         L -> pure $ Lremains (tapeS, remainC)
         R -> pure $ Rremains (tapeS, remainC)
---
---matchPoints (skipS, skipC, skipD) (tapeS, pointC, tapeD) | (skipS == tapeS) = error ""
-matchPoints (skipS, skipC, skipD) (tapeS, pointC, tapeD) | (skipD == tapeD) = error ""
-
---matchPoints _ _ = nothingES
+-- matchPoints (skipS, skipC, skipD) (tapeS, pointC, tapeD) | (skipS == tapeS) = error ""
+-- matchPoints (skipS, skipC, skipD) (tapeS, pointC, tapeD) | (skipD == tapeD) = error ""
+matchPoints _ _ = nothingES

@@ -118,6 +118,7 @@ dispSkipResult (Skipped p tape) = "skipped to phase: " <> dispPhase p <> " and t
 --returns nothing if the skip is inapplicable, else returns a new tape
 --the fact that the type is bit is only used when running off the tape, but for now I don't want to
 --generalize that out (also ExpTape would have to be generalized)
+-- VERSION 1
 --TODO:: this is an old implementation from before Counts had vars, so I don't think it works
 -- applySkip :: Skip Bit -> (Phase, ExpTape Bit Count) -> Maybe (SkipResult Bit Count)
 -- applySkip (Skip s e) (p, ExpTape leftTape tapePoint rightTape) | s ^. cstate == p
@@ -144,48 +145,84 @@ dispSkipResult (Skipped p tape) = "skipped to phase: " <> dispPhase p <> " and t
 --             ExpTape ((e^.ls) `etApp` newL) (e^.c_point) ((e^.rs) `etApp` newR)
 --if the phases don't match, we fail right away
 -- applySkip _ _ = Nothing
+--
+-- VERSION 2
+-- applySkip :: Skip Bit -> (Phase, ExpTape Bit Count) -> Maybe (SkipResult Bit Count)
+-- applySkip skip@(Skip s e) state@(p, ExpTape leftT pointT rightT) | s ^. cstate == p
+--   = packageResult skip $ foo skip state where
+-- applySkip _ _ = Nothing
+--
+-- foo :: Skip Bit -> (Phase, ExpTape Bit Count)
+--   -> EquationState (ExpTape Bit Count -> ExpTape Bit Count, TapeOrInf Bit, TapeOrInf Bit)
+-- foo skip@(Skip s e) (p, ExpTape leftT pointT rightT) = matchPoints (s^.c_point) pointT >>= undefined
+--   -- \case
+--   --   Lremains remainP -> (,,) <$> pure glomPointLeft
+--   --     <*> pure (NewTape $ remainP : leftT)
+--   --     <*> ((mfailGuard (s^.ls == []) "ls not empty") >>
+--   --     (matchBitTape
+--   --       (s^.rs)
+--   --       rightT))
+--   --   Rremains remainP -> (,,) <$> pure glomPointRight
+--   --     <*> (mfailGuard (s^.rs == []) "rs not empty" >> matchBitTape (s^.ls) leftT)
+--   --     <*> pure (NewTape $ remainP : rightT)
+--   --   PerfectP -> (\(a,b) -> (id,a,b)) <$> (bisequence
+--   --     (matchBitTape (s^.ls) leftT,
+--   --      matchBitTape (s^.rs) rightT))
+-- packageResult :: _
+-- packageResult skip@(Skip s e) (EquationState (Just (eqns, (invariant, tapeInfL, tapeInfR)))) = case (tapeInfL, tapeInfR) of
+--   (Infinite, _) -> Just $ SkippedOffEnd skip
+--   (_, Infinite) -> Just $ SkippedOffEnd skip
+--   (NewTape newLs, NewTape newRs) -> Just $ Skipped (e^.cstate) $ invariant $ ExpTape
+--     ((updateList eqns $ e^.ls) `etApp` newLs)
+--     (updatePoint eqns $ e ^. c_point)
+--     ((updateList eqns $ e^.rs) `etApp` newRs)
+--   where
+--   updateCount :: Map Count Count -> Count -> Count
+--   updateCount _ c@(Count _ Empty) = c
+--   updateCount m c = case m^.at c of
+--     Just c' -> c'
+--     Nothing -> error "a var wasn't mapped in a skip"
+--   updatePoint :: Map Count Count -> (s, Count, Dir) -> (s, Count, Dir)
+--   updatePoint m = _2 %~ updateCount m
+--   updateList :: Map Count Count -> [(s, Count)] -> [(s, Count)]
+--   updateList = fmap . fmap . updateCount
+-- packageResult _ _ = Nothing
 
+-- VERSION 3
 applySkip :: Skip Bit -> (Phase, ExpTape Bit Count) -> Maybe (SkipResult Bit Count)
-applySkip skip@(Skip s e) state@(p, ExpTape leftT pointT rightT) | s ^. cstate == p
-  = packageResult skip $ foo skip state where
---applySkip _ _ = Nothing
-
-foo :: Skip Bit -> (Phase, ExpTape Bit Count)
-  -> EquationState (ExpTape Bit Count -> ExpTape Bit Count, TapeOrInf Bit, TapeOrInf Bit)
-foo skip@(Skip s e) (p, ExpTape leftT pointT rightT) = matchPoints (s^.c_point) pointT >>= undefined
-  -- \case
-  --   Lremains remainP -> (,,) <$> pure glomPointLeft
-  --     <*> pure (NewTape $ remainP : leftT)
-  --     <*> ((mfailGuard (s^.ls == []) "ls not empty") >>
-  --     (matchBitTape
-  --       (s^.rs)
-  --       rightT))
-  --   Rremains remainP -> (,,) <$> pure glomPointRight
-  --     <*> (mfailGuard (s^.rs == []) "rs not empty" >> matchBitTape (s^.ls) leftT)
-  --     <*> pure (NewTape $ remainP : rightT)
-  --   PerfectP -> (\(a,b) -> (id,a,b)) <$> (bisequence
-  --     (matchBitTape (s^.ls) leftT,
-  --      matchBitTape (s^.rs) rightT))
-packageResult :: _
-packageResult skip@(Skip s e) (EquationState (Just (eqns, (invariant, tapeInfL, tapeInfR)))) = case (tapeInfL, tapeInfR) of
-  (Infinite, _) -> Just $ SkippedOffEnd skip
-  (_, Infinite) -> Just $ SkippedOffEnd skip
-  (NewTape newLs, NewTape newRs) -> Just $ Skipped (e^.cstate) $ invariant $ ExpTape
-    ((updateList eqns $ e^.ls) `etApp` newLs)
-    (updatePoint eqns $ e ^. c_point)
-    ((updateList eqns $ e^.rs) `etApp` newRs)
-  where
-  updateCount :: Map Count Count -> Count -> Count
-  updateCount _ c@(Count _ Empty) = c
-  updateCount m c = case m^.at c of
-    Just c' -> c'
-    Nothing -> error "a var wasn't mapped in a skip"
-  updatePoint :: Map Count Count -> (s, Count, Dir) -> (s, Count, Dir)
-  updatePoint m = _2 %~ updateCount m
-  updateList :: Map Count Count -> [(s, Count)] -> [(s, Count)]
-  updateList = fmap . fmap . updateCount
-packageResult _ _ = Nothing
-
+applySkip skip@(Skip s e) (p, ExpTape leftT pointT rightT) | s ^. cstate == p
+  = packageResult =<< runEquationState intermediate where
+    intermediate = matchPoints (s ^. c_point) pointT >>= \case
+      Lremains remainP ->  (,,) <$> pure glomPointLeft
+        <*> pure (NewTape $ remainP : leftT)
+        <*> ((mfailGuard (s^.ls == []) "ls not empty") >> matchBitTape (s^.rs) rightT)
+      Rremains remainP -> (,,) <$> pure glomPointRight
+        <*> (mfailGuard (s^.rs == []) "rs not empty" >> matchBitTape (s^.ls) leftT)
+        <*> pure (NewTape $ remainP : rightT)
+      PerfectP -> (\(a,b) -> (id,a,b)) <$> (bisequence
+        (matchBitTape (s^.ls) leftT,
+         matchBitTape (s^.rs) rightT))
+    packageResult (eqns, (invariant, tapeInfL, tapeInfR)) = case (tapeInfL, tapeInfR) of
+      (Infinite, _) -> Just $ SkippedOffEnd skip
+      (_, Infinite) -> Just $ SkippedOffEnd skip
+      (NewTape newLs, NewTape newRs) -> Just $ Skipped (e^.cstate) $ invariant $ ExpTape
+        ((updateList eqns $ e^.ls) `etApp` newLs)
+        (updatePoint eqns $ e ^. c_point)
+        ((updateList eqns $ e^.rs) `etApp` newRs)
+    updateCount :: Map BoundVar Count -> Count -> Count
+    updateCount m (Count n as (MonoidalMap xs))
+      = (Count n as Empty) <> foldMap (updateVar m) (assocs xs)
+    updateVar :: Map BoundVar Count -> (BoundVar, Sum Natural) -> Count
+    updateVar m (x, (Sum n)) = n `nTimesCount` getVar m x
+    getVar :: Map BoundVar Count -> BoundVar -> Count
+    getVar m x = case m^.at x of
+      Just c -> c
+      Nothing -> error "a var wasn't mapped in a skip"
+    updatePoint :: Map BoundVar Count -> (s, Count, Dir) -> (s, Count, Dir)
+    updatePoint m = _2 %~ updateCount m
+    updateList :: Map BoundVar Count -> [(s, Count)] -> [(s, Count)]
+    updateList = fmap . fmap . updateCount
+applySkip _ _ = Nothing
 
 --we want to be able to apply a skip of counts to an ExpTape _ Count but also a
 --skip of counts to an ExpTape _ Nat

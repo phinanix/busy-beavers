@@ -14,16 +14,18 @@ data ExpTape s c = ExpTape
   } deriving (Eq, Ord, Show, Generic)
 instance (NFData s, NFData c) => NFData (ExpTape s c)
 
---split modify into modifyPointUnderHead and moveTapeADirection
+--TODO:: split modify into modifyPointUnderHead and moveTapeADirection
+--or otherwise refactor it - it's a mess
 modify :: Dir -> Bit -> ExpTape Bit Int -> ExpTape Bit Int
-modify L newBit (ExpTape [] (bit, num, L) rs) = ExpTape [] (False, 1, R) $ rest newBit bit num rs
-modify L newBit (ExpTape ((lbit, lnum):ls) (bit, num, L) rs) = ExpTape ls (lbit, lnum, R) $ rest newBit bit num rs
-modify L newBit (ExpTape ls (bit, num, R) rs) = let newRs = (newBit, 1) : rs in
-  if num == 1
-  then case ls of
-    [] -> ExpTape [] (False, 1, R) newRs
-    (lbit, lnum):ls -> ExpTape ls (lbit, lnum, R) newRs
-  else ExpTape ls (bit, num-1, R) newRs
+modify = undefined
+-- modify L newBit (ExpTape [] (bit, num, L) rs) = ExpTape [] (False, 1, R) $ rest newBit bit num rs
+-- modify L newBit (ExpTape ((lbit, lnum):ls) (bit, num, L) rs) = ExpTape ls (lbit, lnum, R) $ rest newBit bit num rs
+-- modify L newBit (ExpTape ls (bit, num, R) rs) = let newRs = (newBit, 1) : rs in
+--   if num == 1
+--   then case ls of
+--     [] -> ExpTape [] (False, 1, R) newRs
+--     (lbit, lnum):ls -> ExpTape ls (lbit, lnum, R) newRs
+--   else ExpTape ls (bit, num-1, R) newRs
 
 
 rest :: Bit -> Bit -> Int -> [(Bit, Int)] -> [(Bit, Int)]
