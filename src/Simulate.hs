@@ -146,27 +146,37 @@ dispSkipResult (Skipped p tape) = "skipped to phase: " <> dispPhase p <> " and t
 -- applySkip _ _ = Nothing
 
 applySkip :: Skip Bit -> (Phase, ExpTape Bit Count) -> Maybe (SkipResult Bit Count)
-applySKip skip@(Skip s e) (p, ExpTape leftT pointT rightT) | s ^. cstate == p = packageResult foo where
-  foo :: EquationState (ExpTape Bit Count -> ExpTape Bit Count, TapeOrInf Bit, TapeOrInf Bit)
-  foo = matchPoints (s^.c_point) pointT >>= \case
-    Lremains remainP -> (,,) <$> pure glomPointLeft
-      <*> pure (NewTape leftT)
-      <*> (mfailGuard (s^.ls == []) "ls not empty" >> matchBitTape (s^.rs) rightT)
-    Rremains remainP -> (,,) <$> pure glomPointRight
-      <*> (mfailGuard (s^.rs == []) "rs not empty" >> matchBitTape (s^.ls) leftT)
-      <*> pure (NewTape rightT)
-    PerfectP -> (\(a,b) -> (id,a,b)) <$> (bisequence
-      (matchBitTape (s^.ls) leftT,
-       matchBitTape (s^.rs) rightT))
-  packageResult (EquationState (Just (eqns, (invariant, tapeInfL, tapeInfR)))) = case (tapeInfL, tapeInfR) of
-    (Infinite, _) -> Just $ SkippedOffEnd skip
-    (_, Infinite) -> Just $ SkippedOffEnd skip
-    (NewTape newLs, NewTape newRs) -> Just $ Skipped (e^.cstate) $ invariant $ ExpTape
-      ((updateList eqns $ e^.ls) `etApp` newLs)
-      (updatePoint eqns $ e ^. c_point)
-      ((updateList eqns $ e^.rs) `etApp` newRs)
-  packageResult _ = Nothing
+applySkip skip@(Skip s e) state@(p, ExpTape leftT pointT rightT) | s ^. cstate == p
+  = packageResult skip $ foo skip state where
+--applySkip _ _ = Nothing
+
+foo :: Skip Bit -> (Phase, ExpTape Bit Count)
+  -> EquationState (ExpTape Bit Count -> ExpTape Bit Count, TapeOrInf Bit, TapeOrInf Bit)
+foo skip@(Skip s e) (p, ExpTape leftT pointT rightT) = matchPoints (s^.c_point) pointT >>= undefined
+  -- \case
+  --   Lremains remainP -> (,,) <$> pure glomPointLeft
+  --     <*> pure (NewTape $ remainP : leftT)
+  --     <*> ((mfailGuard (s^.ls == []) "ls not empty") >>
+  --     (matchBitTape
+  --       (s^.rs)
+  --       rightT))
+  --   Rremains remainP -> (,,) <$> pure glomPointRight
+  --     <*> (mfailGuard (s^.rs == []) "rs not empty" >> matchBitTape (s^.ls) leftT)
+  --     <*> pure (NewTape $ remainP : rightT)
+  --   PerfectP -> (\(a,b) -> (id,a,b)) <$> (bisequence
+  --     (matchBitTape (s^.ls) leftT,
+  --      matchBitTape (s^.rs) rightT))
+packageResult :: _
+packageResult skip@(Skip s e) (EquationState (Just (eqns, (invariant, tapeInfL, tapeInfR)))) = case (tapeInfL, tapeInfR) of
+  (Infinite, _) -> Just $ SkippedOffEnd skip
+  (_, Infinite) -> Just $ SkippedOffEnd skip
+  (NewTape newLs, NewTape newRs) -> Just $ Skipped (e^.cstate) $ invariant $ ExpTape
+    ((updateList eqns $ e^.ls) `etApp` newLs)
+    (updatePoint eqns $ e ^. c_point)
+    ((updateList eqns $ e^.rs) `etApp` newRs)
+  where
   updateCount :: Map Count Count -> Count -> Count
+  updateCount _ c@(Count _ Empty) = c
   updateCount m c = case m^.at c of
     Just c' -> c'
     Nothing -> error "a var wasn't mapped in a skip"
@@ -174,7 +184,8 @@ applySKip skip@(Skip s e) (p, ExpTape leftT pointT rightT) | s ^. cstate == p = 
   updatePoint m = _2 %~ updateCount m
   updateList :: Map Count Count -> [(s, Count)] -> [(s, Count)]
   updateList = fmap . fmap . updateCount
-applySkip _ _ = Nothing
+packageResult _ _ = Nothing
+
 
 --we want to be able to apply a skip of counts to an ExpTape _ Count but also a
 --skip of counts to an ExpTape _ Nat
@@ -244,7 +255,7 @@ keepNum :: Int
 keepNum = 3
 
 addResult :: Turing -> SimResult Tape -> Results Tape -> Results Tape
-addResult turing h@(Halted steps tape) r = (if turing == bb3test then traceShow h else id)
+addResult turing (Halted steps tape) r = --(if turing == bb3test then traceShow h else id)
   addHalter $ addLongest $ addOnesiest (ones tape) r where
     addLongest r = case r ^. longestRun of
       Nothing -> r & longestRun ?~ (steps, turing, tape)
@@ -285,9 +296,8 @@ bb3test = Turing {states = 3, transitions = fromList
 -- unused states, only sends us to the lowest numbered one
 -- does not check that the edge is unknown, a precondition of correctness
 branchOnEdge :: Edge -> Turing -> [Turing]
-branchOnEdge e@(Phase newPhase, _) (Turing n m) = if elem bb3test out
-  then (trace $ toString $ dispTuring (Turing n m)) out
-  else out where
+branchOnEdge e@(Phase newPhase, _) (Turing n m) = --if elem bb3test out then (trace $ toString $ dispTuring (Turing n m)) out else
+  out where
   out = filter (not . isSmallerMachine) candidates
   candidates = Turing n <$> addTrans <$> possibleTrans
   addTrans t = m & at e ?~ t

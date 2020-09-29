@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9a6f1d8d51f6031e45be833cdf1b6e4b3e4e2e3190cbcb168c049b475b452640
+-- hash: 0e49bf18ab94c41d6962682a2aa516d415b61f9a0804f91a4f7e541b0b878efa
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -75,13 +75,19 @@ test-suite busy-beavers-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      CountSpec
+      SimulateSpec
+      SkipSpec
       Paths_busy_beavers
   hs-source-dirs:
       test
   default-extensions: ApplicativeDo BangPatterns ConstraintKinds DataKinds DefaultSignatures DeriveFoldable DeriveFunctor DeriveGeneric DeriveLift DeriveTraversable DerivingStrategies EmptyCase ExistentialQuantification FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving InstanceSigs KindSignatures LambdaCase MultiParamTypeClasses MultiWayIf NamedFieldPuns NoImplicitPrelude OverloadedStrings PartialTypeSignatures PatternSynonyms PolyKinds QuasiQuotes RankNTypes ScopedTypeVariables StrictData StandaloneDeriving TemplateHaskell TupleSections TypeApplications TypeOperators ViewPatterns
   ghc-options: -Wall -Wno-name-shadowing -Wno-unused-imports -Wcompat -Wredundant-constraints -Wincomplete-record-updates -Wincomplete-uni-patterns -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      QuickCheck
+    , base >=4.7 && <5
     , busy-beavers
+    , hspec
+    , lens
     , relude
   default-language: Haskell2010

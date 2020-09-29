@@ -132,28 +132,7 @@ simProgram = do
                 interact r
 
 --
-exampleSkip :: Skip Bit
-exampleSkip = Skip
-  (Config (Phase 0) [] (False, finiteCount 2, R) [(False, finiteCount 2), (True, finiteCount 1)])
-  (Config (Phase 1) [(True, finiteCount 3)] (False, finiteCount 4, L) [(True, finiteCount 5)])
 
-exampleExpTape :: ExpTape Bit Count
-exampleExpTape = ExpTape
-  ([(True, finiteCount 1), (False, finiteCount 3), (True, finiteCount 1)])
-  (False, finiteCount 10, R)
-  ([(False, finiteCount 2), (True, finiteCount 3), (False, varCount 0)])
-
---
-exampleSimpleSkip :: Skip Bit
-exampleSimpleSkip = Skip
-  (Config (Phase 0) [] (False, finiteCount 2, R) [])
-  (Config (Phase 1) [(True, finiteCount 3)] (False, finiteCount 4, L) [(True, finiteCount 5)])
-
-exampleExpTape2 :: ExpTape Bit Count
-exampleExpTape2 = ExpTape
-  ([(True, finiteCount 1), (False, finiteCount 3), (True, finiteCount 1)])
-  (False, finiteCount 10, R)
-  ([(False, finiteCount 2), (True, finiteCount 3), (False, varCount 0)])
 
 --TODO:: make exponential notation for tape
 --TODO:: make simple induction
@@ -161,9 +140,8 @@ exampleExpTape2 = ExpTape
 --TODO:: make database that stores results of machines, so that results can be compared between different runs
 main :: IO ()
 main = do
-  --simProgram
-  let result = applySkip exampleSimpleSkip ((Phase 0), exampleExpTape)
-  putTextLn $ fromMaybe "fail" $ dispSkipResult <$> result
+  simProgram
+
   -- print $ backwardSearch $ startMachine1 3 --this returns a proof which is bad
   -- print $ backwardSearch $ false_backward_search
   -- traverse_ putTextLn $ show <$> backwardSearch <$> tnfPrecursors 25 bb3

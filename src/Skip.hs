@@ -77,7 +77,7 @@ matchTape (skipHead:restSkip) (tapeHead:restTape) = matchTapeHeads skipHead tape
   --TODO:: I think we can short circuit and skip the rest of the match here if the skip has the invariant
   (TapeHLeft tapeHead) ->matchTape restSkip (tapeHead:restTape)
 
-data TapeOrInf s = Infinite | NewTape [(s, Count)]
+data TapeOrInf s = Infinite | NewTape [(s, Count)] deriving (Eq, Ord, Show, Generic)
 
 --specializes matchTape to Bit, allowing the routine to
 --signal the skip will match an infinite amount of tape
@@ -96,7 +96,7 @@ matchBitTape skip tape = mapMaybe matchToTapeOrInf $ matchTape skip tape where
 
 --if you match two points, either they match perfectly, or some symbols of some count
 --remain on one side
-data PointMatch s = PerfectP | Lremains (s, Count) | Rremains (s, Count)
+data PointMatch s = PerfectP | Lremains (s, Count) | Rremains (s, Count) deriving (Eq, Ord, Show, Generic)
 
 matchPoints :: (Eq s) => (s, Count, Dir) -> (s, Count, Dir) -> EquationState (PointMatch s)
 matchPoints (skipS, skipC, skipD) (tapeS, pointC, tapeD)
@@ -108,4 +108,8 @@ matchPoints (skipS, skipC, skipD) (tapeS, pointC, tapeD)
       remainC -> case mirrorDir tapeD of
         L -> pure $ Lremains (tapeS, remainC)
         R -> pure $ Rremains (tapeS, remainC)
-matchPoints _ _ = nothingES
+--
+--matchPoints (skipS, skipC, skipD) (tapeS, pointC, tapeD) | (skipS == tapeS) = error ""
+matchPoints (skipS, skipC, skipD) (tapeS, pointC, tapeD) | (skipD == tapeD) = error ""
+
+--matchPoints _ _ = nothingES

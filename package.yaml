@@ -56,7 +56,10 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - busy-beavers
+    - QuickCheck
+    - lens
     - relude
+    - hspec
 
 default-extensions:
   - ApplicativeDo
