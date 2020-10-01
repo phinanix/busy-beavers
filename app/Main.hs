@@ -8,11 +8,30 @@ import Data.Text.Read
 import System.IO (hSetBuffering, stdout, BufferMode(..))
 
 import Turing
-import Count
+import Count hiding (num)
 import Skip
 import ExpTape
 import Simulate
 import Display
+
+-- num = finiteCount
+--
+-- varSkip :: Skip Bit
+-- varSkip = Skip
+--   (Config (Phase 0) [] (True, finiteCount 2, R) [(False, newBoundVar 0), (True, finiteCount 1)])
+--   (Config (Phase 1) [(True, newBoundVar 0)] (False, newBoundVar 0, R) [] )
+--
+-- varTape :: ExpTape Bit Count
+-- varTape = ExpTape
+--   ([(True, num 3)])
+--   (True, num 2, R)
+--   ([(False, num 8), (True, num 2)])
+--
+-- varResult :: ExpTape Bit Count
+-- varResult = ExpTape
+--   ([(True, num 11)])
+--   (False, num 8, R)
+--   ([(True, num 1)])
 
 bb2 :: Turing
 bb2 = Turing {states = 2, transitions = fromList

@@ -70,6 +70,9 @@ glomPointRight (ExpTape ls (s_p, c_p, dir) ((s_r, c_r):rs)) | s_p == s_r =
   ExpTape ls (s_p, c_p <> c_r, dir) rs
 glomPointRight e = e
 
+glomPoint :: (Eq s, Semigroup c) => ExpTape s c -> ExpTape s c
+glomPoint = glomPointLeft . glomPointRight
+
 dispBitCount :: (Bit, Count) -> Text
 dispBitCount (b, c) = "(" <> dispBit b <> ", " <> dispCount c <> ") "
 

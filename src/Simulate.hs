@@ -14,7 +14,7 @@ import Data.Map.Strict (assocs)
 import Util
 import Turing
 import Tape
-import ExpTape (ExpTape(..), glomPointLeft, glomPointRight, etApp)
+import ExpTape (ExpTape(..), glomPointLeft, glomPointRight, glomPoint, etApp)
 import qualified ExpTape as E
 import Skip
 import Config
@@ -118,127 +118,104 @@ dispSkipResult (Skipped p tape) = "skipped to phase: " <> dispPhase p <> " and t
 --returns nothing if the skip is inapplicable, else returns a new tape
 --the fact that the type is bit is only used when running off the tape, but for now I don't want to
 --generalize that out (also ExpTape would have to be generalized)
--- VERSION 1
---TODO:: this is an old implementation from before Counts had vars, so I don't think it works
--- applySkip :: Skip Bit -> (Phase, ExpTape Bit Count) -> Maybe (SkipResult Bit Count)
--- applySkip (Skip s e) (p, ExpTape leftTape tapePoint rightTape) | s ^. cstate == p
---   = matchPoints (s^.c_point) tapePoint >>= \case
---       --if we don't match the whole point, we can't care about the stuff on
---       --the other side of the point, or we fail immediately
---       Lremains remainP -> guard (s^.ls == []) >> matchBitTape (s^.rs) rightTape
---         <&> \case
---           Infinite -> SkippedOffEnd (Skip s e)
---           --we only have to glom once because remainP can't match leftTape since
---           --that would violate the input invariant
---           NewTape t -> Skipped (e^.cstate) $ glomPointLeft $
---             ExpTape (remainP:leftTape) (e^.c_point) ((e^.rs) `etApp` t)
---       Rremains remainP -> guard (s^.rs == []) >> matchBitTape (s^.ls) leftTape
---         <&> \case
---           Infinite -> SkippedOffEnd (Skip s e)
---           NewTape t -> Skipped (e^.cstate) $ glomPointRight $
---             ExpTape ((e^.ls) `etApp` t) (e^.c_point) (remainP:rightTape)
---       PerfectP -> bisequence (matchBitTape (s^.ls) leftTape, matchBitTape (s^.rs) rightTape)
---         <&> \case
---           (Infinite, _) -> SkippedOffEnd (Skip s e)
---           (_, Infinite) -> SkippedOffEnd (Skip s e)
---           (NewTape newL, NewTape newR) -> Skipped (e^.cstate) $
---             ExpTape ((e^.ls) `etApp` newL) (e^.c_point) ((e^.rs) `etApp` newR)
---if the phases don't match, we fail right away
--- applySkip _ _ = Nothing
---
--- VERSION 2
--- applySkip :: Skip Bit -> (Phase, ExpTape Bit Count) -> Maybe (SkipResult Bit Count)
--- applySkip skip@(Skip s e) state@(p, ExpTape leftT pointT rightT) | s ^. cstate == p
---   = packageResult skip $ foo skip state where
--- applySkip _ _ = Nothing
---
--- foo :: Skip Bit -> (Phase, ExpTape Bit Count)
---   -> EquationState (ExpTape Bit Count -> ExpTape Bit Count, TapeOrInf Bit, TapeOrInf Bit)
--- foo skip@(Skip s e) (p, ExpTape leftT pointT rightT) = matchPoints (s^.c_point) pointT >>= undefined
---   -- \case
---   --   Lremains remainP -> (,,) <$> pure glomPointLeft
---   --     <*> pure (NewTape $ remainP : leftT)
---   --     <*> ((mfailGuard (s^.ls == []) "ls not empty") >>
---   --     (matchBitTape
---   --       (s^.rs)
---   --       rightT))
---   --   Rremains remainP -> (,,) <$> pure glomPointRight
---   --     <*> (mfailGuard (s^.rs == []) "rs not empty" >> matchBitTape (s^.ls) leftT)
---   --     <*> pure (NewTape $ remainP : rightT)
---   --   PerfectP -> (\(a,b) -> (id,a,b)) <$> (bisequence
---   --     (matchBitTape (s^.ls) leftT,
---   --      matchBitTape (s^.rs) rightT))
--- packageResult :: _
--- packageResult skip@(Skip s e) (EquationState (Just (eqns, (invariant, tapeInfL, tapeInfR)))) = case (tapeInfL, tapeInfR) of
---   (Infinite, _) -> Just $ SkippedOffEnd skip
---   (_, Infinite) -> Just $ SkippedOffEnd skip
---   (NewTape newLs, NewTape newRs) -> Just $ Skipped (e^.cstate) $ invariant $ ExpTape
---     ((updateList eqns $ e^.ls) `etApp` newLs)
---     (updatePoint eqns $ e ^. c_point)
---     ((updateList eqns $ e^.rs) `etApp` newRs)
---   where
---   updateCount :: Map Count Count -> Count -> Count
---   updateCount _ c@(Count _ Empty) = c
---   updateCount m c = case m^.at c of
---     Just c' -> c'
---     Nothing -> error "a var wasn't mapped in a skip"
---   updatePoint :: Map Count Count -> (s, Count, Dir) -> (s, Count, Dir)
---   updatePoint m = _2 %~ updateCount m
---   updateList :: Map Count Count -> [(s, Count)] -> [(s, Count)]
---   updateList = fmap . fmap . updateCount
--- packageResult _ _ = Nothing
-
--- VERSION 3
 applySkip :: Skip Bit -> (Phase, ExpTape Bit Count) -> Maybe (SkipResult Bit Count)
-applySkip skip@(Skip s e) (p, ExpTape leftT pointT rightT) | s ^. cstate == p
+applySkip skip@(Skip s e _ _) (p, ExpTape leftT pointT rightT) | s ^. cstate == p
   = packageResult =<< runEquationState intermediate where
+    --intermediate :: EquationState Bit _
     intermediate = matchPoints (s ^. c_point) pointT >>= \case
-      Lremains remainP ->  (,,) <$> pure glomPointLeft
-        <*> pure (NewTape $ remainP : leftT)
+      Lremains remainP -> (glomPointLeft,,)
+        <$> pure (NewTape $ remainP : leftT)
         <*> ((mfailGuard (s^.ls == []) "ls not empty") >> matchBitTape (s^.rs) rightT)
-      Rremains remainP -> (,,) <$> pure glomPointRight
-        <*> (mfailGuard (s^.rs == []) "rs not empty" >> matchBitTape (s^.ls) leftT)
+      Rremains remainP -> (glomPointRight,,)
+        <$> (mfailGuard (s^.rs == []) "rs not empty" >> matchBitTape (s^.ls) leftT)
         <*> pure (NewTape $ remainP : rightT)
-      PerfectP -> (\(a,b) -> (id,a,b)) <$> (bisequence
+      PerfectP -> uncurry (glomPoint,,) <$> (bisequence
         (matchBitTape (s^.ls) leftT,
          matchBitTape (s^.rs) rightT))
-    packageResult (eqns, (invariant, tapeInfL, tapeInfR)) = case (tapeInfL, tapeInfR) of
+    --packageResult :: (Map BoundVar Count, Map TapeVar Bit, _) -> Maybe (SkipResult Bit Count)
+    packageResult (boundVs, tapeVs, (invariant, tapeInfL, tapeInfR)) = case (tapeInfL, tapeInfR) of
       (Infinite, _) -> Just $ SkippedOffEnd skip
       (_, Infinite) -> Just $ SkippedOffEnd skip
       (NewTape newLs, NewTape newRs) -> Just $ Skipped (e^.cstate) $ invariant $ ExpTape
-        ((updateList eqns $ e^.ls) `etApp` newLs)
-        (updatePoint eqns $ e ^. c_point)
-        ((updateList eqns $ e^.rs) `etApp` newRs)
+        ((updateList boundVs tapeVs $ e^.ls) `etApp` newLs)
+        (updatePoint boundVs tapeVs $ e ^. c_point)
+        ((updateList boundVs tapeVs $ e^.rs) `etApp` newRs)
     updateCount :: Map BoundVar Count -> Count -> Count
     updateCount m (Count n as (MonoidalMap xs))
       = (Count n as Empty) <> foldMap (updateVar m) (assocs xs)
+    deVarOr :: Map TapeVar s -> VarOr s -> s
+    deVarOr _m (NotVar s) = s
+    deVarOr m (Var v) = case m^.at v of
+      Just s -> s
+      Nothing -> error "a tape var wasn't mapped in a skip"
     updateVar :: Map BoundVar Count -> (BoundVar, Sum Natural) -> Count
     updateVar m (x, (Sum n)) = n `nTimesCount` getVar m x
     getVar :: Map BoundVar Count -> BoundVar -> Count
     getVar m x = case m^.at x of
       Just c -> c
-      Nothing -> error "a var wasn't mapped in a skip"
-    updatePoint :: Map BoundVar Count -> (s, Count, Dir) -> (s, Count, Dir)
-    updatePoint m = _2 %~ updateCount m
-    updateList :: Map BoundVar Count -> [(s, Count)] -> [(s, Count)]
-    updateList = fmap . fmap . updateCount
+      Nothing -> error "a bound var wasn't mapped in a skip"
+    updatePoint :: Map BoundVar Count -> Map TapeVar s
+      -> (VarOr s, Count, Dir) -> (s, Count, Dir)
+    updatePoint bs ts = (_2 %~ updateCount bs) . (_1 %~ deVarOr ts)
+    updateList :: Map BoundVar Count -> Map TapeVar s
+      -> [(VarOr s, Count)] -> [(s, Count)]
+    updateList bs ts = fmap $ bimap (deVarOr ts) (updateCount bs)
 applySkip _ _ = Nothing
 
 --we want to be able to apply a skip of counts to an ExpTape _ Count but also a
 --skip of counts to an ExpTape _ Nat
 
---the data type storing various proven skips associated with a machine
-type SkipBook s = Map (Phase, s) (Skip s)
+--the skip that results from the atomic transition given an edge leading to a
+--transition of the specified Phase, Bit, Dir
+oneStepSkip :: Edge -> Phase -> Bit -> Dir -> Skip Bit
+oneStepSkip (p, b) q c L = Skip
+  (Config p [(Var (TapeVar 0), finiteCount 1)] (NotVar b, finiteCount 1, L) [])
+  (Config q [] (Var (TapeVar 0), finiteCount 1, R) [(NotVar c, finiteCount 1)])
+  (finiteCount 1)
+  False
+oneStepSkip (p, b) q c R = Skip
+  (Config p [] (NotVar b, finiteCount 1, L) [(Var (TapeVar 0), finiteCount 1)])
+  (Config q [(NotVar c, finiteCount 1)] (Var (TapeVar 0), finiteCount 1, L) [])
+  (finiteCount 1)
+  False
 
--- initTransSkip :: Edge -> Trans -> Set (Skip Bit)
--- initTransSkip (p, b) Halt = undefined
--- initTransSkip (p, b) (Step q c d) | p == q = undefined
--- initTransSkip (p, b) (Step q c d) = one $ Skip
---   (Config p [] (b, finiteCount 1, L) [])
---   undefined
---
--- initBook :: Turing -> SkipBook Bit
--- initBook t = undefined
+--the skip that results from an atomic transition which transitions a phase to itself
+--writing the given bit and dir
+infiniteSkip :: Edge -> Bit -> Dir -> Skip Bit
+infiniteSkip (p, b) c L = Skip
+  (Config p [(Var (TapeVar 0), finiteCount 1)] (NotVar b, newBoundVar 0, R) [])
+  (Config p [] (Var (TapeVar 0), finiteCount 1, R) [(NotVar c, newBoundVar 0)])
+  (newBoundVar 0)
+  False
+infiniteSkip (p, b) c R = Skip
+  (Config p [] (NotVar b, newBoundVar 0, L) [(Var (TapeVar 0), finiteCount 1)])
+  (Config p [(NotVar c, newBoundVar 0)] (Var (TapeVar 0), finiteCount 1, L) [])
+  (newBoundVar 0)
+  False
+
+initTransSkip :: Edge -> Trans -> Set (Skip Bit)
+initTransSkip e@(p, _b) Halt = one $ oneStepSkip e p True R
+initTransSkip e@(p, _b) (Step q c d) | p == q = fromList
+  [ oneStepSkip e q c d
+  , infiniteSkip e c d
+  ]
+initTransSkip e (Step q c d) = one $ oneStepSkip e q c d
+
+--the data type storing various proven skips associated with a machine
+--the "Phase, s" is the Phase on start and the "s" that the point is made of
+--it's a maybe because some skips have a var under the point
+type SkipBook s = Map (Phase, Maybe s) (Set (Skip s))
+
+addSkipToBook :: (Ord s) => Skip s -> SkipBook s -> SkipBook s
+addSkipToBook skip = atE (skip^.start.cstate, skip^?start.c_point._1._NotVar)
+  . contains skip .~ True
+
+initBook :: Turing -> SkipBook Bit
+initBook (Turing _n trans) = appEndo (foldMap (Endo . addSkipToBook) skips) $ Empty where
+  skips = foldMap (uncurry initTransSkip) $ assocs trans
+
+lookupSkips :: (Ord s) => (Phase, s) -> SkipBook s -> Set (Skip s)
+lookupSkips (p, s) book = book ^. atE (p, Just s) <> book ^. atE (p, Nothing)
 
 --the results should be
 --  how many machines halted

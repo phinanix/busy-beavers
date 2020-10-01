@@ -26,8 +26,12 @@ simpleTape = ExpTape
 
 simpleSkip :: Skip Bit
 simpleSkip = Skip
-  (Config (Phase 0) [] (False, finiteCount 2, R) [])
-  (Config (Phase 1) [(True, finiteCount 3)] (False, finiteCount 4, L) [(True, finiteCount 5)])
+  (Config (Phase 0) [] (NotVar False, finiteCount 2, R) [])
+  (Config (Phase 1)
+    [(NotVar True, finiteCount 3)]
+    (NotVar False, finiteCount 4, L)
+    [(NotVar True, finiteCount 5)])
+  (finiteCount 5) False
 
 simpleResult :: ExpTape Bit Count
 simpleResult = ExpTape
@@ -39,8 +43,14 @@ simpleResult = ExpTape
 --
 exampleSkip :: Skip Bit
 exampleSkip = Skip
-  (Config (Phase 0) [] (True, finiteCount 2, R) [(False, finiteCount 2), (True, finiteCount 1)])
-  (Config (Phase 1) [(True, finiteCount 3)] (False, finiteCount 4, L) [(True, finiteCount 5)])
+  (Config (Phase 0) []
+    (NotVar True, finiteCount 2, R)
+    [(NotVar False, finiteCount 2), (NotVar True, finiteCount 1)])
+  (Config (Phase 1)
+    [(NotVar True, finiteCount 3)]
+    (NotVar False, finiteCount 4, L)
+    [(NotVar True, finiteCount 5)])
+  (finiteCount 10) False
 
 exampleTape :: ExpTape Bit Count
 exampleTape = ExpTape
@@ -56,8 +66,14 @@ exampleResult = ExpTape
 
 varSkip :: Skip Bit
 varSkip = Skip
-  (Config (Phase 0) [] (True, finiteCount 2, R) [(False, newBoundVar 0), (True, finiteCount 1)])
-  (Config (Phase 1) [(True, newBoundVar 0)] (False, newBoundVar 0, R) [] )
+  (Config (Phase 0) []
+    (NotVar True, finiteCount 2, R)
+    [(NotVar False, newBoundVar 0), (NotVar True, finiteCount 1)])
+  (Config (Phase 1)
+    [(NotVar True, newBoundVar 0)]
+    (NotVar False, newBoundVar 0, R) [] )
+  (Count 8 Empty (fromList [(BoundVar 0, Sum 3)]))
+  False
 
 varTape :: ExpTape Bit Count
 varTape = ExpTape
@@ -82,7 +98,7 @@ skipTapeResultSpec skipEx phaseTapeIn@(phase_in, tapeEx) (phase_out, resultEx) =
     runEquationState (matchPoints (skipEx^.start.c_point) (point tapeEx))
       `shouldSatisfy` is _Just
   it "applies the skip" $ do
-    applySkip simpleSkip phaseTapeIn
+    applySkip skipEx phaseTapeIn
       `shouldBe` Just (Skipped phase_out resultEx)
 
 spec :: Spec

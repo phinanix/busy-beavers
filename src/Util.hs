@@ -2,6 +2,7 @@ module Util where
 
 import Relude
 import Data.Map.Monoidal
+import Control.Lens
 
 type MMap = MonoidalMap
 
@@ -29,3 +30,7 @@ unsafeFromLeft (Right _) = error "unsafe"
 unsafeFromRight :: Either a b -> b
 unsafeFromRight (Right a) = a
 unsafeFromRight (Left _) = error "unsafe"
+
+atE :: (AsEmpty (IxValue m), At m) => Index m -> Lens' m (IxValue m)
+--the second iso is of type Iso' (Maybe (IxValue m)) (IxValue m)
+atE i = at i . iso (fromMaybe Empty) Just

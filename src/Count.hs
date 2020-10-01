@@ -3,6 +3,7 @@ module Count where
 import Relude hiding (filter)
 import qualified Relude.Unsafe as Unsafe (head)
 import Control.Lens
+import qualified Data.Map as M (assocs)
 import Data.Map.Merge.Strict (mergeA, zipWithAMatched, preserveMissing)
 import Data.Map.Monoidal (MonoidalMap(..), assocs, mapKeys, unionWith, partitionWithKey)
 import Data.Foldable
@@ -10,11 +11,29 @@ import Data.Witherable
 
 import Util
 
+--a variable with logical type positive integer which is "undergoing universal
+-- generalization" - when you step inside the ∀x . Q(x), the x
 newtype SymbolVar = SymbolVar Int
   deriving (Eq, Ord, Show, Generic)
 getSymbol :: SymbolVar -> Int
 getSymbol (SymbolVar i) = i
 instance NFData SymbolVar
+
+--a variable with logical type positive integer which is (implicitly) quantified
+-- / bound by a forall quantifier at the beginning of the sentence
+newtype BoundVar = BoundVar Int
+  deriving (Eq, Ord, Show, Generic)
+getBoundVar :: BoundVar -> Int
+getBoundVar (BoundVar i) = i
+instance NFData BoundVar
+
+--a variable with logical type "s", the type variable of symbols on the tape which
+--is implicitly forall quantified
+newtype TapeVar = TapeVar Int
+  deriving (Eq, Ord, Show, Generic)
+getTapeVar :: TapeVar -> Int
+getTapeVar (TapeVar i) = i
+instance NFData TapeVar
 
 dispSymbolVar :: (SymbolVar, Sum Natural) -> Text
 dispSymbolVar (SymbolVar i, Sum count) = show count <> "*a_" <> show i <> " "
@@ -22,11 +41,17 @@ dispSymbolVar (SymbolVar i, Sum count) = show count <> "*a_" <> show i <> " "
 dispBoundVar :: (BoundVar, Sum Natural) -> Text
 dispBoundVar (BoundVar i, Sum count) = show count <> "*x_" <> show i <> " "
 
-newtype BoundVar = BoundVar Int
-  deriving (Eq, Ord, Show, Generic)
-getBoundVar :: BoundVar -> Int
-getBoundVar (BoundVar i) = i
-instance NFData BoundVar
+dispTapeVar :: TapeVar -> Text
+dispTapeVar (TapeVar i) = "t_" <> show i <> " "
+
+data VarOr s = Var TapeVar | NotVar s deriving (Eq, Ord, Show, Generic)
+instance NFData s => NFData (VarOr s)
+$(makePrisms ''VarOr)
+
+--returns () because if the match fails, the ES can just fail the whole computation
+matchTapeVar :: (Eq s) => VarOr s -> s -> EquationState s ()
+matchTapeVar (Var v) s = addTapeVar (v, s) $ pure ()
+matchTapeVar (NotVar t) s = maybeES $ guard (t == s)
 
 data Count = Count
   { num :: Natural
@@ -65,7 +90,7 @@ divCount (Count n as xs) d = Count <$> (n `maybeDiv` d) <*> (as `divMap` d) <*> 
 
 --trying to match the first count against the second, returns Nothing on fail,
 --or the remaining part of the second count on success
-matchCount :: Count -> Count -> EquationState Count
+matchCount :: (Eq s) => Count -> Count -> EquationState s Count
 matchCount Empty c = pure c
 matchCount (Count 0 Empty xs) c@(Count m bs ys) = case assocs xs of
   [] -> error "xs can't be empty due to pattern match"
@@ -112,9 +137,9 @@ matchCount (Count 0 Empty xs) c@(Count m bs ys) = case assocs xs of
   --takes a var, and tries to match it with a symbol in the map. if it succeeds, it
   --removes that symbol from the map and returns the list unchanged. if it fails, it
   --adds the var to the list to be handled later.
-  matchVar :: (BoundVar, Sum Natural)
+  matchVar :: (Eq s) => (BoundVar, Sum Natural)
     -> (MMap (Either SymbolVar BoundVar) (Sum Natural), [(BoundVar, Sum Natural)])
-    -> EquationState (MMap (Either SymbolVar BoundVar) (Sum Natural), [(BoundVar, Sum Natural)])
+    -> EquationState s (MMap (Either SymbolVar BoundVar) (Sum Natural), [(BoundVar, Sum Natural)])
   matchVar var@(x, Sum d) (m, rest) =
     case listToMaybe $ filter (\(_y, Sum  e) -> e `mod` d == 0) $ assocs m of
       --no var in the map works here
@@ -166,49 +191,68 @@ addEquationToMap (v, c) m = case m ^. at v of
   --if that ends up being a good feature to do
   Just c' -> guard (c == c') >> Just m
 
-addEquation :: (BoundVar, Count) -> EquationState a -> EquationState a
-addEquation eqn (EquationState (Just (m, a))) = case addEquationToMap eqn m of
+addEquation :: (BoundVar, Count) -> EquationState s a -> EquationState s a
+addEquation eqn (EquationState (Just (m, vs, a))) = case addEquationToMap eqn m of
   Nothing -> EquationState Nothing
-  (Just m') -> EquationState (Just (m',a))
+  (Just m') -> EquationState (Just (m', vs, a))
 addEquation _ _ = EquationState Nothing
 
-addEquations :: (Foldable t) => t (BoundVar, Count) -> EquationState a -> EquationState a
+addEquations :: (Foldable t) => t (BoundVar, Count) -> EquationState s a -> EquationState s a
 addEquations = appEndo . foldMap (Endo . addEquation)
 
 mergeEqns :: Map BoundVar Count -> Map BoundVar Count -> Maybe (Map BoundVar Count)
 mergeEqns = mergeA preserveMissing preserveMissing
   (zipWithAMatched (\_k v1 v2 -> if v1 == v2 then Just v1 else Nothing))
 
-newtype EquationState s = EquationState {runEquationState :: Maybe (Map BoundVar Count, s)}
+addTapeVarToMap :: (Eq s) => (TapeVar, s) -> Map TapeVar s -> Maybe (Map TapeVar s)
+addTapeVarToMap (var, b) m = case m ^. at var of
+  Nothing -> Just $ m & at var ?~ b
+  Just b' -> guard (b == b') >> Just m
+
+addTapeVar :: (Eq s) => (TapeVar, s) -> EquationState s a -> EquationState s a
+addTapeVar eqn (EquationState (Just (m, vs, a))) = case addTapeVarToMap eqn vs of
+  Nothing -> nothingES
+  (Just vs') -> EquationState (Just (m, vs', a))
+addTapeVar _ _ = nothingES
+
+addTapeVars :: (Foldable t, Eq s) => t (TapeVar, s) -> EquationState s a -> EquationState s a
+addTapeVars = appEndo . foldMap (Endo . addTapeVar)
+
+mergeTapeVars :: (Eq s) => Map TapeVar s -> Map TapeVar s -> Maybe (Map TapeVar s)
+mergeTapeVars (M.assocs -> newEqns)
+  = (appEndo . mconcat $ Endo <$> (bind <$> (addTapeVarToMap <$> newEqns))) . Just
+
+newtype EquationState s a = EquationState
+  {runEquationState :: Maybe (Map BoundVar Count, Map TapeVar s, a)}
   deriving newtype (Eq, Ord, Show)
 
-getEquationState :: EquationState s -> Maybe s
-getEquationState = fmap snd . runEquationState
+getEquationState :: EquationState s a -> Maybe a
+getEquationState = fmap (view _3) . runEquationState
 
-nothingES :: EquationState s
+nothingES :: EquationState s a
 nothingES = EquationState Nothing
 
-maybeES :: Maybe s -> EquationState s
-maybeES = EquationState . fmap (Empty,)
+maybeES :: Maybe a -> EquationState s a
+maybeES = EquationState . fmap (Empty, Empty,)
 
-mergeApp :: (Map BoundVar Count, a -> b) -> (Map BoundVar Count, a) -> Maybe (Map BoundVar Count, b)
-mergeApp (eqns, f) (moreEqns, a) = (, f a) <$> mergeEqns eqns moreEqns
-
-instance Functor EquationState where
+instance Functor (EquationState s) where
   fmap f (EquationState e) = EquationState $ fmap (fmap f) e
-instance Applicative EquationState where
-  pure s = EquationState $ Just (Empty, s)
-  (EquationState f) <*> (EquationState a) = EquationState $ join $ mergeApp <$> f <*> a
+instance (Eq s) => Applicative (EquationState s) where
+  pure s = EquationState $ Just (Empty, Empty, s)
+  (EquationState f) <*> (EquationState a) = EquationState $ join $ mergeApp <$> f <*> a where
+    mergeApp (eqns, vs, f) (moreEqns, moreVs, a)
+      = (,, f a) <$> mergeEqns eqns moreEqns <*> mergeTapeVars vs moreVs
 
-instance Monad EquationState where
+instance (Eq s) => Monad (EquationState s) where
   (EquationState k) >>= f = EquationState $ bind combine $ runEquationState . f <$$> k
     where
-    combine (eqns, Just (moreEqns, b)) = (,b) <$> mergeEqns eqns moreEqns
-    combine (_, Nothing) = Nothing
+    combine (eqns, vs, Just (moreEqns, moreVs, b))
+      = (,,b) <$> mergeEqns eqns moreEqns <*> mergeTapeVars vs moreVs
+    combine (_, _, Nothing) = Nothing
 
-instance MonadFail EquationState where
+instance (Eq s) => MonadFail (EquationState s) where
   fail _ = EquationState Nothing
 
-instance Filterable EquationState where
-  mapMaybe fm (EquationState (Just (eqns, a))) = EquationState $ (eqns,) <$> fm a
+instance Filterable (EquationState s) where
+  mapMaybe fm (EquationState (Just (eqns, vs, a))) = EquationState $ (eqns,vs,) <$> fm a
   mapMaybe _ (EquationState Nothing) = EquationState Nothing

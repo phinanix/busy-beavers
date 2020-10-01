@@ -10,7 +10,11 @@ import Control.Exception (evaluate)
 
 import Count
 
-matchAndGet a b = getEquationState $ matchCount a b
+getBitES :: EquationState Bool s -> Maybe s
+getBitES = getEquationState
+
+matchAndGet :: Count -> Count -> Maybe Count
+matchAndGet a b = getBitES $ matchCount a b
 
 spec :: Spec
 spec = do
@@ -37,4 +41,4 @@ spec = do
       matchAndGet (newBoundVar 1) (finiteCount 5) `shouldBe` Just Empty
   describe "equationStae" $ do
     it "getting a pure is Just" $ do
-      property (\(c :: Char) -> getEquationState (pure c) `shouldBe` Just c)
+      property (\(c :: Char) -> getBitES (pure c) `shouldBe` Just c)
