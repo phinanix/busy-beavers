@@ -9,13 +9,11 @@ import qualified Data.List.NonEmpty as NE (filter)
 import Data.Map.Monoidal (MonoidalMap(..), findMin, deleteMin, deleteFindMin)
 import Data.Semigroup (Min(..), getMin)
 import Data.Map.Strict (assocs)
---import Data.Witherable
 
 import Util
 import Turing
 import Tape
-import ExpTape (ExpTape(..), glomPointLeft, glomPointRight, glomPoint, etApp)
-import qualified ExpTape as E
+import ExpTape --(ExpTape(..), Location(..), _Side, _One, glomPointLeft, glomPointRight, glomPoint, etApp)
 import Skip
 import Config
 import Count
@@ -32,8 +30,8 @@ instance NFData a => NFData (TMState a)
 initTMState :: TMState Tape
 initTMState = TMState (Phase 0) (Tape [] False [])
 
-initExpTMState :: s -> TMState (ExpTape s Int)
-initExpTMState s = TMState (Phase 0) (ExpTape [] (s, 1, L) [])
+initExpTMState :: s -> TMState (ExpTape s InfCount Location)
+initExpTMState s = TMState (Phase 0) (ExpTape [(s, Infinity)] (s, One) [(s, Infinity)])
 
 data PartialStepResult a = Unknown Edge | Stopped Dir a | Stepped Dir (TMState a)
 
@@ -50,7 +48,7 @@ instance NFData a => NFData (SimState a)
 initSimState :: SimState Tape
 initSimState = SimState 0 initTMState initTMState
 
-initExpSimState :: s -> SimState (ExpTape s Int)
+initExpSimState :: s -> SimState (ExpTape s InfCount Location)
 initExpSimState s = SimState 0 (initExpTMState s) (initExpTMState s)
 
 data SimResult a = Halted Steps a
@@ -94,72 +92,56 @@ simStep (Turing _ trans ) (TMState p (Tape ls bit rs))
     Just (Step q newBit R) ->
       (Stepped R (TMState q $ tapeRight $ Tape ls newBit rs))
 
---WARNING :: this function is probably messy and kind of bad
-simExpStep :: Turing -> TMState (ExpTape Bit Int) -> PartialStepResult (ExpTape Bit Int)
-simExpStep (Turing _ trans) (TMState p tape@(ExpTape ls (bit, num, headDir) rs))
-  = case trans ^. at (p, bit) of
-    Nothing -> Unknown (p, bit)
-    Just Halt -> Stopped L $ E.modify L True tape
-    --we can skip to the end of the block when the new phase is the same as the old phase,
-    --plus the dir is opposite the original dir (if you're on the L and go R)
-    --TODO :: notice if this tries to skip to the end of the world
-    Just (Step newP newBit moveDir) -> if newP == p && moveDir /= headDir then
-      --we're about to move off the point, in block terms, not bit terms, so the side on which the point is is irrelevant
-      Stepped moveDir (TMState newP $ E.tapeMove moveDir $ ExpTape ls (newBit, num, error "unused") rs)
-      else Stepped moveDir (TMState newP $ E.modify moveDir newBit tape)
-
 --either we skipped ahead to a new Phase and Tape or we might've proved infinity
-data SkipResult s c = Skipped Phase (ExpTape s c) | SkippedOffEnd (Skip s) deriving (Eq, Ord, Show, Generic)
+data SkipResult s c l = Skipped Phase (ExpTape s c l) | SkippedOffEnd (Skip s) deriving (Eq, Ord, Show, Generic)
 
-dispSkipResult :: SkipResult Bit Count -> Text
+dispSkipResult :: SkipResult Bit InfCount Location -> Text
 dispSkipResult (SkippedOffEnd _) = "skipped off end!"
-dispSkipResult (Skipped p tape) = "skipped to phase: " <> dispPhase p <> " and tape " <> E.dispExpTape tape
+dispSkipResult (Skipped p tape) = "skipped to phase: " <> dispPhase p <> " and tape " <> dispExpTape tape
 
 --returns nothing if the skip is inapplicable, else returns a new tape
 --the fact that the type is bit is only used when running off the tape, but for now I don't want to
 --generalize that out (also ExpTape would have to be generalized)
-applySkip :: Skip Bit -> (Phase, ExpTape Bit Count) -> Maybe (SkipResult Bit Count)
+applySkip :: Skip Bit -> (Phase, ExpTape Bit InfCount Location) -> Maybe (SkipResult Bit InfCount Location)
 applySkip skip@(Skip s e _ _) (p, ExpTape leftT pointT rightT) | s ^. cstate == p
   = packageResult =<< runEquationState intermediate where
     --intermediate :: EquationState Bit _
     intermediate = matchPoints (s ^. c_point) pointT >>= \case
-      Lremains remainP -> (glomPointLeft,,)
-        <$> pure (NewTape $ remainP : leftT)
-        <*> ((mfailGuard (s^.ls == []) "ls not empty") >> matchBitTape (s^.rs) rightT)
-      Rremains remainP -> (glomPointRight,,)
-        <$> (mfailGuard (s^.rs == []) "rs not empty" >> matchBitTape (s^.ls) leftT)
-        <*> pure (NewTape $ remainP : rightT)
-      PerfectP -> uncurry (glomPoint,,) <$> (bisequence
-        (matchBitTape (s^.ls) leftT,
-         matchBitTape (s^.rs) rightT))
-    --packageResult :: (Map BoundVar Count, Map TapeVar Bit, _) -> Maybe (SkipResult Bit Count)
-    packageResult (boundVs, tapeVs, (invariant, tapeInfL, tapeInfR)) = case (tapeInfL, tapeInfR) of
+      Lremains remainP -> matchSides (remainP : leftT) rightT
+      Rremains remainP -> matchSides leftT (remainP : rightT)
+      PerfectP -> matchSides leftT rightT
+    matchSides left right = bisequence (matchBitTape (s^.ls) left, matchBitTape (s^.rs) right)
+    --packageResult :: (Map BoundVar InfCount, Map TapeVar Bit, _) -> Maybe (SkipResult Bit InfCount Location)
+    packageResult (boundVs, tapeVs, (tapeInfL, tapeInfR)) = case (tapeInfL, tapeInfR) of
       (Infinite, _) -> Just $ SkippedOffEnd skip
       (_, Infinite) -> Just $ SkippedOffEnd skip
-      (NewTape newLs, NewTape newRs) -> Just $ Skipped (e^.cstate) $ invariant $ ExpTape
-        ((updateList boundVs tapeVs $ e^.ls) `etApp` newLs)
+      (NewTape newLs, NewTape newRs) -> Just $ Skipped (e^.cstate) $ glomPoint $ ExpTape
+        ((invariantifyList $ updateList boundVs tapeVs $ NotInfinity <$$> e^.ls) `etApp` newLs)
         (updatePoint boundVs tapeVs $ e ^. c_point)
-        ((updateList boundVs tapeVs $ e^.rs) `etApp` newRs)
-    updateCount :: Map BoundVar Count -> Count -> Count
+        ((invariantifyList $ updateList boundVs tapeVs $ NotInfinity <$$> e^.rs) `etApp` newRs)
+    updateInfCount :: Map BoundVar InfCount -> InfCount -> InfCount
+    updateInfCount _m Infinity = Infinity
+    updateInfCount m (NotInfinity c) = updateCount m c
+    updateCount :: Map BoundVar InfCount -> Count -> InfCount
     updateCount m (Count n as (MonoidalMap xs))
-      = (Count n as Empty) <> foldMap (updateVar m) (assocs xs)
+      = (NotInfinity $ Count n as Empty) <> foldMap (updateVar m) (assocs xs)
     deVarOr :: Map TapeVar s -> VarOr s -> s
     deVarOr _m (NotVar s) = s
     deVarOr m (Var v) = case m^.at v of
       Just s -> s
       Nothing -> error "a tape var wasn't mapped in a skip"
-    updateVar :: Map BoundVar Count -> (BoundVar, Sum Natural) -> Count
+    updateVar :: Map BoundVar InfCount -> (BoundVar, Sum Natural) -> InfCount
     updateVar m (x, (Sum n)) = n `nTimesCount` getVar m x
-    getVar :: Map BoundVar Count -> BoundVar -> Count
+    getVar :: Map BoundVar InfCount -> BoundVar -> InfCount
     getVar m x = case m^.at x of
       Just c -> c
       Nothing -> error "a bound var wasn't mapped in a skip"
-    updatePoint :: Map BoundVar Count -> Map TapeVar s
-      -> (VarOr s, Count, Dir) -> (s, Count, Dir)
-    updatePoint bs ts = (_2 %~ updateCount bs) . (_1 %~ deVarOr ts)
-    updateList :: Map BoundVar Count -> Map TapeVar s
-      -> [(VarOr s, Count)] -> [(s, Count)]
-    updateList bs ts = fmap $ bimap (deVarOr ts) (updateCount bs)
+    updatePoint :: Map BoundVar InfCount -> Map TapeVar s
+      -> (VarOr s, Location Count) -> (s, Location InfCount)
+    updatePoint bs ts = (_2. _Side . _1 %~ updateCount bs) . (_1 %~ deVarOr ts)
+    updateList :: Map BoundVar InfCount -> Map TapeVar s
+      -> [(VarOr s, InfCount)] -> [(s, InfCount)]
+    updateList bs ts = fmap $ bimap (deVarOr ts) (updateInfCount bs)
 applySkip _ _ = Nothing
 
 --we want to be able to apply a skip of counts to an ExpTape _ Count but also a
@@ -169,13 +151,13 @@ applySkip _ _ = Nothing
 --transition of the specified Phase, Bit, Dir
 oneStepSkip :: Edge -> Phase -> Bit -> Dir -> Skip Bit
 oneStepSkip (p, b) q c L = Skip
-  (Config p [(Var (TapeVar 0), finiteCount 1)] (NotVar b, finiteCount 1, L) [])
-  (Config q [] (Var (TapeVar 0), finiteCount 1, R) [(NotVar c, finiteCount 1)])
+  (Config p [(Var (TapeVar 0), finiteCount 1)] (NotVar b, One) [])
+  (Config q [] (Var (TapeVar 0), One) [(NotVar c, finiteCount 1)])
   (finiteCount 1)
   False
 oneStepSkip (p, b) q c R = Skip
-  (Config p [] (NotVar b, finiteCount 1, L) [(Var (TapeVar 0), finiteCount 1)])
-  (Config q [(NotVar c, finiteCount 1)] (Var (TapeVar 0), finiteCount 1, L) [])
+  (Config p [] (NotVar b, One) [(Var (TapeVar 0), finiteCount 1)])
+  (Config q [(NotVar c, finiteCount 1)] (Var (TapeVar 0), One) [])
   (finiteCount 1)
   False
 
@@ -183,13 +165,13 @@ oneStepSkip (p, b) q c R = Skip
 --writing the given bit and dir
 infiniteSkip :: Edge -> Bit -> Dir -> Skip Bit
 infiniteSkip (p, b) c L = Skip
-  (Config p [(Var (TapeVar 0), finiteCount 1)] (NotVar b, newBoundVar 0, R) [])
-  (Config p [] (Var (TapeVar 0), finiteCount 1, R) [(NotVar c, newBoundVar 0)])
+  (Config p [(Var (TapeVar 0), finiteCount 1)] (NotVar b, Side (newBoundVar 0) R) [])
+  (Config p [] (Var (TapeVar 0), One) [(NotVar c, newBoundVar 0)])
   (newBoundVar 0)
   False
 infiniteSkip (p, b) c R = Skip
-  (Config p [] (NotVar b, newBoundVar 0, L) [(Var (TapeVar 0), finiteCount 1)])
-  (Config p [(NotVar c, newBoundVar 0)] (Var (TapeVar 0), finiteCount 1, L) [])
+  (Config p [] (NotVar b, Side (newBoundVar 0) L) [(Var (TapeVar 0), finiteCount 1)])
+  (Config p [(NotVar c, newBoundVar 0)] (Var (TapeVar 0), One) [])
   (newBoundVar 0)
   False
 

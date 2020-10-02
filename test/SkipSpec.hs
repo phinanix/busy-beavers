@@ -14,27 +14,29 @@ import ExpTape
 import Skip
 
 num = finiteCount
+inum = finiteInfCount
 
 spec :: Spec
 spec = do
   describe "matchTapeHeads" $ do
     it "matches identical values" $ do
-      getEquationState (matchTapeHeads (NotVar False, finiteCount 5) (False, finiteCount 5))
+      getEquationState (matchTapeHeads (NotVar False, num 5) (False, inum 5))
         `shouldBe` Just PerfectH
     --
     it "matches smaller against larger values" $ do
-      getEquationState (matchTapeHeads (NotVar False, finiteCount 5) (False, finiteCount 8))
-        `shouldBe` Just (TapeHLeft (False, finiteCount 3))
+      getEquationState (matchTapeHeads (NotVar False, num 5) (False, inum 8))
+        `shouldBe` Just (TapeHLeft (False, inum 3))
     --
     it "matches a var against a num " $ do
-      getEquationState (matchTapeHeads (NotVar False, newBoundVar 5) (False, finiteCount 5))
+      getEquationState (matchTapeHeads (NotVar False, newBoundVar 5) (False, inum 5))
         `shouldBe` Just PerfectH
     --
     it "matches a var against several vars" $ do
-      getEquationState (matchTapeHeads (NotVar False, newBoundVar 5) (False, newBoundVar 0 <> newBoundVar 0 <> newBoundVar 5))
+      getEquationState (matchTapeHeads (NotVar False, newBoundVar 5)
+        (False, newInfBoundVar 0 <> newInfBoundVar 0 <> newInfBoundVar 5))
         `shouldBe` Just PerfectH
   describe "matchTape" $ do
     it "matches a simple example" $ do
       getEquationState (matchBitTape
-        [(NotVar False, num 3)] [(False, num 5), (True, num 1)])
-        `shouldBe` Just (NewTape [(False, num 2), (True, num 1)])
+        [(NotVar False, num 3)] [(False, inum 5), (True, inum 1)])
+        `shouldBe` Just (NewTape [(False, inum 2), (True, inum 1)])

@@ -5,7 +5,7 @@ import qualified Relude.Unsafe as Unsafe (head)
 import Control.Lens
 import qualified Data.Map as M (assocs)
 import Data.Map.Merge.Strict (mergeA, zipWithAMatched, preserveMissing)
-import Data.Map.Monoidal (MonoidalMap(..), assocs, mapKeys, unionWith, partitionWithKey)
+import Data.Map.Monoidal (MonoidalMap(..), assocs, mapKeys, unionWith, partitionWithKey, findMin)
 import Data.Foldable
 import Data.Witherable
 
@@ -53,6 +53,8 @@ matchTapeVar :: (Eq s) => VarOr s -> s -> EquationState s ()
 matchTapeVar (Var v) s = addTapeVar (v, s) $ pure ()
 matchTapeVar (NotVar t) s = maybeES $ guard (t == s)
 
+--a finite number, plus some number of symbols multiplied by a given natural (which must be positive)
+--and some number of bound variables also multiplied by a given natural which also must be positive
 data Count = Count
   { num :: Natural
   , symbols :: MMap SymbolVar (Sum Natural)
@@ -66,6 +68,15 @@ dispCount (Count n symbols bound)
   <> (mconcat $ dispSymbolVar <$> assocs symbols)
   <> (mconcat $ dispBoundVar <$> assocs bound)
 
+--a count which has the potential to be "infinity" eg the infinite string of zeros at the
+--end of a Turing Machine's tape
+data InfCount = Infinity | NotInfinity Count deriving (Eq, Ord, Show, Generic)
+instance NFData InfCount
+
+dispInfCount :: InfCount -> Text
+dispInfCount Infinity = "inf"
+dispInfCount (NotInfinity c) = dispCount c
+
 instance Semigroup Count where
   (Count n as xs) <> (Count m bs ys) = Count (n+m) (as <> bs) (xs <> ys)
 
@@ -76,7 +87,17 @@ instance Monoid Count where
 instance AsEmpty Count where
   _Empty = only mempty
 
-nTimesCount :: (Integral n) => n -> Count -> Count
+instance Semigroup InfCount where
+  Infinity <> _ = Infinity
+  _ <> Infinity = Infinity
+  (NotInfinity c) <> (NotInfinity d) = NotInfinity (c <> d)
+
+instance Monoid InfCount where
+  mempty = NotInfinity mempty
+
+instance AsEmpty InfCount
+
+nTimesCount :: (Integral n) => n -> InfCount -> InfCount
 nTimesCount n c = fold $ genericReplicate n c
 
 maybeDiv :: (Integral a) => a -> a -> Maybe a
@@ -98,7 +119,7 @@ matchCount (Count 0 Empty xs) c@(Count m bs ys) = case assocs xs of
   --of the count of that var, and there's only one way to match
   [(x, Sum d)] -> case divCount c d of
     Nothing -> nothingES
-    Just reducedC -> addEquation (x, reducedC) $ pure Empty
+    Just reducedC -> addEquation (x, NotInfinity reducedC) $ pure Empty
   xs -> case containsOne xs of
     (maybeX1, xs') -> foldrM matchVar (eitherKeys bs ys, []) xs' >>= \case
       --now we've matched all the vars we can against other vars, so we proceed
@@ -110,8 +131,8 @@ matchCount (Count 0 Empty xs) c@(Count m bs ys) = case assocs xs of
         if remainingSum > m then nothingES else
         --we need to do two things here: first, send all the remaining vars to one,
         --second send x1 to everything else
-        addEquations ((,finiteCount 1) . fst <$> remaining) $ case maybeX1 of
-          Just x1 -> addEquation (x1, Count (m - remainingSum) newBs newYs) $
+        addEquations ((,NotInfinity $ finiteCount 1) . fst <$> remaining) $ case maybeX1 of
+          Just x1 -> addEquation (x1, NotInfinity $ Count (m - remainingSum) newBs newYs) $
             --the leftovers are empty because x1 matched everything
             pure $ Empty
           --there's some stuff leftover because there was no x1 to eat it all
@@ -147,7 +168,7 @@ matchCount (Count 0 Empty xs) c@(Count m bs ys) = case assocs xs of
       --here y works, so we need to delete it, but we also need to emit the new eqn
       Just (y, Sum e) ->
         let newM = m & at y .~ Nothing
-            eqn = (x, makeCount y $ e `div` d) in
+            eqn = (x, NotInfinity $ makeCount y $ e `div` d) in
           addEquation eqn $ pure (newM, rest)
   makeCount :: (Either SymbolVar BoundVar) -> Natural -> Count
   makeCount (Left symbol) d = symbolVarCount symbol d
@@ -169,21 +190,41 @@ matchCount (Count n as xs) (Count m bs ys) = if n <= m
   then matchCount (Count 0 as xs) (Count (m-n) bs ys)
   else nothingES
 
+matchInfCount :: (Eq s) => Count -> InfCount -> EquationState s InfCount
+--if you consume a finite number of symbols from an infinity, then an infinite number remain
+matchInfCount (Count _ _ Empty) Infinity = pure Infinity
+--if there is a "forall x" in the count, then morally you can think of it as consuming the infinite
+--number of symbols - x can only really be set to any finite value, but eg, you can show the machine will
+--consume 100 symbols, and 1000 symbols, etc, and so the machine must never stop consuming symbols
+matchInfCount (Count _ _ xs) Infinity = addEquation (fst $ findMin xs, Infinity) $ pure mempty
+matchInfCount c (NotInfinity d) = NotInfinity <$> matchCount c d
 
 finiteCount :: Natural -> Count
 finiteCount n = Count n mempty mempty
 
+finiteInfCount :: Natural -> InfCount
+finiteInfCount = NotInfinity . finiteCount
+
 symbolVarCount :: SymbolVar -> Natural -> Count
 symbolVarCount a d = Count 0 (MonoidalMap (one (a, Sum d))) mempty
+
+symbolVarInfCount :: SymbolVar -> Natural -> InfCount
+symbolVarInfCount a d = NotInfinity $ symbolVarCount a d
 
 boundVarCount :: BoundVar -> Natural -> Count
 boundVarCount x d = Count 0 mempty (MonoidalMap (one (x, Sum d)))
 
+boundVarInfCount :: BoundVar -> Natural -> InfCount
+boundVarInfCount x d = NotInfinity $ boundVarCount x d
+
 newBoundVar :: Int -> Count
 newBoundVar n = Count 0 mempty $ MonoidalMap (one (BoundVar n, Sum 1))
 
+newInfBoundVar :: Int -> InfCount
+newInfBoundVar = NotInfinity . newBoundVar
+
 --fails when the equation is inconsistent with what we already know
-addEquationToMap :: (BoundVar, Count) -> Map BoundVar Count -> Maybe (Map BoundVar Count)
+addEquationToMap :: (BoundVar, InfCount) -> Map BoundVar InfCount -> Maybe (Map BoundVar InfCount)
 addEquationToMap (v, c) m = case m ^. at v of
   Nothing -> Just $ m & at v ?~ c
   --it's fine to assign the same count twice, but fails immediately if you assign
@@ -191,16 +232,16 @@ addEquationToMap (v, c) m = case m ^. at v of
   --if that ends up being a good feature to do
   Just c' -> guard (c == c') >> Just m
 
-addEquation :: (BoundVar, Count) -> EquationState s a -> EquationState s a
+addEquation :: (BoundVar, InfCount) -> EquationState s a -> EquationState s a
 addEquation eqn (EquationState (Just (m, vs, a))) = case addEquationToMap eqn m of
   Nothing -> EquationState Nothing
   (Just m') -> EquationState (Just (m', vs, a))
 addEquation _ _ = EquationState Nothing
 
-addEquations :: (Foldable t) => t (BoundVar, Count) -> EquationState s a -> EquationState s a
+addEquations :: (Foldable t) => t (BoundVar, InfCount) -> EquationState s a -> EquationState s a
 addEquations = appEndo . foldMap (Endo . addEquation)
 
-mergeEqns :: Map BoundVar Count -> Map BoundVar Count -> Maybe (Map BoundVar Count)
+mergeEqns :: Map BoundVar InfCount -> Map BoundVar InfCount -> Maybe (Map BoundVar InfCount)
 mergeEqns = mergeA preserveMissing preserveMissing
   (zipWithAMatched (\_k v1 v2 -> if v1 == v2 then Just v1 else Nothing))
 
@@ -223,7 +264,7 @@ mergeTapeVars (M.assocs -> newEqns)
   = (appEndo . mconcat $ Endo <$> (bind <$> (addTapeVarToMap <$> newEqns))) . Just
 
 newtype EquationState s a = EquationState
-  {runEquationState :: Maybe (Map BoundVar Count, Map TapeVar s, a)}
+  {runEquationState :: Maybe (Map BoundVar InfCount, Map TapeVar s, a)}
   deriving newtype (Eq, Ord, Show)
 
 getEquationState :: EquationState s a -> Maybe a
