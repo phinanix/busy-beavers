@@ -35,12 +35,16 @@ tapeRight (Tape ls h (r : rs)) = Tape (h : ls) r rs
 mirrorTape :: Tape -> Tape
 mirrorTape (Tape ls h rs) =  Tape rs h ls
 
-ones :: Tape -> Int
-ones (Tape ls h rs) = length $ filter (==True) $ ls <> rs <> [h]
-
 dispTape :: Tape -> Text
 dispTape (Tape ls h rs) = dispBits (reverse ls) <> ">" <> dispBit h <> "<" <> dispBits rs where
   dispBits :: [Bit] -> Text
   dispBits [] = ""
   dispBits bits = mconcat ((\i -> dispBit i <> " ") <$> Unsafe.init bits)
     <> dispBit (Unsafe.last bits)
+
+--a class for things like tapes where you can count the ones
+class Tapeable tape where
+  ones :: tape -> Int
+
+instance Tapeable Tape where
+  ones (Tape ls h rs) = length $ filter (==True) $ ls <> rs <> [h]

@@ -10,8 +10,11 @@ import System.IO (hSetBuffering, stdout, BufferMode(..))
 import Turing
 import Count hiding (num)
 import Skip
+import Tape (dispTape)
 import ExpTape
+import Results
 import Simulate
+import SimulateSkip
 import Display
 
 -- num = finiteCount
@@ -49,6 +52,13 @@ loop2 = Turing {states = 2, transitions = fromList
   --these two don't matter
   ,((Phase {unPhase = 0},True),Halt) --Step (Phase {unPhase = 0}) True R)
   ,((Phase {unPhase = 1},True),Halt)
+  ]}
+
+--
+jumps_to_end :: Turing
+jumps_to_end = Turing {states = 2, transitions = fromList
+  [((Phase 0,False),Step (Phase 1) True  R)
+  ,((Phase 1,False),Step (Phase 1) False R)
   ]}
 
 --this halted after a bit more time to simulate the OffToInfinityN proof
@@ -124,11 +134,10 @@ false_backward_search = Turing {states = 3, transitions = fromList
 -- 2 False | 0 True R
 -- 2 True | 2 True R
 
-simProgram :: IO ()
-simProgram = do
+simProgram :: (a -> Text) -> Results a -> IO ()
+simProgram display results = do
   hSetBuffering stdout NoBuffering
-  let results = Simulate.simulate 310 $ startMachine1 4
-  putTextLn $ dispResults $ results
+  putTextLn $ dispResults display $ results
   interact results where
   interact r = do
     putText "Would you like to run a machine listed above?\n If so, enter it's index, else hit enter to exit:"
@@ -152,14 +161,19 @@ simProgram = do
 
 --
 
-
---TODO:: make exponential notation for tape
 --TODO:: make simple induction
 --TODO:: make macro machine simulator
 --TODO:: make database that stores results of machines, so that results can be compared between different runs
 main :: IO ()
 main = do
-  simProgram
+  let results = Simulate.simulate 30 $ startMachine1 3
+  simProgram dispTape results
+
+  -- let skipResults = simulateWithSkips 30 $ startMachine1 3
+  -- simProgram dispExpTape skipResults
+
+  -- putTextLn $ showOneMachine bb2 10
+  -- putTextLn $ displaySkipSimulation jumps_to_end 2
 
   -- print $ backwardSearch $ startMachine1 3 --this returns a proof which is bad
   -- print $ backwardSearch $ false_backward_search

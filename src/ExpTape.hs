@@ -5,6 +5,7 @@ import Control.Lens
 
 import Turing
 import Count
+import Tape
 
 --when the machine is pointing to a block containing one symbol, then it isn't on a particular side
 --else it's pointing to a count, which is not 1, and it's on one side of that count
@@ -104,3 +105,11 @@ dispExpTape (ExpTape ls point rs)
   = (mconcat $ dispBitCount <$> reverse ls)
   <> dispPoint point
   <> (mconcat $ dispBitCount <$> rs)
+
+instance Tapeable (ExpTape Bit InfCount Location) where
+  ones (ExpTape ls point rs) = countPoint point + countList ls + countList rs where
+    countPoint (False, _) = 0
+    countPoint (True, One) = 1
+    countPoint (True, Side c _) = infCountToInt c
+    countList :: [(Bit, InfCount)] -> Int
+    countList = getSum . foldMap Sum . mapMaybe (\(bit, c) -> guard bit $> infCountToInt c)

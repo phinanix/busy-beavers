@@ -28,6 +28,24 @@ instance (NFData s) => NFData (Skip s)
 $(makeLenses ''Config)
 $(makeLenses ''Skip)
 
+dispVarOrAndCount :: (VarOr Bit, Count) -> Text
+dispVarOrAndCount (vb, count) = "(" <> dispVarOrBit vb <> ", " <> dispCount count <> ") "
+
+dispVarOrAndLocCount :: (VarOr Bit, Location Count) -> Text
+dispVarOrAndLocCount (vb, Side count L) = "|>" <> dispVarOrAndCount (vb, count)
+dispVarOrAndLocCount (vb, Side count R) = dispVarOrAndCount (vb, count) <> "<|"
+dispVarOrAndLocCount (vb, One) = dispVarOrAndCount (vb, finiteCount 1) <> "<|"
+
+dispConfig :: Config Bit -> Text
+dispConfig (Config p ls point rs) = "phase: " <> dispPhase p <> "  "
+  <> (mconcat $ dispVarOrAndCount <$> reverse ls)
+  <> dispVarOrAndLocCount point
+  <> (mconcat $ dispVarOrAndCount <$> rs)
+
+dispSkip :: Skip Bit -> Text
+dispSkip (Skip s e c halts) = "in " <> dispCount c <> " steps we turn\n"
+  <> dispConfig s <> "\ninto: \n" <> dispConfig e <> (if halts then "\n and halt" else "")
+
 --a Perfect match had no leftovers
 --or we might have used up all of the skip and had some tape leftover, or vv
 data HeadMatch s = PerfectH | TapeHLeft (s, InfCount) deriving (Eq, Ord, Show)
@@ -70,28 +88,31 @@ matchTape (skipHead:restSkip) (tapeHead:restTape) = matchTapeHeads skipHead tape
   --TODO:: I think we can short circuit and skip the rest of the match here if the skip has the invariant
   (TapeHLeft tapeHead) -> matchTape restSkip (tapeHead:restTape)
 
-data TapeOrInf s = Infinite | NewTape [(s, InfCount)] deriving (Eq, Ord, Show, Generic)
+getTapeRemain :: TapeMatch s -> Maybe [(s, InfCount)]
+getTapeRemain Perfect = Just Empty
+getTapeRemain (TapeLeft ne) = Just $ toList ne
+getTapeRemain (SkipLeft _) = Nothing
+
+--data TapeOrInf s = Infinite | NewTape [(s, InfCount)] deriving (Eq, Ord, Show, Generic)
 
 --specializes matchTape to Bit, allowing the routine to
 --signal the skip will match an infinite amount of tape
 --fails if there is skip left-over
---first line is some seriously ugly munging but I'm not sure off the top of my head how to do better
---the function's type is (a -> Maybe b) -> Maybe (a,c) -> Maybe (b,c)
-matchBitTape :: [(VarOr Bit, Count)] -> [(Bit, InfCount)] -> EquationState Bit (TapeOrInf Bit)
-matchBitTape skip tape = bind matchToTapeOrInf $ matchTape skip tape where
-  matchToTapeOrInf :: TapeMatch Bit -> EquationState Bit (TapeOrInf Bit)
-  matchToTapeOrInf = \case
-    Perfect -> pure $ NewTape []
-    TapeLeft (toList -> newTape) -> pure $ NewTape newTape
-    --if there's a count without any foralls, like a+3 where a is free, then
-    --there is a chance to match the zeros at the end of the tape
-    SkipLeft ((varOrBit, Count _ _ Empty) :| [])
-      -> matchTapeVar varOrBit False $> NewTape []
-    -- _notEmpty thereby must have foralls, and thus if the var matches zero,
-    -- the skip matches the whole infinite rest of the tape
-    SkipLeft ((varOrBit, _notEmpty) :| [])
-      -> matchTapeVar varOrBit False $> Infinite
-    SkipLeft _ -> nothingES
+-- matchBitTape :: [(VarOr Bit, Count)] -> [(Bit, InfCount)] -> EquationState Bit (TapeOrInf Bit)
+-- matchBitTape skip tape = bind matchToTapeOrInf $ matchTape skip tape where
+--   matchToTapeOrInf :: TapeMatch Bit -> EquationState Bit (TapeOrInf Bit)
+--   matchToTapeOrInf = \case
+--     Perfect -> pure $ NewTape []
+--     TapeLeft (toList -> newTape) -> pure $ NewTape newTape
+--     --if there's a count without any foralls, like a+3 where a is free, then
+--     --there is a chance to match the zeros at the end of the tape
+--     SkipLeft ((varOrBit, Count _ _ Empty) :| [])
+--       -> matchTapeVar varOrBit False $> NewTape []
+--     -- _notEmpty thereby must have foralls, and thus if the var matches zero,
+--     -- the skip matches the whole infinite rest of the tape
+--     SkipLeft ((varOrBit, _notEmpty) :| [])
+--       -> matchTapeVar varOrBit False $> Infinite
+--     SkipLeft _ -> nothingES
 
 --if you match two points, either they match perfectly, or some symbols of some count
 --remain on one side

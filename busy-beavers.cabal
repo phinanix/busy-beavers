@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 0e49bf18ab94c41d6962682a2aa516d415b61f9a0804f91a4f7e541b0b878efa
+-- hash: bd771735ce8c5de042bd40ce9252fc902202033c3376ff0e8eb201518c1aa4e6
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -31,10 +31,13 @@ library
       Count
       Display
       ExpTape
+      HaltProof
+      Results
       Simple.Display
       Simple.Simulate
       Simple.Tape
       Simulate
+      SimulateSkip
       Skip
       Tape
       Turing

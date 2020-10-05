@@ -1,11 +1,12 @@
 module Count where
 
+import Turing (Bit, dispBit)
 import Relude hiding (filter)
 import qualified Relude.Unsafe as Unsafe (head)
 import Control.Lens
 import qualified Data.Map as M (assocs)
 import Data.Map.Merge.Strict (mergeA, zipWithAMatched, preserveMissing)
-import Data.Map.Monoidal (MonoidalMap(..), assocs, mapKeys, unionWith, partitionWithKey, findMin)
+import Data.Map.Monoidal (MonoidalMap(..), assocs, mapKeys, unionWith, partitionWithKey, keys)
 import Data.Foldable
 import Data.Witherable
 
@@ -48,6 +49,10 @@ data VarOr s = Var TapeVar | NotVar s deriving (Eq, Ord, Show, Generic)
 instance NFData s => NFData (VarOr s)
 $(makePrisms ''VarOr)
 
+dispVarOrBit :: VarOr Bit -> Text
+dispVarOrBit (Var v) = dispTapeVar v
+dispVarOrBit (NotVar b) = dispBit b
+
 --returns () because if the match fails, the ES can just fail the whole computation
 matchTapeVar :: (Eq s) => VarOr s -> s -> EquationState s ()
 matchTapeVar (Var v) s = addTapeVar (v, s) $ pure ()
@@ -59,10 +64,30 @@ data Count = Count
   { num :: Natural
   , symbols :: MMap SymbolVar (Sum Natural)
   , bound :: MMap BoundVar (Sum Natural)
-  } deriving (Eq, Ord, Show, Generic)
+  } deriving (Eq, Show, Generic)
 instance NFData Count
 
+--bound vars bigger than free vars bigger than bare numbers
+--if both have bounds or frees, then compare via summing coefficients
+instance Ord Count where
+  (Count n Empty Empty) <= (Count m Empty Empty) = n <= m
+  (Count _ Empty Empty) <= (Count _ _ne Empty) = True
+  c@(Count n as Empty) <= d@(Count m bs Empty) = if c == d then True else
+    if fold as < fold bs then True else case compare n m of
+      LT -> True
+      GT -> False
+      EQ -> as < bs
+  (Count _ _ Empty) <= (Count _ _ _ne) = True
+  --hang, on, I'm worried this ord instance isn't compatible with the semigroup
+  --I now think it is but still want like, a proof TODO
+  c@(Count n as xs) <= d@(Count m bs ys) = if c == d then True else
+    if fold xs < fold ys then True else case compare (Count n as Empty) (Count m bs Empty) of
+      LT -> True
+      GT -> False
+      EQ -> xs < ys
+
 dispCount :: Count -> Text
+dispCount (Count n Empty Empty) = show n
 dispCount (Count n symbols bound)
   = show n <> " + "
   <> (mconcat $ dispSymbolVar <$> assocs symbols)
@@ -70,12 +95,18 @@ dispCount (Count n symbols bound)
 
 --a count which has the potential to be "infinity" eg the infinite string of zeros at the
 --end of a Turing Machine's tape
-data InfCount = Infinity | NotInfinity Count deriving (Eq, Ord, Show, Generic)
+--infinity comes second so it's bigger than NotInfinity
+data InfCount = NotInfinity Count | Infinity deriving (Eq, Ord, Show, Generic)
 instance NFData InfCount
 
 dispInfCount :: InfCount -> Text
 dispInfCount Infinity = "inf"
 dispInfCount (NotInfinity c) = dispCount c
+
+infCountToInt :: InfCount -> Int
+infCountToInt Infinity = error "infinity isn't an int"
+infCountToInt (NotInfinity (Count m Empty Empty)) = fromIntegral m
+infCountToInt (NotInfinity c) = error $ "tried to int-ify: " <> dispCount c
 
 instance Semigroup Count where
   (Count n as xs) <> (Count m bs ys) = Count (n+m) (as <> bs) (xs <> ys)
@@ -196,7 +227,13 @@ matchInfCount (Count _ _ Empty) Infinity = pure Infinity
 --if there is a "forall x" in the count, then morally you can think of it as consuming the infinite
 --number of symbols - x can only really be set to any finite value, but eg, you can show the machine will
 --consume 100 symbols, and 1000 symbols, etc, and so the machine must never stop consuming symbols
-matchInfCount (Count _ _ xs) Infinity = addEquation (fst $ findMin xs, Infinity) $ pure mempty
+--however you leave the infinity on the tape for the next guy - if you need to consume 100 then 100
+--symbols, or 1000 then 1 symbols, infinity will have your back
+--note that adding an equation to send every variable to Infinity is a little bit aggressive
+--if some of the vars are already set, this is fine, and we can ignore those - we want to send
+--as many to infinity as possible though
+--TODO:: Handle this better. Probably this is actually addEquation's job?
+matchInfCount (Count _ _ xs) Infinity = addEquations (keys xs <&> (, Infinity)) $ pure Infinity
 matchInfCount c (NotInfinity d) = NotInfinity <$> matchCount c d
 
 finiteCount :: Natural -> Count

@@ -151,7 +151,6 @@ data TotalStepResult = Stopped Steps Tape | Stepped SimState
 --ContinueForever means the machine has been proven to run forever
 data SimResult = Halted Steps Tape
   | Continue SimState | ContinueForever HaltProof deriving (Eq, Ord, Show, Generic)
-
 instance NFData SimResult
 
 stepRtoSimR :: TotalStepResult -> SimResult

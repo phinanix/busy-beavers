@@ -5,24 +5,35 @@ import Control.Lens
 
 import Turing
 import Tape
+import ExpTape
+import Results
+import Skip
 import Simulate
 import qualified Simple.Simulate as Simple (simulate, dispStartState, initState, SimResult(..))
-import Simple.Display as Simple (dispResult)
+import qualified Simple.Display as Simple (dispResult)
 import qualified Simple.Tape as Simple
 import Data.Map (restrictKeys)
+import SimulateSkip
 
 showOneMachine :: Turing -> Steps -> Text
 showOneMachine t n =
   dispTuring t <> "\n" <> (mconcat $
-  (\steps -> dispResult (Simple.simulate steps Simple.dispStartState t) <> "\n") <$>
+  (\steps -> Simple.dispResult (Simple.simulate steps Simple.dispStartState t) <> "\n") <$>
   [0.. n]
+  )
+--
+displaySkipSimulation :: Turing -> Steps -> Text
+displaySkipSimulation t limit =
+  dispTuring t <> "\n" <> (mconcat $
+  (\steps -> dispResult dispExpTape (simulateOneMachine steps t) <> "\n") <$>
+  [0 .. limit]
   )
 
 totalMachines :: Results a -> Int
 totalMachines r = r ^. haltCount + r ^. provenForever + r ^. unproven
 
-dispResults :: Results Tape -> Text
-dispResults r = "checked: " <> show (totalMachines r) <> " machines.\n"
+dispResults :: (a -> Text) -> Results a -> Text
+dispResults dispTape r = "checked: " <> show (totalMachines r) <> " machines.\n"
   <> show (r ^. haltCount) <> " machines halted\n"
   <> "the most steps was " <> show (r ^? longestRun . _Just . _1) <> ", performed by\n"
   <> maybe "None" dispTuring (r ^? longestRun . _Just . _2)
@@ -36,14 +47,15 @@ dispResults r = "checked: " <> show (totalMachines r) <> " machines.\n"
   <> show (r ^. infinityN) <> " by running off the tape in a cycle\n"
   <> show (r ^. backwardSearches) <> " by backwards search\n"
   -- <> "including:\n" <> (mconcat $ dispTuring <$> r ^. backwardExamples)
+  <> show (r ^. skipInfinity) <> " by a skip to infinity\n"
   <> "\n"
   <> show (r ^. unproven) <> " machines were not proven to halt, including:\n"
   <> (mconcat $ dispUnproven <$> r ^. unprovenExamples)
   where
-    dispUnproven :: (Turing, SimState Tape) -> Text
-    dispUnproven (t, (SimState steps _ finalState)) = "after: " <> show steps <> " steps,\n"
+    --dispUnproven :: (Turing, Steps, Phase, a) -> Text
+    dispUnproven (t, steps, p, finalTape) = "after: " <> show steps <> " steps,\n"
       <> dispTuring t <> "\nwas not shown to halt or run forever\n"
-      <> "final state: " <> dispTMState finalState <> "\n\n\n"
+      <> "final state: phase: " <> dispPhase p <> " tape: " <> dispTape finalTape <> "\n\n"
 
 tnfSignature :: Steps -> Turing -> [Edge]
 tnfSignature n t = ordNub duplicateEdgesList where
@@ -58,3 +70,6 @@ tnfPrecursors steps t@(Turing n trans) = Turing n <$> restrictKeys trans <$> edg
   signature = tnfSignature steps t
   edgeSets :: [Set Edge]
   edgeSets = fromList <$> (drop 1 $ inits signature)
+
+dispSkipBook :: SkipBook Bit -> Text
+dispSkipBook skips = foldMap (\s -> dispSkip s <> "\n") $ fold skips
