@@ -45,9 +45,6 @@ $(makeLenses ''SimState)
 initExpTape :: s -> ExpTape s InfCount Location
 initExpTape s = ExpTape [(s, Infinity)] (s, One) [(s, Infinity)]
 
--- initExpSimState :: s -> SimState (ExpTape s InfCount Location)
--- initExpSimState s = SimState 0 (initExpTMState s) (initExpTMState s)
-
 dispSkipResult :: SkipResult Bit InfCount Location -> Text
 dispSkipResult (Skipped c p tape)
   = "skipped to phase: " <> dispPhase p
@@ -57,19 +54,14 @@ dispSkipResult (Skipped c p tape)
 --returns nothing if the skip is inapplicable, else returns a new tape
 --the fact that the type is bit is only used when running off the tape, but for now I don't want to
 --generalize that out (also ExpTape would have to be generalized)
-applySkip :: Skip Bit -> (Phase, ExpTape Bit InfCount Location) -> Maybe (SkipResult Bit InfCount Location)
-applySkip (Skip s e hopCount _) (p, ExpTape leftT pointT rightT) | s ^. cstate == p
-  = packageResult <$> runEquationState intermediate where
-    --intermediate :: EquationState Bit _
-    intermediate = matchPoints (s ^. c_point) pointT >>= \case
-      Lremains remainP -> matchSides (remainP : leftT) rightT
-      Rremains remainP -> matchSides leftT (remainP : rightT)
-      PerfectP -> matchSides leftT rightT
-    matchSides :: [(Bit, InfCount)] -> [(Bit, InfCount)]
-      -> EquationState Bit ([(Bit, InfCount)], [(Bit, InfCount)])
-    matchSides left right = bisequence (mapMaybe getTapeRemain $ matchTape (s^.ls) left
-                                      , mapMaybe getTapeRemain $ matchTape (s^.rs) right)
-    --packageResult :: (Map BoundVar InfCount, Map TapeVar Bit, _) -> Maybe (SkipResult Bit InfCount Location)
+applySkip :: forall s. (Eq s) => Skip s -> (Phase, ExpTape s InfCount Location)
+  -> Maybe (SkipResult s InfCount Location)
+--Skip Bit -> (Phase, ExpTape Bit InfCount Location) -> Maybe (SkipResult Bit InfCount Location)
+applySkip (Skip s e hopCount _) (p, tape)
+  = guard (s^.cstate == p) >> packageResult <$> runEquationState (matchConfigTape s tape)
+  where
+    packageResult :: (Map BoundVar InfCount, Map TapeVar s, ([(s, InfCount)], [(s, InfCount)]))
+      -> SkipResult s InfCount Location
     packageResult (boundVs, tapeVs, (newLs, newRs)) = Skipped
       (updateCount boundVs hopCount)
       (e^.cstate)
@@ -100,7 +92,6 @@ applySkip (Skip s e hopCount _) (p, ExpTape leftT pointT rightT) | s ^. cstate =
     updateList :: Map BoundVar InfCount -> Map TapeVar s
       -> [(VarOr s, InfCount)] -> [(s, InfCount)]
     updateList bs ts = fmap $ bimap (deVarOr ts) (updateInfCount bs)
-applySkip _ _ = Nothing
 
 --we want to be able to apply a skip of counts to an ExpTape _ Count but also a
 --skip of counts to an ExpTape _ Nat
@@ -164,10 +155,14 @@ skipFarthest _   (Skip _ _ _ True, _) = GT
 skipFarthest (_, Skipped c _ _) (_, Skipped c' _ _) = compare c c'
 
 --simulates one step of a TM using a skip-book
+--right now you can't generalize this Bit to an s because you want to be able to case
+--on whether the base transition is present in the line marked **
+--but that should be generalizeable
+--a TapeSymbol has a function (s, Location c) -> Bit called getPointBit or something
 skipStep :: Turing -> SkipBook Bit -> Phase -> ExpTape Bit InfCount Location
   -> PartialStepResult (ExpTape Bit InfCount Location)
 skipStep (Turing _ trans) book p tape@(ExpTape _ls (bit, _loc) _rs)
-  = case trans ^. at (p, bit) of
+  = case trans ^. at (p, bit) of -- **
     Nothing -> Unknown (p,bit)
     Just _ -> let
       --just tries applying all the skips. I think this will be ok, but is probably
@@ -176,6 +171,7 @@ skipStep (Turing _ trans) book p tape@(ExpTape _ls (bit, _loc) _rs)
       appliedSkips = mapMaybe (\s -> (s,) <$> applySkip s (p, tape)) $ toList skips
       --maximumBy is safe, because we already checked the machine has this transition
       --defined, which implies at least one skip will apply
+      --TODO :: unless we are at the end of the tape in which caswe we crash 
       (bestSkip, Skipped hops newP newT) = maximumBy skipFarthest appliedSkips
       in --trace (toString $ (mconcat $ dispSkip . fst <$> appliedSkips) <> "\n") $
       if bestSkip ^. halts then Stopped hops newT bestSkip

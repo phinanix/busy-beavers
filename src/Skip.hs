@@ -142,3 +142,16 @@ matchInfsAndReturn skipC tapeS tapeC tapeD = matchInfCount skipC tapeC >>= \case
       remainC -> case mirrorDir tapeD of
         L -> pure $ Lremains (tapeS, remainC)
         R -> pure $ Rremains (tapeS, remainC)
+
+--match a config to a tape, and return the lists that remain on each side of the
+--tape after matching
+matchConfigTape :: (Eq s) => Config s -> ExpTape s InfCount Location
+  -> EquationState s ([(s, InfCount)], [(s, InfCount)])
+matchConfigTape (Config _p lsC pointC rsC) (ExpTape lsT pointT rsT)
+  = matchPoints pointC pointT >>= \case
+    Lremains remainP -> matchSides (remainP : lsT) rsT
+    Rremains remainP -> matchSides lsT (remainP : rsT)
+    PerfectP -> matchSides lsT rsT
+  where
+  matchSides left right = bisequence (mapMaybe getTapeRemain $ matchTape lsC left
+                                     , mapMaybe getTapeRemain $ matchTape rsC right)

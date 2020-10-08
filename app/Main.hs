@@ -160,7 +160,10 @@ simProgram display results = do
                 interact r
 
 --
-
+--TODO:: write unification
+--TODO:: write skip gluing logic
+--TODO:: write skip-proves-infinity logic
+--TODO:: fix end-of-tape detection issue
 --TODO:: make simple induction
 --TODO:: make macro machine simulator
 --TODO:: make database that stores results of machines, so that results can be compared between different runs

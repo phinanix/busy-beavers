@@ -108,15 +108,20 @@ infCountToInt Infinity = error "infinity isn't an int"
 infCountToInt (NotInfinity (Count m Empty Empty)) = fromIntegral m
 infCountToInt (NotInfinity c) = error $ "tried to int-ify: " <> dispCount c
 
+--the linear count, plus a series of counts put through the quadratic function
+--f(x) = x(x+1) / 2, all summed
+data QuadCount = QuadCount
+  { _linearCount :: Count
+  , _quadCounts :: [Count]
+  } deriving (Eq, Ord, Show, Generic)
+
 instance Semigroup Count where
   (Count n as xs) <> (Count m bs ys) = Count (n+m) (as <> bs) (xs <> ys)
 
 instance Monoid Count where
   mempty = Count 0 mempty mempty
 
---this is actually the default instance
-instance AsEmpty Count where
-  _Empty = only mempty
+instance AsEmpty Count
 
 instance Semigroup InfCount where
   Infinity <> _ = Infinity
@@ -127,6 +132,14 @@ instance Monoid InfCount where
   mempty = NotInfinity mempty
 
 instance AsEmpty InfCount
+
+instance Semigroup QuadCount where
+  (QuadCount c qs) <> (QuadCount d rs) = QuadCount (c <> d) (qs <> rs)
+
+instance Monoid QuadCount where
+  mempty = QuadCount mempty mempty
+
+instance AsEmpty QuadCount
 
 nTimesCount :: (Integral n) => n -> InfCount -> InfCount
 nTimesCount n c = fold $ genericReplicate n c
