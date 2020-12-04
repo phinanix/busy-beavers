@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: bd771735ce8c5de042bd40ce9252fc902202033c3376ff0e8eb201518c1aa4e6
+-- hash: 80a2c616115f1ca9a8c0f09a251fb6ca0ab8c27a6f5c453fef15ede00111bdda
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -31,6 +31,7 @@ library
       Count
       Display
       ExpTape
+      Glue
       HaltProof
       Results
       Simple.Display
@@ -53,7 +54,9 @@ library
     , containers
     , lens
     , monoidal-containers
+    , mtl
     , relude
+    , unification-fd
     , witherable
   default-language: Haskell2010
 

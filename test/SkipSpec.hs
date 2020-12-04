@@ -20,23 +20,23 @@ spec :: Spec
 spec = do
   describe "matchTapeHeads" $ do
     it "matches identical values" $ do
-      getEquationState (matchTapeHeads (NotVar False, num 5) (False, inum 5))
+      getEquations (matchTapeHeads (NotVar False, num 5) (False, inum 5))
         `shouldBe` Just PerfectH
     --
     it "matches smaller against larger values" $ do
-      getEquationState (matchTapeHeads (NotVar False, num 5) (False, inum 8))
+      getEquations (matchTapeHeads (NotVar False, num 5) (False, inum 8))
         `shouldBe` Just (TapeHLeft (False, inum 3))
     --
     it "matches a var against a num " $ do
-      getEquationState (matchTapeHeads (NotVar False, newBoundVar 5) (False, inum 5))
+      getEquations (matchTapeHeads (NotVar False, newBoundVar 5) (False, inum 5))
         `shouldBe` Just PerfectH
     --
     it "matches a var against several vars" $ do
-      getEquationState (matchTapeHeads (NotVar False, newBoundVar 5)
+      getEquations (matchTapeHeads (NotVar False, newBoundVar 5)
         (False, newInfBoundVar 0 <> newInfBoundVar 0 <> newInfBoundVar 5))
         `shouldBe` Just PerfectH
   describe "matchTape" $ do
     it "matches a simple example" $ do
-      getEquationState (matchBitTape
+      getEquations (matchBitTape
         [(NotVar False, num 3)] [(False, inum 5), (True, inum 1)])
         `shouldBe` Just (NewTape [(False, inum 2), (True, inum 1)])

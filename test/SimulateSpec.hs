@@ -90,13 +90,13 @@ varResult = ExpTape
 
 skipTapeResultSpec skipEx phaseTapeIn@(phase_in, tapeEx) (phase_out, resultEx) = do
   it "matches the left half of the skip" $ do
-    runEquationState (matchBitTape (skipEx^.start.ls) (left tapeEx))
+    runEquations (matchBitTape (skipEx^.start.ls) (left tapeEx))
       `shouldSatisfy`  is _Just
   it "matches the right half of the skip" $ do
-    runEquationState (matchBitTape (skipEx^.start.rs) (right tapeEx))
+    runEquations (matchBitTape (skipEx^.start.rs) (right tapeEx))
       `shouldSatisfy` is _Just
   it "matches the point of the skip" $ do
-    runEquationState (matchPoints (skipEx^.start.c_point) (point tapeEx))
+    runEquations (matchPoints (skipEx^.start.c_point) (point tapeEx))
       `shouldSatisfy` is _Just
   it "applies the skip" $ do
     applySkip skipEx phaseTapeIn
@@ -106,22 +106,22 @@ spec :: Spec
 spec = do
   describe "applySkip" $ do
     it "matches the left half of the skip" $ do
-      getEquationState (matchBitTape (simpleSkip^.start.ls) (left simpleTape))
+      getEquations (matchBitTape (simpleSkip^.start.ls) (left simpleTape))
         `shouldBe` Just (NewTape (left simpleTape))
     it "matches the right half of the skip" $ do
-      getEquationState (matchBitTape (simpleSkip^.start.rs) (right simpleTape))
+      getEquations (matchBitTape (simpleSkip^.start.rs) (right simpleTape))
         `shouldBe` Just (NewTape (right simpleTape))
     it "matches the point of the simple skip" $ do
-      getEquationState (matchPoints (simpleSkip^.start.c_point) (point simpleTape))
+      getEquations (matchPoints (simpleSkip^.start.c_point) (point simpleTape))
         `shouldBe` Just (Lremains (False, inum 8))
     it "applies a simple skip" $ do
       applySkip simpleSkip ((Phase 0), simpleTape)
         `shouldBe` Just (Skipped (Phase 1) simpleResult)
     it "passes the guard" $ do
-      runEquationState (mfailGuard (exampleSkip^.start.ls == []) "ls not empty" >> matchBitTape (exampleSkip^.start.rs) (right exampleTape))
+      runEquations (mfailGuard (exampleSkip^.start.ls == []) "ls not empty" >> matchBitTape (exampleSkip^.start.rs) (right exampleTape))
         `shouldSatisfy` is _Just
     it "matches the point of the more complex skip" $ do
-      getEquationState (matchPoints (exampleSkip^.start.c_point) (point exampleTape))
+      getEquations (matchPoints (exampleSkip^.start.c_point) (point exampleTape))
         `shouldBe` Just (Lremains (True, inum 6))
     it "applies a more complex skip" $ do
       applySkip exampleSkip ((Phase 0), exampleTape)
@@ -131,5 +131,5 @@ spec = do
     --tests that they match works
     describe "varExample" $ skipTapeResultSpec (varSkip) ((Phase 0), varTape) ((Phase 1), varResult)
     it "matches the point of the var" $ do
-      getEquationState (matchPoints (varSkip^.start.c_point) (point varTape))
+      getEquations (matchPoints (varSkip^.start.c_point) (point varTape))
         `shouldBe` Just (PerfectP)

@@ -28,7 +28,9 @@ library:
   - containers
   - lens
   - monoidal-containers
+  - mtl
   - relude
+  - unification-fd
   - witherable
 executables:
   busy-beavers-exe:

@@ -10,8 +10,8 @@ import Control.Exception (evaluate)
 
 import Count
 
-getBitES :: EquationState Bool s -> Maybe s
-getBitES = getEquationState
+getBitES :: Equations Bool s -> Maybe s
+getBitES = getEquations
 
 matchAndGet :: Count -> Count -> Maybe Count
 matchAndGet a b = getBitES $ matchCount a b

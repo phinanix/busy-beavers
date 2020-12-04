@@ -16,6 +16,7 @@ import Skip
 import Count
 import HaltProof
 import Results
+import Glue
 
 data PartialStepResult a = Unknown Edge
                          | Stopped InfCount a (Skip Bit)
@@ -58,7 +59,7 @@ applySkip :: forall s. (Eq s) => Skip s -> (Phase, ExpTape s InfCount Location)
   -> Maybe (SkipResult s InfCount Location)
 --Skip Bit -> (Phase, ExpTape Bit InfCount Location) -> Maybe (SkipResult Bit InfCount Location)
 applySkip (Skip s e hopCount _) (p, tape)
-  = guard (s^.cstate == p) >> packageResult <$> runEquationState (matchConfigTape s tape)
+  = guard (s^.cstate == p) >> packageResult <$> runEquations (matchConfigTape s tape)
   where
     packageResult :: (Map BoundVar InfCount, Map TapeVar s, ([(s, InfCount)], [(s, InfCount)]))
       -> SkipResult s InfCount Location
@@ -171,7 +172,7 @@ skipStep (Turing _ trans) book p tape@(ExpTape _ls (bit, _loc) _rs)
       appliedSkips = mapMaybe (\s -> (s,) <$> applySkip s (p, tape)) $ toList skips
       --maximumBy is safe, because we already checked the machine has this transition
       --defined, which implies at least one skip will apply
-      --TODO :: unless we are at the end of the tape in which caswe we crash 
+      --TODO :: unless we are at the end of the tape in which caswe we crash
       (bestSkip, Skipped hops newP newT) = maximumBy skipFarthest appliedSkips
       in --trace (toString $ (mconcat $ dispSkip . fst <$> appliedSkips) <> "\n") $
       if bestSkip ^. halts then Stopped hops newT bestSkip

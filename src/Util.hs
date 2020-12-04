@@ -20,8 +20,11 @@ mfailGuard False = fail
 
 (<$$>) :: (Functor f, Functor g) => (a -> b) -> f (g a) -> f (g b)
 (<$$>) = fmap . fmap
-
 infixl 4 <$$>
+
+(<%>) :: (Traversable t, Applicative f) => (a -> f b) -> t a -> f (t b)
+(<%>) = traverse
+infixl 5 <%>
 
 unsafeFromLeft :: Either a b -> a
 unsafeFromLeft (Left a) = a

@@ -1,0 +1,395 @@
+	Sat Aug 22 23:02 2020 Time and Allocation Profiling Report  (Final)
+
+	   busy-beavers-exe +RTS -N -p -s -h -xc -RTS -fprof-auto
+
+	total time  =        4.63 secs   (17163 ticks @ 1000 us, 8 processors)
+	total alloc = 19,550,553,720 bytes  (excludes profiling overheads)
+
+COST CENTRE                   MODULE                 SRC                                      %time %alloc
+
+at                            Control.Lens.At        src/Control/Lens/At.hs:471:3-25           17.5   11.7
+dfsToHalt.try                 HaltProof              src/HaltProof.hs:(51,3)-(64,18)            8.5   10.4
+compare                       Beaver                 src/Beaver.hs:6:55-57                      7.5    0.0
+simulateHalt                  HaltProof              src/HaltProof.hs:(208,1)-(251,86)          5.7   11.9
+aggregateResults.dispForevers Main                   app/Main.hs:(53,3)-(61,83)                 5.3    0.5
+#..\                          Data.Profunctor.Unsafe src/Data/Profunctor/Unsafe.hs:175:26-31    5.2    0.9
+uniMap                        Beaver                 src/Beaver.hs:(80,1)-(84,24)               4.1   12.1
+dfsToHalt.\                   HaltProof              src/HaltProof.hs:(45,46)-(47,36)           4.0    4.8
+_1                            Control.Lens.Tuple     src/Control/Lens/Tuple.hs:123:3-37         3.8    4.6
+simStepWithDir                HaltProof              src/HaltProof.hs:(178,1)-(187,72)          3.5    2.2
+main.results.\                Main                   app/Main.hs:(122,24)-(123,46)              3.4    0.6
+_2                            Control.Lens.Tuple     src/Control/Lens/Tuple.hs:229:3-37         3.2    2.9
+dfsToHalt                     HaltProof              src/HaltProof.hs:(35,1)-(64,18)            3.0    5.8
+infiniteRight.step            HaltProof              src/HaltProof.hs:(104,3)-(121,16)          2.4    3.9
+contains.\                    Control.Lens.At        src/Control/Lens/At.hs:172:5-48            2.2    2.5
+contains                      Control.Lens.At        src/Control/Lens/At.hs:(171,3)-(172,48)    2.1    1.2
+main.results                  Main                   app/Main.hs:(122,7)-(123,60)               2.0    3.4
+testHalt                      HaltProof              src/HaltProof.hs:(134,1)-(139,23)          1.9    1.7
+#.                            Data.Profunctor.Unsafe src/Data/Profunctor/Unsafe.hs:175:3-71     1.9    0.7
+mirrorTuring                  Beaver                 src/Beaver.hs:(49,1)-(50,57)               1.5    5.2
+uniMap.addKey                 Beaver                 src/Beaver.hs:(82,3)-(84,24)               1.4    3.0
+uniTuring                     Beaver                 src/Beaver.hs:(87,1)-(91,19)               1.3    2.8
+dfsToHalt.try.\               HaltProof              src/HaltProof.hs:(62,16)-(64,18)           1.2    1.1
+simpleInfiniteRight           HaltProof              src/HaltProof.hs:(82,1)-(83,68)            1.2    0.2
+aggregateResults              Main                   app/Main.hs:(22,1)-(67,90)                 0.9    1.3
+fmap                          Data.Orphans           src/Data/Orphans.hs:1099:5-34              0.4    1.1
+
+
+                                                                                                                                           individual      inherited
+COST CENTRE                               MODULE                        SRC                                            no.      entries  %time %alloc   %time %alloc
+
+MAIN                                      MAIN                          <built-in>                                     3630          0    0.0    0.0   100.0  100.0
+ CAF                                      GHC.Conc.Signal               <entire-module>                                3738          0    0.0    0.0     0.0    0.0
+ CAF                                      GHC.IO.Encoding               <entire-module>                                3720          0    0.0    0.0     0.0    0.0
+ CAF                                      GHC.IO.Encoding.Iconv         <entire-module>                                3718          0    0.0    0.0     0.0    0.0
+ CAF                                      GHC.IO.Handle.FD              <entire-module>                                3710          0    0.0    0.0     0.0    0.0
+ CAF                                      GHC.IO.Handle.Text            <entire-module>                                3708          0    0.0    0.0     0.0    0.0
+ CAF                                      GHC.Show                      <entire-module>                                3690          0    0.0    0.0     0.0    0.0
+ CAF                                      GHC.Event.Thread              <entire-module>                                3663          0    0.0    0.0     0.0    0.0
+ CAF                                      GHC.Event.Poll                <entire-module>                                3648          0    0.0    0.0     0.0    0.0
+ CAF:$fEqPhase2                           Beaver                        <no location info>                             7196          0    0.0    0.0     0.0    0.0
+  ==                                      Beaver                        src/Beaver.hs:6:51-52                          7324          1    0.0    0.0     0.0    0.0
+ CAF:$fOrdPhase7                          Beaver                        <no location info>                             7199          0    0.0    0.0     0.0    0.0
+  compare                                 Beaver                        src/Beaver.hs:6:55-57                          7286          1    0.0    0.0     0.0    0.0
+ CAF:$fShowDir3                           Beaver                        <no location info>                             7186          0    0.0    0.0     0.0    0.0
+ CAF:$fShowDir6                           Beaver                        <no location info>                             7187          0    0.0    0.0     0.0    0.0
+ CAF:$fShowPhase2                         Beaver                        <no location info>                             7191          0    0.0    0.0     0.0    0.0
+ CAF:$fShowPhase4                         Beaver                        <no location info>                             7208          0    0.0    0.0     0.0    0.0
+ CAF:$fShowPhase6                         Beaver                        <no location info>                             7207          0    0.0    0.0     0.0    0.0
+ CAF:$fShowPhase8                         Beaver                        <no location info>                             7213          0    0.0    0.0     0.0    0.0
+  showsPrec                               Beaver                        src/Beaver.hs:6:60-63                          7565          0    0.0    0.0     0.0    0.0
+ CAF:$fShowTrans5                         Beaver                        <no location info>                             7188          0    0.0    0.0     0.0    0.0
+ CAF:dispBit1                             Beaver                        <no location info>                             7183          0    0.0    0.0     0.0    0.0
+ CAF:dispBit3                             Beaver                        <no location info>                             7184          0    0.0    0.0     0.0    0.0
+ CAF:dispET1                              Beaver                        <no location info>                             7211          0    0.0    0.0     0.0    0.0
+ CAF:dispET4                              Beaver                        <no location info>                             7210          0    0.0    0.0     0.0    0.0
+  dispEdge                                Beaver                        src/Beaver.hs:28:1-41                          7549          0    0.0    0.0     0.0    0.0
+   showsPrec                              Beaver                        src/Beaver.hs:6:60-63                          7550          0    0.0    0.0     0.0    0.0
+ CAF:dispTape3                            Beaver                        <no location info>                             7185          0    0.0    0.0     0.0    0.0
+ CAF:dispTrans2                           Beaver                        <no location info>                             7209          0    0.0    0.0     0.0    0.0
+  dispTrans                               Beaver                        src/Beaver.hs:(31,1)-(32,65)                   7553          0    0.0    0.0     0.0    0.0
+   showsPrec                              Beaver                        src/Beaver.hs:6:60-63                          7554          0    0.0    0.0     0.0    0.0
+ CAF:infiniteSimLimit                     HaltProof                     src/HaltProof.hs:86:1-16                       7179          0    0.0    0.0     0.0    0.0
+  infiniteSimLimit                        HaltProof                     src/HaltProof.hs:86:1-21                       7410          1    0.0    0.0     0.0    0.0
+ CAF:initState                            HaltProof                     src/HaltProof.hs:171:1-9                       7178          0    0.0    0.0     0.0    0.0
+  initState                               HaltProof                     src/HaltProof.hs:171:1-42                      7293          1    0.0    0.0     0.0    0.0
+ CAF:lvl11_rsxb                           HaltProof                     <no location info>                             7157          0    0.0    0.0     0.0    0.0
+  dfsToHalt                               HaltProof                     src/HaltProof.hs:(35,1)-(64,18)                7349          0    0.0    0.0     0.0    0.0
+   #.                                     Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:3-71         7350          1    0.0    0.0     0.0    0.0
+    #..\                                  Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:26-31        7351          1    0.0    0.0     0.0    0.0
+ CAF:lvl13_ri16                           Main                          <no location info>                             7249          0    0.0    0.0     0.0    0.0
+ CAF:lvl14_ri17                           Main                          <no location info>                             7250          0    0.0    0.0     0.0    0.0
+ CAF:lvl15_ri1a                           Main                          <no location info>                             7251          0    0.0    0.0     0.0    0.0
+ CAF:lvl16_ri1b                           Main                          <no location info>                             7252          0    0.0    0.0     0.0    0.0
+ CAF:main                                 Main                          app/Main.hs:119:1-4                            7254          0    0.0    0.0     0.0    0.0
+  main                                    Main                          app/Main.hs:(119,1)-(124,46)                   7260          1    0.0    0.0     0.0    0.0
+ CAF:main1                                Main                          <no location info>                             7253          0    0.0    0.0     6.5    1.8
+  main                                    Main                          app/Main.hs:(119,1)-(124,46)                   7261          0    0.0    0.0     6.5    1.8
+   aggregateResults                       Main                          app/Main.hs:(22,1)-(67,90)                     7298          1    0.9    1.3     6.5    1.8
+    aggregateResults.count                Main                          app/Main.hs:(26,3)-(29,62)                     7299    4826809    0.0    0.0     0.0    0.0
+    aggregateResults.dispContinues        Main                          app/Main.hs:(47,3)-(51,43)                     7530          1    0.0    0.0     0.0    0.0
+     aggregateResults.dispContinues.\     Main                          app/Main.hs:50:28-75                           7533          5    0.0    0.0     0.0    0.0
+      dispSimState                        HaltProof                     src/HaltProof.hs:(154,1)-(156,31)              7562          5    0.0    0.0     0.0    0.0
+       dispTape                           Beaver                        src/Beaver.hs:(120,1)-(124,33)                 7566          5    0.0    0.0     0.0    0.0
+        dispTape.dispBits                 Beaver                        src/Beaver.hs:(122,3)-(124,33)                 7567         10    0.0    0.0     0.0    0.0
+         dispTape.dispBits.\              Beaver                        src/Beaver.hs:123:35-50                        7568         18    0.0    0.0     0.0    0.0
+          dispBit                         Beaver                        src/Beaver.hs:(24,1)-(25,18)                   7569         18    0.0    0.0     0.0    0.0
+         dispBit                          Beaver                        src/Beaver.hs:(24,1)-(25,18)                   7570          7    0.0    0.0     0.0    0.0
+        dispBit                           Beaver                        src/Beaver.hs:(24,1)-(25,18)                   7571          5    0.0    0.0     0.0    0.0
+       showInt3Wide                       HaltProof                     src/HaltProof.hs:(149,1)-(151,23)              7563          5    0.0    0.0     0.0    0.0
+       showsPrec                          Beaver                        src/Beaver.hs:6:60-63                          7564          5    0.0    0.0     0.0    0.0
+      dispTuring                          Beaver                        src/Beaver.hs:38:1-78                          7534          5    0.0    0.0     0.0    0.0
+       ifoldMap                           Control.Lens.Indexed          src/Control/Lens/Indexed.hs:271:3-34           7535          5    0.0    0.0     0.0    0.0
+        #.                                Control.Lens.Internal.Indexed src/Control/Lens/Internal/Indexed.hs:167:3-20  7545          5    0.0    0.0     0.0    0.0
+        #.                                Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:3-71         7539          5    0.0    0.0     0.0    0.0
+         #..\                             Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:26-31        7540          5    0.0    0.0     0.0    0.0
+          itraversed                      Control.Lens.Indexed          src/Control/Lens/Indexed.hs:514:3-55           7541          0    0.0    0.0     0.0    0.0
+           dispET                         Beaver                        src/Beaver.hs:35:1-55                          7546         10    0.0    0.0     0.0    0.0
+            dispEdge                      Beaver                        src/Beaver.hs:28:1-41                          7547         10    0.0    0.0     0.0    0.0
+             showsPrec                    Beaver                        src/Beaver.hs:6:60-63                          7548         10    0.0    0.0     0.0    0.0
+            dispTrans                     Beaver                        src/Beaver.hs:(31,1)-(32,65)                   7551         10    0.0    0.0     0.0    0.0
+             showsPrec                    Beaver                        src/Beaver.hs:7:37-40                          7555          9    0.0    0.0     0.0    0.0
+             showsPrec                    Beaver                        src/Beaver.hs:6:60-63                          7552          9    0.0    0.0     0.0    0.0
+           itraverse                      Control.Lens.Indexed          src/Control/Lens/Indexed.hs:712:3-33           7542          0    0.0    0.0     0.0    0.0
+            dispET                        Beaver                        src/Beaver.hs:35:1-55                          7556         20    0.0    0.0     0.0    0.0
+             dispEdge                     Beaver                        src/Beaver.hs:28:1-41                          7557         20    0.0    0.0     0.0    0.0
+              showsPrec                   Beaver                        src/Beaver.hs:6:60-63                          7558         20    0.0    0.0     0.0    0.0
+             dispTrans                    Beaver                        src/Beaver.hs:(31,1)-(32,65)                   7559         20    0.0    0.0     0.0    0.0
+              showsPrec                   Beaver                        src/Beaver.hs:7:37-40                          7561         16    0.0    0.0     0.0    0.0
+              showsPrec                   Beaver                        src/Beaver.hs:6:60-63                          7560         16    0.0    0.0     0.0    0.0
+        itraversed                        Control.Lens.Indexed          src/Control/Lens/Indexed.hs:514:3-55           7536          5    0.0    0.0     0.0    0.0
+         conjoined                        Control.Lens.Internal.Indexed src/Control/Lens/Internal/Indexed.hs:96:3-19   7537          5    0.0    0.0     0.0    0.0
+         indexed                          Control.Lens.Internal.Indexed src/Control/Lens/Internal/Indexed.hs:246:3-22  7543          5    0.0    0.0     0.0    0.0
+         itraverse                        Control.Lens.Indexed          src/Control/Lens/Indexed.hs:712:3-33           7538          5    0.0    0.0     0.0    0.0
+         runIndexed                       Control.Lens.Internal.Indexed src/Control/Lens/Internal/Indexed.hs:127:35-44 7544          5    0.0    0.0     0.0    0.0
+     takeNeveryM                          Main                          app/Main.hs:(14,1)-(19,47)                     7531          1    0.0    0.0     0.0    0.0
+      takeNeveryM.go                      Main                          app/Main.hs:(16,3)-(19,47)                     7532         22    0.0    0.0     0.0    0.0
+    aggregateResults.dispForevers         Main                          app/Main.hs:(53,3)-(61,83)                     7572          1    5.3    0.5     5.3    0.5
+     aggregateResults.sortProofs          Main                          app/Main.hs:(64,3)-(67,90)                     7573    4036564    0.0    0.0     0.0    0.0
+    aggregateResults.dispHalts            Main                          app/Main.hs:(31,3)-(38,69)                     7528          1    0.0    0.0     0.3    0.0
+     aggregateResults.dispHalts.numHalted Main                          app/Main.hs:33:5-28                            7529          1    0.3    0.0     0.3    0.0
+   main.results                           Main                          app/Main.hs:(122,7)-(123,60)                   7262          1    0.0    0.0     0.0    0.0
+ CAF:main2                                Main                          <no location info>                             7248          0    0.0    0.0    78.2   70.7
+  main                                    Main                          app/Main.hs:(119,1)-(124,46)                   7300          0    0.0    0.0    78.2   70.7
+   main.results                           Main                          app/Main.hs:(122,7)-(123,60)                   7301          0    2.0    3.4    78.2   70.7
+    main.results.\                        Main                          app/Main.hs:(122,24)-(123,46)                  7304    4826808    3.4    0.6    76.2   67.4
+     simulateHalt                         HaltProof                     src/HaltProof.hs:(208,1)-(251,86)              7305    4826808    5.7   11.9    72.8   66.8
+      simStep                             HaltProof                     src/HaltProof.hs:190:1-38                      7306    9567224    0.7    0.0     7.3    2.5
+       simStepWithDir                     HaltProof                     src/HaltProof.hs:(178,1)-(187,72)              7307    9567224    2.1    1.7     6.6    2.5
+        at                                Control.Lens.At               src/Control/Lens/At.hs:471:3-25                7308    9567224    3.1    0.8     4.6    0.8
+         compare                          Beaver                        src/Beaver.hs:6:55-57                          7309          0    1.5    0.0     1.5    0.0
+        tapeLeft                          Beaver                        src/Beaver.hs:(107,1)-(110,50)                 7328    5006752    0.0    0.0     0.0    0.0
+        tapeRight                         Beaver                        src/Beaver.hs:(114,1)-(117,51)                 7310    4406972    0.0    0.0     0.0    0.0
+      testHalt                            HaltProof                     src/HaltProof.hs:(134,1)-(139,23)              7311    4227028    1.7    1.6    52.9   46.7
+       dfsToHalt                          HaltProof                     src/HaltProof.hs:(35,1)-(64,18)                7329    7430664    2.8    5.5    40.6   34.1
+        dfsToHalt.try                     HaltProof                     src/HaltProof.hs:(51,3)-(64,18)                7330   14861328    5.1    8.3    16.4   12.8
+         at                               Control.Lens.At               src/Control/Lens/At.hs:471:3-25                7331   14861328    4.5    1.2     6.2    1.2
+          compare                         Beaver                        src/Beaver.hs:6:55-57                          7332          0    1.7    0.0     1.7    0.0
+         #.                               Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:3-71         7333   14410600    0.5    0.0     1.9    0.0
+          #..\                            Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:26-31        7334   14410600    1.1    0.0     1.5    0.0
+           _2                             Control.Lens.Tuple            src/Control/Lens/Tuple.hs:229:3-37             7335    3613896    0.2    0.0     0.4    0.0
+            contains                      Control.Lens.At               src/Control/Lens/At.hs:(171,3)-(172,48)        7336    3613896    0.2    0.0     0.2    0.0
+         dfsToHalt.try.\                  HaltProof                     src/HaltProof.hs:(62,16)-(64,18)               7344    3613896    0.9    1.0     3.1    3.3
+          #.                              Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:3-71         7345    6814080    0.4    0.4     2.2    2.2
+           #..\                           Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:26-31        7346    6814080    0.4    0.0     1.9    1.8
+            _1                            Control.Lens.Tuple            src/Control/Lens/Tuple.hs:123:3-37             7347    3407040    1.5    1.8     1.5    1.8
+             _1.\                         Control.Lens.Tuple            src/Control/Lens/Tuple.hs:123:32-37            7348    3407040    0.0    0.0     0.0    0.0
+        dfsToHalt.\                       HaltProof                     src/HaltProof.hs:(45,46)-(47,36)               7359    5514880    3.9    4.7    19.6   14.7
+         #.                               Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:3-71         7364   10796704    0.4    0.0     6.9    5.6
+          #..\                            Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:26-31        7365   10796704    1.4    0.0     6.5    5.6
+           _1                             Control.Lens.Tuple            src/Control/Lens/Tuple.hs:123:3-37             7366    5511648    1.0    1.4     1.0    1.4
+            _1.\                          Control.Lens.Tuple            src/Control/Lens/Tuple.hs:123:32-37            7367    5511648    0.0    0.0     0.0    0.0
+           _2                             Control.Lens.Tuple            src/Control/Lens/Tuple.hs:229:3-37             7373    5285056    1.5    2.2     4.0    4.2
+            _2.\                          Control.Lens.Tuple            src/Control/Lens/Tuple.hs:229:32-37            7374    5285056    0.0    0.0     0.0    0.0
+            contains                      Control.Lens.At               src/Control/Lens/At.hs:(171,3)-(172,48)        7382    3810208    0.1    0.0     2.6    2.1
+             contains.\                   Control.Lens.At               src/Control/Lens/At.hs:172:5-48                7383    3810208    1.9    2.1     2.4    2.1
+              compare                     Beaver                        src/Beaver.hs:6:55-57                          7384          0    0.5    0.0     0.5    0.0
+         dfsToHalt.\                      HaltProof                     src/HaltProof.hs:44:15-49                      7385    1473696    0.0    0.0     0.0    0.0
+         dfsToHalt.try                    HaltProof                     src/HaltProof.hs:(51,3)-(64,18)                7360          0    3.0    1.7     8.7    4.4
+          _2                              Control.Lens.Tuple            src/Control/Lens/Tuple.hs:229:3-37             7363   10796704    0.9    0.0     3.8    1.2
+           contains                       Control.Lens.At               src/Control/Lens/At.hs:(171,3)-(172,48)        7368   10796704    1.6    1.2     2.9    1.2
+            compare                       Beaver                        src/Beaver.hs:6:55-57                          7371          0    1.3    0.0     1.3    0.0
+          dfsToHalt.try.\                 HaltProof                     src/HaltProof.hs:59:15-24                      7372    8383520    0.0    0.0     0.0    0.0
+          dfsToHalt.try.\                 HaltProof                     src/HaltProof.hs:(62,16)-(64,18)               7404    2413184    0.3    0.0     0.3    0.0
+          #.                              Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:3-71         7361    2347392    0.1    0.0     0.6    0.0
+           #..\                           Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:26-31        7362    2347392    0.4    0.0     0.4    0.0
+          _1                              Control.Lens.Tuple            src/Control/Lens/Tuple.hs:123:3-37             7405    2347392    0.9    1.2     1.1    1.5
+           #.                             Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:3-71         7407    2347392    0.2    0.3     0.2    0.3
+            #..\                          Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:26-31        7408    2347392    0.0    0.0     0.0    0.0
+           _1.\                           Control.Lens.Tuple            src/Control/Lens/Tuple.hs:123:32-37            7406    2347392    0.0    0.0     0.0    0.0
+        #.                                Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:3-71         7352          0    0.0    0.0     1.7    1.0
+         #..\                             Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:26-31        7353          0    0.7    0.0     1.7    1.0
+          _1                              Control.Lens.Tuple            src/Control/Lens/Tuple.hs:123:3-37             7354    6988576    0.1    0.0     0.1    0.0
+          _2                              Control.Lens.Tuple            src/Control/Lens/Tuple.hs:229:3-37             7357    1703520    0.5    0.7     0.9    1.0
+           _2.\                           Control.Lens.Tuple            src/Control/Lens/Tuple.hs:229:32-37            7358    1703520    0.0    0.0     0.0    0.0
+           contains                       Control.Lens.At               src/Control/Lens/At.hs:(171,3)-(172,48)        7369    1701440    0.1    0.0     0.3    0.3
+            contains.\                    Control.Lens.At               src/Control/Lens/At.hs:172:5-48                7370    1701440    0.2    0.3     0.2    0.3
+        dfsToHalt.\                       HaltProof                     src/HaltProof.hs:44:15-49                      7386          0    0.1    0.1     0.1    0.1
+       simpleInfiniteLeft                 HaltProof                     src/HaltProof.hs:(68,1)-(77,32)                7312    4227028    0.5    0.3     1.9    0.5
+        at                                Control.Lens.At               src/Control/Lens/At.hs:471:3-25                7512    2484807    0.8    0.2     1.1    0.2
+         compare                          Beaver                        src/Beaver.hs:6:55-57                          7513          0    0.3    0.0     0.3    0.0
+        ==                                Beaver                        src/Beaver.hs:6:51-52                          7514          0    0.3    0.0     0.3    0.0
+       simpleInfiniteRight                HaltProof                     src/HaltProof.hs:(82,1)-(83,68)                7313    3071406    1.1    0.2     4.8    6.9
+        simpleInfiniteLeft                HaltProof                     src/HaltProof.hs:(68,1)-(77,32)                7318    3071406    0.3    0.3     1.4    0.5
+         at                               Control.Lens.At               src/Control/Lens/At.hs:471:3-25                7320    1964118    0.6    0.2     0.9    0.2
+          compare                         Beaver                        src/Beaver.hs:6:55-57                          7321          0    0.3    0.0     0.3    0.0
+         ==                               Beaver                        src/Beaver.hs:6:51-52                          7325          0    0.3    0.0     0.3    0.0
+        mirrorTuring                      Beaver                        src/Beaver.hs:(49,1)-(50,57)                   7319    1964118    1.2    4.3     1.4    4.7
+         mirrorTrans                      Beaver                        src/Beaver.hs:(45,1)-(46,49)                   7322    1964118    0.2    0.3     0.2    0.3
+          mirrorDir                       Beaver                        src/Beaver.hs:(41,1)-(42,15)                   7323    1928966    0.0    0.0     0.0    0.0
+        mirrorHaltProof                   HaltProof                     src/HaltProof.hs:(26,1)-(28,21)                7326    1155622    0.1    0.1     0.1    0.1
+         mirrorDir                        Beaver                        src/Beaver.hs:(41,1)-(42,15)                   7327    1155622    0.0    0.0     0.0    0.0
+        mirrorSimState                    HaltProof                     src/HaltProof.hs:146:1-32                      7315          0    0.2    0.0     0.7    1.4
+         fmap                             Data.Orphans                  src/Data/Orphans.hs:1099:5-34                  7316    3071406    0.3    0.9     0.6    1.4
+          mirrorTape                      Beaver                        src/Beaver.hs:127:1-41                         7317    3071406    0.2    0.5     0.2    0.5
+       #.                                 Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:3-71         7355    1703520    0.1    0.0     0.1    0.0
+        #..\                              Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:26-31        7356    1703520    0.1    0.0     0.1    0.0
+       infiniteLeft                       HaltProof                     src/HaltProof.hs:(130,1)-(131,51)              7387     442088    0.2    0.2     2.4    2.4
+        infiniteRight                     HaltProof                     src/HaltProof.hs:(96,1)-(127,27)               7391     442088    0.1    0.1     1.8    1.6
+         infiniteRight.step               HaltProof                     src/HaltProof.hs:(104,3)-(121,16)              7515    1634644    0.8    1.2     1.8    1.5
+          simStepWithDir                  HaltProof                     src/HaltProof.hs:(178,1)-(187,72)              7517    1495270    0.3    0.1     1.0    0.2
+           at                             Control.Lens.At               src/Control/Lens/At.hs:471:3-25                7518    1495270    0.4    0.1     0.7    0.1
+            compare                       Beaver                        src/Beaver.hs:6:55-57                          7519          0    0.2    0.0     0.2    0.0
+           tapeLeft                       Beaver                        src/Beaver.hs:(107,1)-(110,50)                 7522     882822    0.0    0.0     0.0    0.0
+           tapeRight                      Beaver                        src/Beaver.hs:(114,1)-(117,51)                 7523     551668    0.0    0.0     0.0    0.0
+          infiniteRight.newMax            HaltProof                     src/HaltProof.hs:(125,3)-(126,62)              7527      15510    0.0    0.0     0.0    0.0
+          ==                              Beaver                        src/Beaver.hs:6:51-52                          7524          0    0.0    0.0     0.0    0.0
+        mirrorTuring                      Beaver                        src/Beaver.hs:(49,1)-(50,57)                   7516     196080    0.2    0.4     0.2    0.5
+         mirrorTrans                      Beaver                        src/Beaver.hs:(45,1)-(46,49)                   7520     415984    0.0    0.1     0.0    0.1
+          mirrorDir                       Beaver                        src/Beaver.hs:(41,1)-(42,15)                   7521     359278    0.0    0.0     0.0    0.0
+        mirrorHaltProof                   HaltProof                     src/HaltProof.hs:(26,1)-(28,21)                7525      78594    0.0    0.0     0.0    0.0
+         mirrorDir                        Beaver                        src/Beaver.hs:(41,1)-(42,15)                   7526      78594    0.0    0.0     0.0    0.0
+        mirrorSimState                    HaltProof                     src/HaltProof.hs:146:1-32                      7388          0    0.0    0.0     0.1    0.2
+         fmap                             Data.Orphans                  src/Data/Orphans.hs:1099:5-34                  7389     442088    0.0    0.1     0.1    0.2
+          mirrorTape                      Beaver                        src/Beaver.hs:127:1-41                         7390     442088    0.0    0.1     0.0    0.1
+       infiniteRight                      HaltProof                     src/HaltProof.hs:(96,1)-(127,27)               7392     363494    0.1    0.1     1.3    1.1
+        infiniteRight.step                HaltProof                     src/HaltProof.hs:(104,3)-(121,16)              7409    1161304    0.5    0.8     1.2    1.0
+         simStepWithDir                   HaltProof                     src/HaltProof.hs:(178,1)-(187,72)              7411    1044470    0.2    0.1     0.7    0.2
+          at                              Control.Lens.At               src/Control/Lens/At.hs:471:3-25                7412    1044470    0.3    0.1     0.4    0.1
+           compare                        Beaver                        src/Beaver.hs:6:55-57                          7413          0    0.2    0.0     0.2    0.0
+          tapeRight                       Beaver                        src/Beaver.hs:(114,1)-(117,51)                 7415     520510    0.0    0.0     0.0    0.0
+          tapeLeft                        Beaver                        src/Beaver.hs:(107,1)-(110,50)                 7506     485720    0.0    0.0     0.0    0.0
+         infiniteRight.newMax             HaltProof                     src/HaltProof.hs:(125,3)-(126,62)              7507      15510    0.0    0.0     0.0    0.0
+         ==                               Beaver                        src/Beaver.hs:6:51-52                          7414          0    0.0    0.0     0.0    0.0
+      simulateHalt.simulateHaltHelper     HaltProof                     src/HaltProof.hs:(228,3)-(251,86)              7395     425944    0.8    0.9     7.0    5.7
+       simStep                            HaltProof                     src/HaltProof.hs:190:1-38                      7399     770588    0.0    0.0     0.8    0.2
+        simStepWithDir                    HaltProof                     src/HaltProof.hs:(178,1)-(187,72)              7400     770588    0.4    0.2     0.7    0.2
+         at                               Control.Lens.At               src/Control/Lens/At.hs:471:3-25                7401     770588    0.2    0.1     0.3    0.1
+          compare                         Beaver                        src/Beaver.hs:6:55-57                          7402          0    0.1    0.0     0.1    0.0
+         tapeLeft                         Beaver                        src/Beaver.hs:(107,1)-(110,50)                 7403     461992    0.0    0.0     0.0    0.0
+         tapeRight                        Beaver                        src/Beaver.hs:(114,1)-(117,51)                 7418     271748    0.0    0.0     0.0    0.0
+       eqStates                           HaltProof                     src/HaltProof.hs:159:1-55                      7396     425724    0.0    0.0     0.1    0.0
+        ==                                Beaver                        src/Beaver.hs:97:15-16                         7398     116744    0.0    0.0     0.0    0.0
+        ==                                Beaver                        src/Beaver.hs:6:51-52                          7397          0    0.0    0.0     0.0    0.0
+       testHalt                           HaltProof                     src/HaltProof.hs:(134,1)-(139,23)              7419     192876    0.2    0.1     5.3    4.6
+        dfsToHalt                         HaltProof                     src/HaltProof.hs:(35,1)-(64,18)                7426     386592    0.2    0.3     1.9    1.4
+         dfsToHalt.try                    HaltProof                     src/HaltProof.hs:(51,3)-(64,18)                7427     773184    0.3    0.3     0.9    0.6
+          at                              Control.Lens.At               src/Control/Lens/At.hs:471:3-25                7428     773184    0.2    0.1     0.3    0.1
+           compare                        Beaver                        src/Beaver.hs:6:55-57                          7429          0    0.1    0.0     0.1    0.0
+          #.                              Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:3-71         7430     586292    0.0    0.0     0.1    0.0
+           #..\                           Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:26-31        7431     586292    0.1    0.0     0.1    0.0
+            _2                            Control.Lens.Tuple            src/Control/Lens/Tuple.hs:229:3-37             7432     298156    0.0    0.0     0.0    0.0
+             contains                     Control.Lens.At               src/Control/Lens/At.hs:(171,3)-(172,48)        7433     298156    0.0    0.0     0.0    0.0
+          dfsToHalt.try.\                 HaltProof                     src/HaltProof.hs:(62,16)-(64,18)               7434     298156    0.0    0.1     0.2    0.2
+           #.                             Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:3-71         7435     450368    0.0    0.0     0.2    0.1
+            #..\                          Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:26-31        7436     450368    0.0    0.0     0.2    0.1
+             _1                           Control.Lens.Tuple            src/Control/Lens/Tuple.hs:123:3-37             7437     225184    0.1    0.1     0.1    0.1
+              _1.\                        Control.Lens.Tuple            src/Control/Lens/Tuple.hs:123:32-37            7438     225184    0.0    0.0     0.0    0.0
+         dfsToHalt.\                      HaltProof                     src/HaltProof.hs:(45,46)-(47,36)               7446     200676    0.1    0.2     0.6    0.4
+          #.                              Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:3-71         7451     288136    0.0    0.0     0.2    0.1
+           #..\                           Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:26-31        7452     288136    0.1    0.0     0.2    0.1
+            _1                            Control.Lens.Tuple            src/Control/Lens/Tuple.hs:123:3-37             7453     199796    0.0    0.0     0.0    0.0
+             _1.\                         Control.Lens.Tuple            src/Control/Lens/Tuple.hs:123:32-37            7454     199796    0.0    0.0     0.0    0.0
+            _2                            Control.Lens.Tuple            src/Control/Lens/Tuple.hs:229:3-37             7498      88340    0.0    0.0     0.1    0.1
+             _2.\                         Control.Lens.Tuple            src/Control/Lens/Tuple.hs:229:32-37            7499      88340    0.0    0.0     0.0    0.0
+             contains                     Control.Lens.At               src/Control/Lens/At.hs:(171,3)-(172,48)        7502      87636    0.0    0.0     0.1    0.0
+              contains.\                  Control.Lens.At               src/Control/Lens/At.hs:172:5-48                7503      87636    0.0    0.0     0.1    0.0
+               compare                    Beaver                        src/Beaver.hs:6:55-57                          7504          0    0.0    0.0     0.0    0.0
+          dfsToHalt.\                     HaltProof                     src/HaltProof.hs:44:15-49                      7510        256    0.0    0.0     0.0    0.0
+          dfsToHalt.try                   HaltProof                     src/HaltProof.hs:(51,3)-(64,18)                7447          0    0.1    0.1     0.3    0.2
+           _2                             Control.Lens.Tuple            src/Control/Lens/Tuple.hs:229:3-37             7450     288136    0.0    0.0     0.1    0.0
+            contains                      Control.Lens.At               src/Control/Lens/At.hs:(171,3)-(172,48)        7455     288136    0.0    0.0     0.1    0.0
+             compare                      Beaver                        src/Beaver.hs:6:55-57                          7458          0    0.0    0.0     0.0    0.0
+           dfsToHalt.try.\                HaltProof                     src/HaltProof.hs:59:15-24                      7459     170356    0.0    0.0     0.0    0.0
+           dfsToHalt.try.\                HaltProof                     src/HaltProof.hs:(62,16)-(64,18)               7495     117780    0.0    0.0     0.0    0.0
+           #.                             Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:3-71         7448      89620    0.0    0.0     0.0    0.0
+            #..\                          Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:26-31        7449      89620    0.0    0.0     0.0    0.0
+           _1                             Control.Lens.Tuple            src/Control/Lens/Tuple.hs:123:3-37             7496      89620    0.1    0.0     0.1    0.1
+            #.                            Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:3-71         7500      89620    0.0    0.0     0.0    0.0
+             #..\                         Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:26-31        7501      89620    0.0    0.0     0.0    0.0
+            _1.\                          Control.Lens.Tuple            src/Control/Lens/Tuple.hs:123:32-37            7497      89620    0.0    0.0     0.0    0.0
+         #.                               Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:3-71         7439          0    0.0    0.0     0.1    0.1
+          #..\                            Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:26-31        7440          0    0.1    0.0     0.1    0.1
+           _1                             Control.Lens.Tuple            src/Control/Lens/Tuple.hs:123:3-37             7441     200932    0.0    0.0     0.0    0.0
+           _2                             Control.Lens.Tuple            src/Control/Lens/Tuple.hs:229:3-37             7444     112592    0.0    0.0     0.0    0.1
+            _2.\                          Control.Lens.Tuple            src/Control/Lens/Tuple.hs:229:32-37            7445     112592    0.0    0.0     0.0    0.0
+            contains                      Control.Lens.At               src/Control/Lens/At.hs:(171,3)-(172,48)        7456     112160    0.0    0.0     0.0    0.0
+             contains.\                   Control.Lens.At               src/Control/Lens/At.hs:172:5-48                7457     112160    0.0    0.0     0.0    0.0
+         dfsToHalt.\                      HaltProof                     src/HaltProof.hs:44:15-49                      7511          0    0.0    0.0     0.0    0.0
+        simpleInfiniteLeft                HaltProof                     src/HaltProof.hs:(68,1)-(77,32)                7420     192876    0.0    0.0     0.1    0.0
+         at                               Control.Lens.At               src/Control/Lens/At.hs:471:3-25                7466      95838    0.0    0.0     0.1    0.0
+          compare                         Beaver                        src/Beaver.hs:6:55-57                          7467          0    0.0    0.0     0.0    0.0
+         ==                               Beaver                        src/Beaver.hs:6:51-52                          7468          0    0.0    0.0     0.0    0.0
+        simpleInfiniteRight               HaltProof                     src/HaltProof.hs:(82,1)-(83,68)                7421     189396    0.1    0.0     0.3    0.3
+         simpleInfiniteLeft               HaltProof                     src/HaltProof.hs:(68,1)-(77,32)                7425     189396    0.0    0.0     0.1    0.0
+          at                              Control.Lens.At               src/Control/Lens/At.hs:471:3-25                7483      94444    0.0    0.0     0.0    0.0
+           compare                        Beaver                        src/Beaver.hs:6:55-57                          7484          0    0.0    0.0     0.0    0.0
+          ==                              Beaver                        src/Beaver.hs:6:51-52                          7487          0    0.0    0.0     0.0    0.0
+         mirrorTuring                     Beaver                        src/Beaver.hs:(49,1)-(50,57)                   7482      94444    0.1    0.2     0.1    0.2
+          mirrorTrans                     Beaver                        src/Beaver.hs:(45,1)-(46,49)                   7485      94444    0.0    0.0     0.0    0.0
+           mirrorDir                      Beaver                        src/Beaver.hs:(41,1)-(42,15)                   7486      87252    0.0    0.0     0.0    0.0
+         mirrorHaltProof                  HaltProof                     src/HaltProof.hs:(26,1)-(28,21)                7508       3480    0.0    0.0     0.0    0.0
+          mirrorDir                       Beaver                        src/Beaver.hs:(41,1)-(42,15)                   7509       3480    0.0    0.0     0.0    0.0
+         mirrorSimState                   HaltProof                     src/HaltProof.hs:146:1-32                      7422          0    0.0    0.0     0.0    0.1
+          fmap                            Data.Orphans                  src/Data/Orphans.hs:1099:5-34                  7423     189396    0.0    0.1     0.0    0.1
+           mirrorTape                     Beaver                        src/Beaver.hs:127:1-41                         7424     189396    0.0    0.0     0.0    0.0
+        infiniteLeft                      HaltProof                     src/HaltProof.hs:(130,1)-(131,51)              7460     185660    0.1    0.1     1.8    1.6
+         infiniteRight                    HaltProof                     src/HaltProof.hs:(96,1)-(127,27)               7464     185660    0.0    0.1     1.6    1.2
+          infiniteRight.step              HaltProof                     src/HaltProof.hs:(104,3)-(121,16)              7469    1273272    0.5    1.0     1.5    1.2
+           simStepWithDir                 HaltProof                     src/HaltProof.hs:(178,1)-(187,72)              7471    1196760    0.3    0.1     1.0    0.2
+            at                            Control.Lens.At               src/Control/Lens/At.hs:471:3-25                7472    1196760    0.5    0.1     0.7    0.1
+             compare                      Beaver                        src/Beaver.hs:6:55-57                          7473          0    0.2    0.0     0.2    0.0
+            tapeLeft                      Beaver                        src/Beaver.hs:(107,1)-(110,50)                 7476     602740    0.0    0.0     0.0    0.0
+            tapeRight                     Beaver                        src/Beaver.hs:(114,1)-(117,51)                 7477     539816    0.0    0.0     0.0    0.0
+           infiniteRight.newMax           HaltProof                     src/HaltProof.hs:(125,3)-(126,62)              7479      28076    0.0    0.0     0.0    0.0
+           ==                             Beaver                        src/Beaver.hs:6:51-52                          7478          0    0.0    0.0     0.0    0.0
+         mirrorTuring                     Beaver                        src/Beaver.hs:(49,1)-(50,57)                   7470      90908    0.1    0.2     0.1    0.2
+          mirrorTrans                     Beaver                        src/Beaver.hs:(45,1)-(46,49)                   7474     244492    0.0    0.0     0.0    0.0
+           mirrorDir                      Beaver                        src/Beaver.hs:(41,1)-(42,15)                   7475     230096    0.0    0.0     0.0    0.0
+         mirrorHaltProof                  HaltProof                     src/HaltProof.hs:(26,1)-(28,21)                7480      22308    0.0    0.0     0.0    0.0
+          mirrorDir                       Beaver                        src/Beaver.hs:(41,1)-(42,15)                   7481      22308    0.0    0.0     0.0    0.0
+         mirrorSimState                   HaltProof                     src/HaltProof.hs:146:1-32                      7461          0    0.0    0.0     0.0    0.1
+          fmap                            Data.Orphans                  src/Data/Orphans.hs:1099:5-34                  7462     185660    0.0    0.1     0.0    0.1
+           mirrorTape                     Beaver                        src/Beaver.hs:127:1-41                         7463     185660    0.0    0.0     0.0    0.0
+        infiniteRight                     HaltProof                     src/HaltProof.hs:(96,1)-(127,27)               7465     163352    0.0    0.0     1.2    1.1
+         infiniteRight.step               HaltProof                     src/HaltProof.hs:(104,3)-(121,16)              7488    1115268    0.5    0.9     1.2    1.0
+          simStepWithDir                  HaltProof                     src/HaltProof.hs:(178,1)-(187,72)              7489    1046280    0.2    0.1     0.6    0.2
+           at                             Control.Lens.At               src/Control/Lens/At.hs:471:3-25                7490    1046280    0.3    0.1     0.4    0.1
+            compare                       Beaver                        src/Beaver.hs:6:55-57                          7491          0    0.1    0.0     0.1    0.0
+           tapeLeft                       Beaver                        src/Beaver.hs:(107,1)-(110,50)                 7494     505016    0.0    0.0     0.0    0.0
+           tapeRight                      Beaver                        src/Beaver.hs:(114,1)-(117,51)                 7493     494584    0.0    0.0     0.0    0.0
+          infiniteRight.newMax            HaltProof                     src/HaltProof.hs:(125,3)-(126,62)              7505      27982    0.0    0.0     0.0    0.0
+          ==                              Beaver                        src/Beaver.hs:6:51-52                          7492          0    0.0    0.0     0.0    0.0
+        #.                                Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:3-71         7442     112592    0.0    0.0     0.0    0.0
+         #..\                             Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:26-31        7443     112592    0.0    0.0     0.0    0.0
+ CAF:main4                                Main                          <no location info>                             7247          0    0.0    0.0     0.0    0.0
+  main                                    Main                          app/Main.hs:(119,1)-(124,46)                   7263          0    0.0    0.0     0.0    0.0
+   main.results                           Main                          app/Main.hs:(122,7)-(123,60)                   7264          0    0.0    0.0     0.0    0.0
+    main.results.\                        Main                          app/Main.hs:(122,24)-(123,46)                  7288          1    0.0    0.0     0.0    0.0
+     simulateHalt                         HaltProof                     src/HaltProof.hs:(208,1)-(251,86)              7291          1    0.0    0.0     0.0    0.0
+      simStep                             HaltProof                     src/HaltProof.hs:190:1-38                      7292          1    0.0    0.0     0.0    0.0
+       simStepWithDir                     HaltProof                     src/HaltProof.hs:(178,1)-(187,72)              7294          1    0.0    0.0     0.0    0.0
+        at                                Control.Lens.At               src/Control/Lens/At.hs:471:3-25                7295          1    0.0    0.0     0.0    0.0
+        tapeLeft                          Beaver                        src/Beaver.hs:(107,1)-(110,50)                 7297          1    0.0    0.0     0.0    0.0
+ CAF:main5                                Main                          <no location info>                             7245          0    0.0    0.0     0.0    0.0
+  main                                    Main                          app/Main.hs:(119,1)-(124,46)                   7265          0    0.0    0.0     0.0    0.0
+   main.results                           Main                          app/Main.hs:(122,7)-(123,60)                   7266          0    0.0    0.0     0.0    0.0
+ CAF:main_machines                        Main                          app/Main.hs:120:7-14                           7244          0    0.0    0.0    15.3   27.5
+  main                                    Main                          app/Main.hs:(119,1)-(124,46)                   7267          0    0.0    0.0    15.3   27.5
+   main.machines                          Main                          app/Main.hs:120:7-28                           7268          1    0.0    0.0    15.3   27.5
+    uniTuring                             Beaver                        src/Beaver.hs:(87,1)-(91,19)                   7269          1    1.3    2.8    15.3   27.5
+     uniMap                               Beaver                        src/Beaver.hs:(80,1)-(84,24)                   7270          1    4.1   12.1    14.0   24.7
+      uniMap.addKey                       Beaver                        src/Beaver.hs:(82,3)-(84,24)                   7275     402234    1.4    3.0     9.9   12.7
+       #.                                 Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:3-71         7283    5229042    0.2    0.0     8.5    9.6
+        #..\                              Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:26-31        7284    5229042    0.9    0.9     8.3    9.6
+         at                               Control.Lens.At               src/Control/Lens/At.hs:471:3-25                7285    5229042    6.4    8.8     7.4    8.8
+          compare                         Beaver                        src/Beaver.hs:6:55-57                          7287          0    1.0    0.0     1.0    0.0
+     uniTuring.ks                         Beaver                        src/Beaver.hs:88:7-20                          7271          1    0.0    0.0     0.0    0.0
+      uniEdge                             Beaver                        src/Beaver.hs:(63,1)-(66,15)                   7272          1    0.0    0.0     0.0    0.0
+       uniPhase                           Beaver                        src/Beaver.hs:60:1-37                          7274          1    0.0    0.0     0.0    0.0
+     uniTuring.vs                         Beaver                        src/Beaver.hs:89:7-21                          7289          1    0.0    0.0     0.0    0.0
+      uniTrans                            Beaver                        src/Beaver.hs:(69,1)-(73,24)                   7290          1    0.0    0.0     0.0    0.0
+       uniPhase                           Beaver                        src/Beaver.hs:60:1-37                          7303          1    0.0    0.0     0.0    0.0
+ CAF:main_simSteps                        Main                          app/Main.hs:121:7-14                           7246          0    0.0    0.0     0.0    0.0
+  main                                    Main                          app/Main.hs:(119,1)-(124,46)                   7393          0    0.0    0.0     0.0    0.0
+   main.simSteps                          Main                          app/Main.hs:121:7-19                           7394          1    0.0    0.0     0.0    0.0
+ CAF:mirrorSimState                       HaltProof                     src/HaltProof.hs:146:1-14                      7168          0    0.0    0.0     0.0    0.0
+  mirrorSimState                          HaltProof                     src/HaltProof.hs:146:1-32                      7314          1    0.0    0.0     0.0    0.0
+ CAF:testHalt2                            HaltProof                     <no location info>                             7155          0    0.0    0.0     0.0    0.0
+  testHalt                                HaltProof                     src/HaltProof.hs:(134,1)-(139,23)              7337          0    0.0    0.0     0.0    0.0
+   .#                                     Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:176:3-25         7338          2    0.0    0.0     0.0    0.0
+    #.                                    Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:3-71         7339          2    0.0    0.0     0.0    0.0
+     #..\                                 Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:26-31        7340          2    0.0    0.0     0.0    0.0
+      _Empty                              Control.Lens.Empty            src/Control/Lens/Empty.hs:141:3-36             7341          1    0.0    0.0     0.0    0.0
+       dimap                              Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:181:3-37         7343          1    0.0    0.0     0.0    0.0
+       right'                             Data.Profunctor.Choice        src/Data/Profunctor/Choice.hs:135:3-38         7342          1    0.0    0.0     0.0    0.0
+ CAF:testHalt3                            HaltProof                     <no location info>                             7156          0    0.0    0.0     0.0    0.0
+  testHalt                                HaltProof                     src/HaltProof.hs:(134,1)-(139,23)              7375          0    0.0    0.0     0.0    0.0
+   .#                                     Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:176:3-25         7376          2    0.0    0.0     0.0    0.0
+    #.                                    Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:3-71         7377          2    0.0    0.0     0.0    0.0
+     #..\                                 Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:26-31        7378          2    0.0    0.0     0.0    0.0
+      _Empty                              Control.Lens.Empty            src/Control/Lens/Empty.hs:121:3-33             7379          1    0.0    0.0     0.0    0.0
+       dimap                              Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:181:3-37         7381          1    0.0    0.0     0.0    0.0
+       right'                             Data.Profunctor.Choice        src/Data/Profunctor/Choice.hs:135:3-38         7380          1    0.0    0.0     0.0    0.0
+ CAF:uniBit                               Beaver                        src/Beaver.hs:56:1-6                           7194          0    0.0    0.0     0.0    0.0
+  uniBit                                  Beaver                        src/Beaver.hs:56:1-24                          7273          1    0.0    0.0     0.0    0.0
+ CAF:uniDir                               Beaver                        src/Beaver.hs:53:1-6                           7195          0    0.0    0.0     0.0    0.0
+  uniDir                                  Beaver                        src/Beaver.hs:53:1-17                          7302          1    0.0    0.0     0.0    0.0
+ CAF:uniMap1                              Beaver                        <no location info>                             7182          0    0.0    0.0     0.0    0.0
+  uniMap                                  Beaver                        src/Beaver.hs:(80,1)-(84,24)                   7276          0    0.0    0.0     0.0    0.0
+   .#                                     Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:176:3-25         7277          2    0.0    0.0     0.0    0.0
+    #.                                    Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:3-71         7278          2    0.0    0.0     0.0    0.0
+     #..\                                 Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:175:26-31        7279          2    0.0    0.0     0.0    0.0
+      _Empty                              Control.Lens.Empty            src/Control/Lens/Empty.hs:129:3-36             7280          1    0.0    0.0     0.0    0.0
+       dimap                              Data.Profunctor.Unsafe        src/Data/Profunctor/Unsafe.hs:181:3-37         7282          1    0.0    0.0     0.0    0.0
+       right'                             Data.Profunctor.Choice        src/Data/Profunctor/Choice.hs:135:3-38         7281          1    0.0    0.0     0.0    0.0

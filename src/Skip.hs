@@ -48,11 +48,11 @@ dispSkip (Skip s e c halts) = "in " <> dispCount c <> " steps we turn\n"
 
 --a Perfect match had no leftovers
 --or we might have used up all of the skip and had some tape leftover, or vv
-data HeadMatch s = PerfectH | TapeHLeft (s, InfCount) deriving (Eq, Ord, Show)
+data HeadMatch s c = PerfectH | TapeHLeft (s, c) deriving (Eq, Ord, Show)
 
 --we take the start of a skip and the start of a tape, match the symbols, match the counts
 -- and return what's left of the tape if any
-matchTapeHeads :: (Eq s) => (VarOr s, Count) -> (s, InfCount) -> EquationState s (HeadMatch s)
+matchTapeHeads :: (Eq s) => (VarOr s, Count) -> (s, InfCount) -> Equations s (HeadMatch s InfCount)
 matchTapeHeads (varSB, skipC) (tb, tapeC) = do
   matchTapeVar varSB tb
   matchInfCount skipC tapeC >>= \case
@@ -76,7 +76,7 @@ data TapeMatch s = Perfect
 --fails, returning nothing
 --example :: matchBitTape [(F, 2), (T, 1)] [(F, 2), (T, 3), (F, x)] == [(T, 2), (F, x)]
 --returns Nothing if the match fails, else the match
-matchTape :: (Eq s) => [(VarOr s, Count)] -> [(s, InfCount)] -> EquationState s (TapeMatch s)
+matchTape :: (Eq s) => [(VarOr s, Count)] -> [(s, InfCount)] -> Equations s (TapeMatch s)
 matchTape [] [] = pure Perfect
 matchTape [] (t:ts) = pure $ TapeLeft (t :| ts)
 matchTape (s:rest) []  = pure $ SkipLeft (s :| rest)
@@ -98,9 +98,9 @@ getTapeRemain (SkipLeft _) = Nothing
 --specializes matchTape to Bit, allowing the routine to
 --signal the skip will match an infinite amount of tape
 --fails if there is skip left-over
--- matchBitTape :: [(VarOr Bit, Count)] -> [(Bit, InfCount)] -> EquationState Bit (TapeOrInf Bit)
+-- matchBitTape :: [(VarOr Bit, Count)] -> [(Bit, InfCount)] -> Equations Bit (TapeOrInf Bit)
 -- matchBitTape skip tape = bind matchToTapeOrInf $ matchTape skip tape where
---   matchToTapeOrInf :: TapeMatch Bit -> EquationState Bit (TapeOrInf Bit)
+--   matchToTapeOrInf :: TapeMatch Bit -> Equations Bit (TapeOrInf Bit)
 --   matchToTapeOrInf = \case
 --     Perfect -> pure $ NewTape []
 --     TapeLeft (toList -> newTape) -> pure $ NewTape newTape
@@ -118,7 +118,7 @@ getTapeRemain (SkipLeft _) = Nothing
 --remain on one side
 data PointMatch s = PerfectP | Lremains (s, InfCount) | Rremains (s, InfCount) deriving (Eq, Ord, Show, Generic)
 
-matchPoints :: (Eq s) => (VarOr s, Location Count) -> (s, Location InfCount) -> EquationState s (PointMatch s)
+matchPoints :: (Eq s) => (VarOr s, Location Count) -> (s, Location InfCount) -> Equations s (PointMatch s)
 --if there is one of each symbol then they just match
 matchPoints (skipS, One) (tapeS, One) = matchTapeVar skipS tapeS $> PerfectP
 --if there is a single symbol in the skip, then the skip applies regardless of the tapeD
@@ -134,7 +134,7 @@ matchPoints (skipS, Side skipC skipD) (tapeS, Side tapeC tapeD)
       matchInfsAndReturn skipC tapeS tapeC tapeD
 matchPoints _ _ = nothingES
 --strictly a helper function for the above
-matchInfsAndReturn :: (Eq s) => Count -> s -> InfCount -> Dir -> EquationState s (PointMatch s)
+matchInfsAndReturn :: (Eq s) => Count -> s -> InfCount -> Dir -> Equations s (PointMatch s)
 matchInfsAndReturn skipC tapeS tapeC tapeD = matchInfCount skipC tapeC >>= \case
       Empty -> pure PerfectP
       --if some of the tape's point is not matched, then it remains on the tape
@@ -146,7 +146,7 @@ matchInfsAndReturn skipC tapeS tapeC tapeD = matchInfCount skipC tapeC >>= \case
 --match a config to a tape, and return the lists that remain on each side of the
 --tape after matching
 matchConfigTape :: (Eq s) => Config s -> ExpTape s InfCount Location
-  -> EquationState s ([(s, InfCount)], [(s, InfCount)])
+  -> Equations s ([(s, InfCount)], [(s, InfCount)])
 matchConfigTape (Config _p lsC pointC rsC) (ExpTape lsT pointT rsT)
   = matchPoints pointC pointT >>= \case
     Lremains remainP -> matchSides (remainP : lsT) rsT
