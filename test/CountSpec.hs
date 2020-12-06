@@ -3,10 +3,12 @@ module CountSpec where
 --
 import Relude
 import Control.Lens
+import Data.Map.Monoidal (MonoidalMap(..))
 
 import Test.Hspec
 import Test.QuickCheck
 import Control.Exception (evaluate)
+import Test.QuickCheck.Instances
 
 import Count
 
@@ -15,6 +17,15 @@ getBitES = getEquations
 
 matchAndGet :: Count -> Count -> Maybe Count
 matchAndGet a b = getBitES $ matchCount a b
+
+instance Arbitrary SymbolVar where 
+  arbitrary = SymbolVar <$> arbitrary 
+
+instance Arbitrary BoundVar where 
+  arbitrary = BoundVar <$> arbitrary
+
+instance Arbitrary Count where 
+  arbitrary = liftA3 Count arbitrary (MonoidalMap <$> arbitrary) (MonoidalMap <$> arbitrary)
 
 spec :: Spec
 spec = do
@@ -39,6 +50,12 @@ spec = do
 
     it "matches a var against a finite count" $ do
       matchAndGet (newBoundVar 1) (finiteCount 5) `shouldBe` Just Empty
-  describe "equationStae" $ do
+  describe "equationState" $ do
     it "getting a pure is Just" $ do
       property (\(c :: Char) -> getBitES (pure c) `shouldBe` Just c)
+  describe "likeTerms" $ do
+    it "gets simple like terms" $ do 
+      likeTerms (finiteCount 5) (newBoundVar 1 <> finiteCount 2) `shouldBe` (finiteCount 2, finiteCount 3, newBoundVar 1)
+    it "satisfies the additive property" $ do 
+      property (\ c d -> case likeTerms c d of 
+        (likes, c', d') -> (likes <> c', likes <> d') `shouldBe` (c, d))

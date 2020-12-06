@@ -6,7 +6,8 @@ import qualified Relude.Unsafe as Unsafe (head)
 import Control.Lens
 import qualified Data.Map as M (assocs)
 import Data.Map.Merge.Strict (mergeA, zipWithAMatched, preserveMissing)
-import Data.Map.Monoidal (MonoidalMap(..), assocs, mapKeys, unionWith, partitionWithKey, keys)
+import Data.Map.Monoidal (MonoidalMap(..), assocs, mapKeys, unionWith, size, singleton,
+  partitionWithKey, keys, intersectionWith)
 import Data.Foldable
 import Data.Witherable
 
@@ -66,6 +67,16 @@ data Count = Count
   , bound :: MMap BoundVar (Sum Natural)
   } deriving (Eq, Show, Generic)
 instance NFData Count
+
+pattern ZeroVar :: Natural -> MMap SymbolVar (Sum Natural) -> Count 
+pattern ZeroVar n as = Count n as Empty
+
+pattern SingletonMap :: k -> v -> MMap k v
+pattern SingletonMap k v <- (assocs -> [(k,v)]) where 
+  SingletonMap k v = singleton k v
+
+pattern OneVar :: Natural -> MMap SymbolVar (Sum Natural) -> Natural -> BoundVar -> Count 
+pattern OneVar n as k x = Count n as (SingletonMap x (Sum k))
 
 --bound vars bigger than free vars bigger than bare numbers
 --if both have bounds or frees, then compare via summing coefficients
@@ -152,6 +163,22 @@ divMap m d = Sum <$$> traverse (flip maybeDiv d) (getSum <$> m)
 
 divCount :: Count -> Natural -> Maybe Count
 divCount (Count n as xs) d = Count <$> (n `maybeDiv` d) <*> (as `divMap` d) <*> (xs `divMap` d)
+
+--given two counts, returns a count of their like terms and the two leftovers, in that order 
+likeTerms :: Count -> Count -> (Count, Count, Count) 
+likeTerms (Count n as xs) (Count m bs ys) = (likes, leftOvers, rightOvers) where 
+  likeN = min n m 
+  combineNats (Sum n) (Sum m) = Sum $ min n m 
+  -- likeAs :: MMap SymbolVar (Sum Natural)
+  likeAs = intersectionWith combineNats as bs
+  -- likeXs :: MMap BoundVar (Sum Natural)
+  likeXs = intersectionWith combineNats xs ys 
+  likes = Count likeN likeAs likeXs
+  subMaps :: (Ord k, Num a) => MMap k a -> MMap k a -> MMap k a
+  subMaps = unionWith (-)
+  leftOvers = Count (n - likeN) (subMaps as likeAs) (subMaps xs likeXs)
+  rightOvers = Count (m - likeN) (subMaps bs likeAs) (subMaps ys likeXs)
+
 
 --trying to match the first count against the second, returns Nothing on fail,
 --or the remaining part of the second count on success

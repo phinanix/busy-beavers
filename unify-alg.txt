@@ -1,0 +1,18 @@
+Not MIRI: Turing Machine dumping
+To unify two-sided:
+First, remove like terms. Then:
+If zero vars on either side: must match exactly or fail
+Exactly one var on each side: each term unifies to the sum of the non-var parts plus a var
+Eg x+5 and y+a unify to 5+a+z
+x and y+5 unify to 5+z
+One var on only one side: unifies to the other side exactly
+x and a+b unify to a+b
+[10:25 AM]
+One var to a multiple: unifies if the other side is divisible:
+kx unifies with 3k but not 2k+1
+[10:28 AM]
+One var per side  to multiples:
+Vars unify to one var times GCD, constant on one side must be divisible by coefficient on other side
+3x and 5y unify to 15z
+2x + 3 and 3y + 6a unify to 6z + 3 + 6a via x-> 3z + 3a, y-> 2z + 1
+October 21, 2020
