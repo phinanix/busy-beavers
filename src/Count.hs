@@ -46,18 +46,18 @@ dispBoundVar (BoundVar i, Sum count) = show count <> "*x_" <> show i <> " "
 dispTapeVar :: TapeVar -> Text
 dispTapeVar (TapeVar i) = "t_" <> show i <> " "
 
-data VarOr s = Var TapeVar | NotVar s deriving (Eq, Ord, Show, Generic)
+{- data VarOr s = Var TapeVar | NotVar s deriving (Eq, Ord, Show, Generic)
 instance NFData s => NFData (VarOr s)
 $(makePrisms ''VarOr)
+ -}
+-- dispVarOrBit :: VarOr Bit -> Text
+-- dispVarOrBit (Var v) = dispTapeVar v
+-- dispVarOrBit (NotVar b) = dispBit b
 
-dispVarOrBit :: VarOr Bit -> Text
-dispVarOrBit (Var v) = dispTapeVar v
-dispVarOrBit (NotVar b) = dispBit b
-
---returns () because if the match fails, the ES will just fail the whole computation
-matchTapeVar :: (Eq s) => VarOr s -> s -> Equations s ()
-matchTapeVar (Var v) s = addTapeVar (v, s) $ pure ()
-matchTapeVar (NotVar t) s = maybeES $ guard (t == s)
+-- --returns () because if the match fails, the ES will just fail the whole computation
+-- matchTapeVar :: (Eq s) => VarOr s -> s -> Equations s ()
+-- matchTapeVar (Var v) s = addTapeVar (v, s) $ pure ()
+-- matchTapeVar (NotVar t) s = maybeES $ guard (t == s)
 
 --a finite number, plus some number of symbols multiplied by a given natural (which must be positive)
 --and some number of bound variables also multiplied by a given natural which also must be positive
@@ -310,9 +310,9 @@ addEquationToMap (v, c) m = case m ^. at v of
   Just c' -> guard (c == c') >> Just m
 
 addEquation :: (BoundVar, InfCount) -> Equations s a -> Equations s a
-addEquation eqn (Equations (Just (m, vs, a))) = case addEquationToMap eqn m of
+addEquation eqn (Equations (Just (m, a))) = case addEquationToMap eqn m of
   Nothing -> Equations Nothing
-  (Just m') -> Equations (Just (m', vs, a))
+  (Just m') -> Equations (Just (m', a))
 addEquation _ _ = Equations Nothing
 
 addEquations :: (Foldable t) => t (BoundVar, InfCount) -> Equations s a -> Equations s a
@@ -322,55 +322,36 @@ mergeEqns :: Map BoundVar InfCount -> Map BoundVar InfCount -> Maybe (Map BoundV
 mergeEqns = mergeA preserveMissing preserveMissing
   (zipWithAMatched (\_k v1 v2 -> if v1 == v2 then Just v1 else Nothing))
 
-addTapeVarToMap :: (Eq s) => (TapeVar, s) -> Map TapeVar s -> Maybe (Map TapeVar s)
-addTapeVarToMap (var, b) m = case m ^. at var of
-  Nothing -> Just $ m & at var ?~ b
-  Just b' -> guard (b == b') >> Just m
-
-addTapeVar :: (Eq s) => (TapeVar, s) -> Equations s a -> Equations s a
-addTapeVar eqn (Equations (Just (m, vs, a))) = case addTapeVarToMap eqn vs of
-  Nothing -> nothingES
-  (Just vs') -> Equations (Just (m, vs', a))
-addTapeVar _ _ = nothingES
-
-addTapeVars :: (Foldable t, Eq s) => t (TapeVar, s) -> Equations s a -> Equations s a
-addTapeVars = appEndo . foldMap (Endo . addTapeVar)
-
-mergeTapeVars :: (Eq s) => Map TapeVar s -> Map TapeVar s -> Maybe (Map TapeVar s)
-mergeTapeVars (M.assocs -> newEqns)
-  = (appEndo . mconcat $ Endo <$> (bind <$> (addTapeVarToMap <$> newEqns))) . Just
-
 newtype Equations s a = Equations
-  {runEquations :: Maybe (Map BoundVar InfCount, Map TapeVar s, a)}
+  {runEquations :: Maybe (Map BoundVar InfCount, a)}
   deriving newtype (Eq, Ord, Show)
 
 getEquations :: Equations s a -> Maybe a
-getEquations = fmap (view _3) . runEquations
+getEquations = fmap (view _2) . runEquations
 
 nothingES :: Equations s a
 nothingES = Equations Nothing
 
 maybeES :: Maybe a -> Equations s a
-maybeES = Equations . fmap (Empty, Empty,)
+maybeES = Equations . fmap (Empty,)
 
 instance Functor (Equations s) where
   fmap f (Equations e) = Equations $ fmap (fmap f) e
 instance (Eq s) => Applicative (Equations s) where
-  pure s = Equations $ Just (Empty, Empty, s)
+  pure s = Equations $ Just (Empty, s)
   (Equations f) <*> (Equations a) = Equations $ join $ mergeApp <$> f <*> a where
-    mergeApp (eqns, vs, f) (moreEqns, moreVs, a)
-      = (,, f a) <$> mergeEqns eqns moreEqns <*> mergeTapeVars vs moreVs
+    mergeApp (eqns, f) (moreEqns, a) = (, f a) <$> mergeEqns eqns moreEqns 
 
 instance (Eq s) => Monad (Equations s) where
   (Equations k) >>= f = Equations $ bind combine $ runEquations . f <$$> k
     where
-    combine (eqns, vs, Just (moreEqns, moreVs, b))
-      = (,,b) <$> mergeEqns eqns moreEqns <*> mergeTapeVars vs moreVs
-    combine (_, _, Nothing) = Nothing
+    combine (eqns, Just (moreEqns, b))
+      = (,b) <$> mergeEqns eqns moreEqns
+    combine (_, Nothing) = Nothing
 
 instance (Eq s) => MonadFail (Equations s) where
   fail _ = Equations Nothing
 
 instance Filterable (Equations s) where
-  mapMaybe fm (Equations (Just (eqns, vs, a))) = Equations $ (eqns,vs,) <$> fm a
+  mapMaybe fm (Equations (Just (eqns, a))) = Equations $ (eqns,) <$> fm a
   mapMaybe _ (Equations Nothing) = Equations Nothing

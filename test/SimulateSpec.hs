@@ -19,7 +19,7 @@ import Simulate
 inum = finiteInfCount
 num = finiteCount
 
-simpleTape :: ExpTape Bit InfCount Location
+simpleTape :: ExpTape Bit InfCount
 simpleTape = ExpTape
   ([(True, inum 1)])
   (False, Side (inum 10) R)
@@ -34,7 +34,7 @@ simpleSkip = Skip
     [(NotVar True, num 5)])
   (num 5) False
 
-simpleResult :: ExpTape Bit InfCount Location
+simpleResult :: ExpTape Bit InfCount
 simpleResult = ExpTape
   ([(True, inum 3), (False, inum 8), (True, inum 1)])
   (False, Side (inum 4) L)
@@ -53,13 +53,13 @@ exampleSkip = Skip
     [(NotVar True, num 5)])
   (num 10) False
 
-exampleTape :: ExpTape Bit InfCount Location
+exampleTape :: ExpTape Bit InfCount
 exampleTape = ExpTape
   ([(False, inum 3), (True, inum 1)])
   (True, Side (inum 8) R)
   ([(False, inum 2), (True, inum 3), (False, newInfBoundVar 0)])
 
-exampleResult :: ExpTape Bit InfCount Location
+exampleResult :: ExpTape Bit InfCount
 exampleResult = ExpTape
   ([(True, inum 9), (False, inum 3), (True, inum 1)])
   (False, Side (inum 4) L)
@@ -76,13 +76,13 @@ varSkip = Skip
   (Count 8 Empty (fromList [(BoundVar 0, Sum 3)]))
   False
 
-varTape :: ExpTape Bit InfCount Location
+varTape :: ExpTape Bit InfCount
 varTape = ExpTape
   ([(True, inum 3)])
   (True, Side (inum 2) R)
   ([(False, inum 8), (True, inum 2)])
 
-varResult :: ExpTape Bit InfCount Location
+varResult :: ExpTape Bit InfCount
 varResult = ExpTape
   ([(True, inum 11)])
   (False, Side (inum 8) R)

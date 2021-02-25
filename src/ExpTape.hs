@@ -113,3 +113,8 @@ instance Tapeable (ExpTape Bit InfCount ) where
     countPoint (True, Side c _) = infCountToInt c
     countList :: [(Bit, InfCount)] -> Int
     countList = getSum . foldMap Sum . mapMaybe (\(bit, c) -> guard bit $> infCountToInt c)
+
+getNewPoint :: Dir -> [(s, InfCount)] -> Maybe ((s, Location InfCount), [(s, InfCount)])
+getNewPoint _ [] = Nothing 
+getNewPoint _ xs@((b, Infinity) : _) = Just $ ((b, One), xs)
+getNewPoint d ((b, c@(NotInfinity _)) : xs) = Just $ ((b, Side c d), xs)

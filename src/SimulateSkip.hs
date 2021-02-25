@@ -24,8 +24,7 @@ data PartialStepResult a = Unknown Edge
 
 --the data type storing various proven skips associated with a machine
 --the "Phase, s" is the Phase on start and the "s" that the point is made of
---it's a maybe because some skips have a var under the point
-type SkipBook s = Map (Phase, Maybe s) (Set (Skip s))
+type SkipBook s = Map (Phase,  s) (Set (Skip s))
 
 data SimState = SimState
   { _s_phase :: Phase
@@ -53,46 +52,47 @@ dispSkipResult (Skipped c p tape)
   <> " in " <> dispInfCount c <> " hops"
 
 --returns nothing if the skip is inapplicable, else returns a new tape
---the fact that the type is bit is only used when running off the tape, but for now I don't want to
---generalize that out (also ExpTape would have to be generalized)
 applySkip :: forall s. (Eq s) => Skip s -> (Phase, ExpTape s InfCount)
   -> Maybe (SkipResult s InfCount)
---Skip Bit -> (Phase, ExpTape Bit InfCount) -> Maybe (SkipResult Bit InfCount)
-applySkip (Skip s e hopCount _) (p, tape)
-  = guard (s^.cstate == p) >> packageResult <$> runEquations (matchConfigTape s tape)
-  where
-    packageResult :: (Map BoundVar InfCount, Map TapeVar s, ([(s, InfCount)], [(s, InfCount)]))
-      -> SkipResult s InfCount
-    packageResult (boundVs, tapeVs, (newLs, newRs)) = Skipped
-      (updateCount boundVs hopCount)
-      (e^.cstate)
-      $ glomPoint $ ExpTape
-          ((invariantifyList $ updateList boundVs tapeVs $ NotInfinity <$$> e^.ls) `etApp` newLs)
-          (updatePoint boundVs tapeVs $ e ^. c_point)
-          ((invariantifyList $ updateList boundVs tapeVs $ NotInfinity <$$> e^.rs) `etApp` newRs)
+applySkip skip@(Skip s _ _ _) (p, tape)
+  = guard (s^.cstate == p) >> packageResult skip <$> runEquations (matchConfigTape s tape)
+
+packageResult :: forall s. (Eq s) => Skip s -> (Map BoundVar InfCount, ([(s, InfCount)], [(s, InfCount)]))
+  -> SkipResult s InfCount
+packageResult (Skip _ e hopCount _) (boundVs, (newLs, newRs)) = Skipped
+  (updateCount boundVs hopCount)
+  (getSkipEndPhase e)
+  $ getFinalET e (newLs, newRs)
+  where 
+    getFinalET :: SkipEnd s -> ([(s, InfCount)], [(s, InfCount)]) -> ExpTape s InfCount
+    getFinalET (EndMiddle c) (remLs, remRs) = glomPoint $ ExpTape 
+      (finalizeList (c^.ls) `etApp` remLs) 
+      (updatePoint boundVs $ c ^. c_point)
+      (finalizeList (c^.rs) `etApp` remRs) 
+    getFinalET (EndSide _ L newRs) (remLs, remRs) = case getNewPoint L remLs of 
+      Nothing -> error "getting new point failed, what?"
+      Just (point, remremLs) -> glomPoint $ ExpTape remremLs point (finalizeList newRs `etApp` remRs)
+    getFinalET (EndSide _ R newLs) (remLs, remRs) = case getNewPoint R remRs of 
+      Nothing -> error "getting new point failed, what?"
+      Just (point, remremRs) -> glomPoint $ ExpTape (finalizeList newLs `etApp` remLs) point remremRs 
     updateInfCount :: Map BoundVar InfCount -> InfCount -> InfCount
     updateInfCount _m Infinity = Infinity
     updateInfCount m (NotInfinity c) = updateCount m c
     updateCount :: Map BoundVar InfCount -> Count -> InfCount
     updateCount m (Count n as (MonoidalMap xs))
       = (NotInfinity $ Count n as Empty) <> foldMap (updateVar m) (assocs xs)
-    deVarOr :: Map TapeVar s -> VarOr s -> s
-    deVarOr _m (NotVar s) = s
-    deVarOr m (Var v) = case m^.at v of
-      Just s -> s
-      Nothing -> error "a tape var wasn't mapped in a skip"
     updateVar :: Map BoundVar InfCount -> (BoundVar, Sum Natural) -> InfCount
     updateVar m (x, (Sum n)) = n `nTimesCount` getVar m x
     getVar :: Map BoundVar InfCount -> BoundVar -> InfCount
     getVar m x = case m^.at x of
       Just c -> c
       Nothing -> error "a bound var wasn't mapped in a skip"
-    updatePoint :: Map BoundVar InfCount -> Map TapeVar s
-      -> (VarOr s, Location Count) -> (s, Location InfCount)
-    updatePoint bs ts = (_2. _Side . _1 %~ updateCount bs) . (_1 %~ deVarOr ts)
-    updateList :: Map BoundVar InfCount -> Map TapeVar s
-      -> [(VarOr s, InfCount)] -> [(s, InfCount)]
-    updateList bs ts = fmap $ bimap (deVarOr ts) (updateInfCount bs)
+    updatePoint :: Map BoundVar InfCount -> (s, Location Count) -> (s, Location InfCount)
+    updatePoint bs = (_2. _Side . _1 %~ updateCount bs)
+    updateList :: Map BoundVar InfCount -> [(s, InfCount)] -> [(s, InfCount)]
+    updateList bs = fmap $ fmap (updateInfCount bs)
+    finalizeList :: [(s, Count)] -> [(s, InfCount)]
+    finalizeList = invariantifyList . updateList boundVs . fmap (fmap NotInfinity)
 
 --we want to be able to apply a skip of counts to an ExpTape _ Count but also a
 --skip of counts to an ExpTape _ Nat
@@ -100,14 +100,9 @@ applySkip (Skip s e hopCount _) (p, tape)
 --the skip that results from the atomic transition given an edge leading to a
 --transition of the specified Phase, Bit, Dir
 oneStepSkip :: Edge -> Phase -> Bit -> Dir -> Skip Bit
-oneStepSkip (p, b) q c L = Skip
-  (Config p [(Var (TapeVar 0), finiteCount 1)] (NotVar b, One) [])
-  (Config q [] (Var (TapeVar 0), One) [(NotVar c, finiteCount 1)])
-  (finiteCount 1)
-  False
-oneStepSkip (p, b) q c R = Skip
-  (Config p [] (NotVar b, One) [(Var (TapeVar 0), finiteCount 1)])
-  (Config q [(NotVar c, finiteCount 1)] (Var (TapeVar 0), One) [])
+oneStepSkip (p, b) q c d = Skip
+  (Config p [] (b, One) [])
+  (EndSide q d [(c, finiteCount 1)])
   (finiteCount 1)
   False
 
@@ -115,13 +110,13 @@ oneStepSkip (p, b) q c R = Skip
 --writing the given bit and dir
 infiniteSkip :: Edge -> Bit -> Dir -> Skip Bit
 infiniteSkip (p, b) c L = Skip
-  (Config p [(Var (TapeVar 0), finiteCount 1)] (NotVar b, Side (newBoundVar 0) R) [])
-  (Config p [] (Var (TapeVar 0), One) [(NotVar c, newBoundVar 0)])
+  (Config p [] (b, Side (newBoundVar 0) R) [])
+  (EndSide p L [(c, newBoundVar 0)])
   (newBoundVar 0)
   False
 infiniteSkip (p, b) c R = Skip
-  (Config p [] (NotVar b, Side (newBoundVar 0) L) [(Var (TapeVar 0), finiteCount 1)])
-  (Config p [(NotVar c, newBoundVar 0)] (Var (TapeVar 0), One) [])
+  (Config p [] (b, Side (newBoundVar 0) L) [])
+  (EndSide p R [(c, newBoundVar 0)])
   (newBoundVar 0)
   False
 
@@ -135,7 +130,7 @@ initTransSkip e@(p, _b) (Step q c d) | p == q = fromList
 initTransSkip e (Step q c d) = one $ oneStepSkip e q c d
 
 addSkipToBook :: (Ord s) => Skip s -> SkipBook s -> SkipBook s
-addSkipToBook skip = atE (skip^.start.cstate, skip^?start.c_point._1._NotVar)
+addSkipToBook skip = atE (skip^.start.cstate, skip^.start.c_point._1)
   . contains skip .~ True
 
 initBook :: Turing -> SkipBook Bit
@@ -143,7 +138,7 @@ initBook (Turing _n trans) = appEndo (foldMap (Endo . addSkipToBook) skips) $ Em
   skips = foldMap (uncurry initTransSkip) $ assocs trans
 
 lookupSkips :: (Ord s) => (Phase, s) -> SkipBook s -> Set (Skip s)
-lookupSkips (p, s) book = book ^. atE (p, Just s) <> book ^. atE (p, Nothing)
+lookupSkips (p, s) book = book ^. atE (p, s)
 
 --if the machine halts, pick that one, else pick the one that goes farther
 skipFarthest :: (Eq s, Eq c)
@@ -178,6 +173,7 @@ skipStep (Turing _ trans) book p tape@(ExpTape _ls (bit, _loc) _rs)
       if bestSkip ^. halts then Stopped hops newT bestSkip
         else Stepped hops newP newT bestSkip
 
+--TODO: known bug: we currently output a number 1 higher than we should for step count
 simulateWithSkips :: Int -> Turing -> Results (ExpTape Bit InfCount)
 simulateWithSkips limit startMachine
   = loop (startMachine, SimState (Phase 0) (initExpTape False) (initBook startMachine) 0) [] Empty where

@@ -9,17 +9,24 @@ import Count
 import Util
 import ExpTape
 
+--a configuration of the machine's state - it is in a given phase, with the point of the tape and the stuff to the 
+--left and right looking as specified
 data Config s = Config
   { _cstate :: Phase
-  , _ls :: [(VarOr s, Count)]
-  , _c_point :: (VarOr s, Location Count)
-  , _rs :: [(VarOr s, Count)]
+  , _ls :: [(s, Count)]
+  , _c_point :: (s, Location Count)
+  , _rs :: [(s, Count)]
   } deriving (Eq, Ord, Show, Generic)
 instance (NFData s) => NFData (Config s)
 
+--at the end of a skip, you might've fallen off the L of the given pile of bits, or you might be in the middle of some 
+--known bits, which is a config
+data SkipEnd s = EndSide Phase Dir [(s, Count)] | EndMiddle (Config s) deriving (Eq, Ord, Show, Generic)
+instance (NFData s) => NFData (SkipEnd s) 
+
 data Skip s = Skip
   { _start :: Config s
-  , _end :: Config s
+  , _end :: SkipEnd s
   , _hops :: Count --number of atomic TM steps
   , _halts :: Bool --true if the skip results in the machine halting
   } deriving (Eq, Ord, Show, Generic)
@@ -28,23 +35,35 @@ instance (NFData s) => NFData (Skip s)
 $(makeLenses ''Config)
 $(makeLenses ''Skip)
 
-dispVarOrAndCount :: (VarOr Bit, Count) -> Text
-dispVarOrAndCount (vb, count) = "(" <> dispVarOrBit vb <> ", " <> dispCount count <> ") "
+dispBitAndCount :: (Bit, Count) -> Text
+dispBitAndCount (b, count) = "(" <> dispBit b <> ", " <> dispCount count <> ") "
 
-dispVarOrAndLocCount :: (VarOr Bit, Location Count) -> Text
-dispVarOrAndLocCount (vb, Side count L) = "|>" <> dispVarOrAndCount (vb, count)
-dispVarOrAndLocCount (vb, Side count R) = dispVarOrAndCount (vb, count) <> "<|"
-dispVarOrAndLocCount (vb, One) = dispVarOrAndCount (vb, finiteCount 1) <> "<|"
+dispBitAndLocCount :: (Bit, Location Count) -> Text
+dispBitAndLocCount (b, Side count L) = "|>" <> dispBitAndCount (b, count)
+dispBitAndLocCount (b, Side count R) = dispBitAndCount (b, count) <> "<|"
+dispBitAndLocCount (b, One) = dispBitAndCount (b, finiteCount 1) <> "<|"
 
 dispConfig :: Config Bit -> Text
 dispConfig (Config p ls point rs) = "phase: " <> dispPhase p <> "  "
-  <> (mconcat $ dispVarOrAndCount <$> reverse ls)
-  <> dispVarOrAndLocCount point
-  <> (mconcat $ dispVarOrAndCount <$> rs)
+  <> (mconcat $ dispBitAndCount <$> reverse ls)
+  <> dispBitAndLocCount point
+  <> (mconcat $ dispBitAndCount <$> rs)
+
+dispSkipEnd :: SkipEnd Bit -> Text 
+dispSkipEnd (EndSide p L ls) =  "phase: " <> dispPhase p <> "  <|" <> (mconcat $ dispBitAndCount <$> ls)
+dispSkipEnd (EndSide p R ls) =  "phase: " <> dispPhase p <> " " <> (mconcat $ dispBitAndCount <$> ls) <> "|>"
+dispSkipEnd (EndMiddle c) = dispConfig c 
 
 dispSkip :: Skip Bit -> Text
 dispSkip (Skip s e c halts) = "in " <> dispCount c <> " steps we turn\n"
-  <> dispConfig s <> "\ninto: \n" <> dispConfig e <> (if halts then "\n and halt" else "")
+  <> dispConfig s <> "\ninto: \n" <> dispSkipEnd e <> (if halts then "\n and halt" else "")
+
+getSkipEndPhase :: SkipEnd s -> Phase 
+getSkipEndPhase (EndSide p _ _) = p
+getSkipEndPhase (EndMiddle (Config p _ _ _)) = p
+
+matchBits :: (Eq s) => s -> s -> Equations s ()
+matchBits b c = maybeES $ guard (b == c)
 
 --a Perfect match had no leftovers
 --or we might have used up all of the skip and had some tape leftover
@@ -52,9 +71,9 @@ data HeadMatch s c = PerfectH | TapeHLeft (s, c) deriving (Eq, Ord, Show)
 
 --we take the start of a skip and the start of a tape, match the symbols, match the counts
 -- and return what's left of the tape if any
-matchTapeHeads :: (Eq s) => (VarOr s, Count) -> (s, InfCount) -> Equations s (HeadMatch s InfCount)
-matchTapeHeads (varSB, skipC) (tb, tapeC) = do
-  matchTapeVar varSB tb
+matchTapeHeads :: (Eq s) => (s, Count) -> (s, InfCount) -> Equations s (HeadMatch s InfCount)
+matchTapeHeads (sb, skipC) (tb, tapeC) = do
+  matchBits sb tb 
   matchInfCount skipC tapeC >>= \case
     Empty -> pure PerfectH
     newCount -> pure (TapeHLeft (tb, newCount))
@@ -64,7 +83,7 @@ matchTapeHeads (varSB, skipC) (tb, tapeC) = do
 --one thing left
 data TapeMatch s = Perfect
                  | TapeLeft (NonEmpty (s, InfCount))
-                 | SkipLeft (NonEmpty (VarOr s, Count)) deriving (Eq, Ord, Show)
+                 | SkipLeft (NonEmpty (s, Count)) deriving (Eq, Ord, Show)
 --TODO:: maybe define a pattern synonym for TapeMatch that either returns a (possibly empty)
 --leftover tape or the skip
 
@@ -76,7 +95,7 @@ data TapeMatch s = Perfect
 --fails, returning nothing
 --example :: matchBitTape [(F, 2), (T, 1)] [(F, 2), (T, 3), (F, x)] == [(T, 2), (F, x)]
 --returns Nothing if the match fails, else the match
-matchTape :: (Eq s) => [(VarOr s, Count)] -> [(s, InfCount)] -> Equations s (TapeMatch s)
+matchTape :: (Eq s) => [(s, Count)] -> [(s, InfCount)] -> Equations s (TapeMatch s)
 matchTape [] [] = pure Perfect
 matchTape [] (t:ts) = pure $ TapeLeft (t :| ts)
 matchTape (s:rest) []  = pure $ SkipLeft (s :| rest)
@@ -118,19 +137,19 @@ getTapeRemain (SkipLeft _) = Nothing
 --remain on one side
 data PointMatch s = PerfectP | Lremains (s, InfCount) | Rremains (s, InfCount) deriving (Eq, Ord, Show, Generic)
 
-matchPoints :: (Eq s) => (VarOr s, Location Count) -> (s, Location InfCount) -> Equations s (PointMatch s)
+matchPoints :: (Eq s) => (s, Location Count) -> (s, Location InfCount) -> Equations s (PointMatch s)
 --if there is one of each symbol then they just match
-matchPoints (skipS, One) (tapeS, One) = matchTapeVar skipS tapeS $> PerfectP
+matchPoints (skipS, One) (tapeS, One) = matchBits skipS tapeS $> PerfectP
 --if there is a single symbol in the skip, then the skip applies regardless of the tapeD
 --and the rest of the matching is the same
-matchPoints (skipS, One) (tapeS, Side tapeC tapeD) = matchTapeVar skipS tapeS
+matchPoints (skipS, One) (tapeS, Side tapeC tapeD) = matchBits skipS tapeS
   >> matchInfsAndReturn (finiteCount 1) tapeS tapeC tapeD
 matchPoints (_skipS, Side skipC _skipD) (_tapeS, One) = if skipC == finiteCount 1
   then error "Side may not contain a count of exactly 1"
   else nothingES
 matchPoints (skipS, Side skipC skipD) (tapeS, Side tapeC tapeD)
   | skipD == tapeD = do
-      matchTapeVar skipS tapeS
+      matchBits skipS tapeS
       matchInfsAndReturn skipC tapeS tapeC tapeD
 matchPoints _ _ = nothingES
 --strictly a helper function for the above
