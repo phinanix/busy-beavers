@@ -169,7 +169,7 @@ simProgram display results = do
 --TODO:: make database that stores results of machines, so that results can be compared between different runs
 main :: IO ()
 main = do
-  let results = Simulate.simulate 30 $ startMachine1 3
+  let results = Simulate.simulate 300 $ startMachine1 4
   simProgram dispTape results
 
   -- let skipResults = simulateWithSkips 30 $ startMachine1 3

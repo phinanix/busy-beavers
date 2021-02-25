@@ -13,10 +13,23 @@ import Count
 import Skip hiding (HeadMatch(..))
 import ExpTape
 
+
+{-
+Things to do: 
+ - change from using tapevars to using "at the end of the skip it boops left or right"
+ - write applyskip given this 
+ - test / use glueing stuff to write
+ --- skips that skip infinitely detector
+ --- glue two skips together plan
+ - heuristics for things around gluing making induction hypotheses 
+ - i n d u c t i o n   m a c h i n e
+ 
+-}
 divStatics :: Natural -> Natural -> MMap k (Sum Natural) -> Maybe (Natural, MMap k (Sum Natural)) 
 divStatics d n m = (,) <$> (n `maybeDiv` d) <*> (m `divMap` d) 
 
 --given two counts, either produces the most general count that encompasses both of them or fails 
+--probably this should be an Equations and that monad should be upgraded to have a spawn new var field
 glueCounts :: Count -> Count -> Maybe Count 
 glueCounts c d = case likeTerms c d of 
   --this is the two zerovar case, in which case all terms must be alike 

@@ -15,12 +15,12 @@ instance (NFData c) => NFData (Location c)
 $(makePrisms ''Location)
 
 
-data ExpTape s c l = ExpTape
+data ExpTape s c = ExpTape
   { left :: [(s, c)]
-  , point :: (s, l c)
+  , point :: (s, Location c)
   , right :: [(s, c)]
   } deriving (Eq, Ord, Show, Generic)
-instance (NFData s, NFData c, NFData (l c)) => NFData (ExpTape s c l)
+instance (NFData s, NFData c) => NFData (ExpTape s c)
 
 --TODO:: split modify into modifyPointUnderHead and moveTapeADirection
 --or otherwise refactor it - it's a mess
@@ -73,7 +73,7 @@ invariantifyList ((s, c) : (t, d) : xs) | s == t = invariantifyList ((s, c <> d)
 invariantifyList (x : xs) = x : invariantifyList xs
 invariantifyList [] =  []
 
-glomPointLeft :: (Eq s) => ExpTape s InfCount Location -> ExpTape s InfCount Location
+glomPointLeft :: (Eq s) => ExpTape s InfCount -> ExpTape s InfCount
 glomPointLeft (ExpTape ((s_l, c_l):ls) (s_p, One) rs) | s_l == s_p =
   ExpTape ls (s_p, Side (NotInfinity (finiteCount 1) <> c_l) R) rs
 --note: suppose you're at the left of two ones and to your
@@ -82,14 +82,14 @@ glomPointLeft (ExpTape ((s_l, c_l):ls) (s_p, Side c_p R) rs) | s_l == s_p =
   ExpTape ls (s_p, Side (c_p <> c_l) R) rs
 glomPointLeft e = e
 
-glomPointRight :: (Eq s) => ExpTape s InfCount Location -> ExpTape s InfCount Location
+glomPointRight :: (Eq s) => ExpTape s InfCount -> ExpTape s InfCount
 glomPointRight (ExpTape ls (s_p, One) ((s_r, c_r):rs)) | s_p == s_r =
   ExpTape ls (s_p, Side (NotInfinity (finiteCount 1) <> c_r) L) rs
 glomPointRight (ExpTape ls (s_p, Side c_p L) ((s_r, c_r):rs)) | s_p == s_r =
   ExpTape ls (s_p, Side (c_p <> c_r) L) rs
 glomPointRight e = e
 
-glomPoint :: (Eq s) => ExpTape s InfCount Location -> ExpTape s InfCount Location
+glomPoint :: (Eq s) => ExpTape s InfCount -> ExpTape s InfCount
 glomPoint = glomPointLeft . glomPointRight
 
 dispBitCount :: (Bit, InfCount) -> Text
@@ -100,13 +100,13 @@ dispPoint (bit, Side count L) = "|>" <> dispBitCount (bit, count)
 dispPoint (bit, Side count R) = dispBitCount (bit, count) <> "<|"
 dispPoint (bit, One) = dispBitCount (bit, NotInfinity $ finiteCount 1) <> "<|"
 
-dispExpTape :: ExpTape Bit InfCount Location -> Text
+dispExpTape :: ExpTape Bit InfCount -> Text
 dispExpTape (ExpTape ls point rs)
   = (mconcat $ dispBitCount <$> reverse ls)
   <> dispPoint point
   <> (mconcat $ dispBitCount <$> rs)
 
-instance Tapeable (ExpTape Bit InfCount Location) where
+instance Tapeable (ExpTape Bit InfCount ) where
   ones (ExpTape ls point rs) = countPoint point + countList ls + countList rs where
     countPoint (False, _) = 0
     countPoint (True, One) = 1

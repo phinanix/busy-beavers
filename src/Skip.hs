@@ -47,7 +47,7 @@ dispSkip (Skip s e c halts) = "in " <> dispCount c <> " steps we turn\n"
   <> dispConfig s <> "\ninto: \n" <> dispConfig e <> (if halts then "\n and halt" else "")
 
 --a Perfect match had no leftovers
---or we might have used up all of the skip and had some tape leftover, or vv
+--or we might have used up all of the skip and had some tape leftover
 data HeadMatch s c = PerfectH | TapeHLeft (s, c) deriving (Eq, Ord, Show)
 
 --we take the start of a skip and the start of a tape, match the symbols, match the counts
@@ -145,7 +145,7 @@ matchInfsAndReturn skipC tapeS tapeC tapeD = matchInfCount skipC tapeC >>= \case
 
 --match a config to a tape, and return the lists that remain on each side of the
 --tape after matching
-matchConfigTape :: (Eq s) => Config s -> ExpTape s InfCount Location
+matchConfigTape :: (Eq s) => Config s -> ExpTape s InfCount
   -> Equations s ([(s, InfCount)], [(s, InfCount)])
 matchConfigTape (Config _p lsC pointC rsC) (ExpTape lsT pointT rsT)
   = matchPoints pointC pointT >>= \case

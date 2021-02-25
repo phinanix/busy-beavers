@@ -54,7 +54,7 @@ dispVarOrBit :: VarOr Bit -> Text
 dispVarOrBit (Var v) = dispTapeVar v
 dispVarOrBit (NotVar b) = dispBit b
 
---returns () because if the match fails, the ES can just fail the whole computation
+--returns () because if the match fails, the ES will just fail the whole computation
 matchTapeVar :: (Eq s) => VarOr s -> s -> Equations s ()
 matchTapeVar (Var v) s = addTapeVar (v, s) $ pure ()
 matchTapeVar (NotVar t) s = maybeES $ guard (t == s)

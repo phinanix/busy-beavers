@@ -29,24 +29,24 @@ type SkipBook s = Map (Phase, Maybe s) (Set (Skip s))
 
 data SimState = SimState
   { _s_phase :: Phase
-  , _s_tape :: ExpTape Bit InfCount Location
+  , _s_tape :: ExpTape Bit InfCount
   , _s_book :: SkipBook Bit
   , _s_steps :: Steps
   }
 --the count is the number of atomic steps the skip results in
-data SkipResult s c l = Skipped
+data SkipResult s c = Skipped
   { _hopsTaken :: InfCount
   , _newPhase :: Phase
-  , _newTape :: (ExpTape s c l)
+  , _newTape :: (ExpTape s c)
   } deriving (Eq, Ord, Show, Generic)
 
 $(makeLenses ''SkipResult)
 $(makeLenses ''SimState)
 
-initExpTape :: s -> ExpTape s InfCount Location
+initExpTape :: s -> ExpTape s InfCount
 initExpTape s = ExpTape [(s, Infinity)] (s, One) [(s, Infinity)]
 
-dispSkipResult :: SkipResult Bit InfCount Location -> Text
+dispSkipResult :: SkipResult Bit InfCount -> Text
 dispSkipResult (Skipped c p tape)
   = "skipped to phase: " <> dispPhase p
   <> " and tape " <> dispExpTape tape
@@ -55,14 +55,14 @@ dispSkipResult (Skipped c p tape)
 --returns nothing if the skip is inapplicable, else returns a new tape
 --the fact that the type is bit is only used when running off the tape, but for now I don't want to
 --generalize that out (also ExpTape would have to be generalized)
-applySkip :: forall s. (Eq s) => Skip s -> (Phase, ExpTape s InfCount Location)
-  -> Maybe (SkipResult s InfCount Location)
---Skip Bit -> (Phase, ExpTape Bit InfCount Location) -> Maybe (SkipResult Bit InfCount Location)
+applySkip :: forall s. (Eq s) => Skip s -> (Phase, ExpTape s InfCount)
+  -> Maybe (SkipResult s InfCount)
+--Skip Bit -> (Phase, ExpTape Bit InfCount) -> Maybe (SkipResult Bit InfCount)
 applySkip (Skip s e hopCount _) (p, tape)
   = guard (s^.cstate == p) >> packageResult <$> runEquations (matchConfigTape s tape)
   where
     packageResult :: (Map BoundVar InfCount, Map TapeVar s, ([(s, InfCount)], [(s, InfCount)]))
-      -> SkipResult s InfCount Location
+      -> SkipResult s InfCount
     packageResult (boundVs, tapeVs, (newLs, newRs)) = Skipped
       (updateCount boundVs hopCount)
       (e^.cstate)
@@ -146,9 +146,9 @@ lookupSkips :: (Ord s) => (Phase, s) -> SkipBook s -> Set (Skip s)
 lookupSkips (p, s) book = book ^. atE (p, Just s) <> book ^. atE (p, Nothing)
 
 --if the machine halts, pick that one, else pick the one that goes farther
-skipFarthest :: (Eq s, Eq c, Eq (l c))
-  => (Skip s, SkipResult s c l)
-  -> (Skip s, SkipResult s c l)
+skipFarthest :: (Eq s, Eq c)
+  => (Skip s, SkipResult s c)
+  -> (Skip s, SkipResult s c)
   -> Ordering
 skipFarthest a b | a == b = EQ
 skipFarthest (Skip _ _ _ True, _)   _ = LT
@@ -160,8 +160,8 @@ skipFarthest (_, Skipped c _ _) (_, Skipped c' _ _) = compare c c'
 --on whether the base transition is present in the line marked **
 --but that should be generalizeable
 --a TapeSymbol has a function (s, Location c) -> Bit called getPointBit or something
-skipStep :: Turing -> SkipBook Bit -> Phase -> ExpTape Bit InfCount Location
-  -> PartialStepResult (ExpTape Bit InfCount Location)
+skipStep :: Turing -> SkipBook Bit -> Phase -> ExpTape Bit InfCount
+  -> PartialStepResult (ExpTape Bit InfCount)
 skipStep (Turing _ trans) book p tape@(ExpTape _ls (bit, _loc) _rs)
   = case trans ^. at (p, bit) of -- **
     Nothing -> Unknown (p,bit)
@@ -178,11 +178,11 @@ skipStep (Turing _ trans) book p tape@(ExpTape _ls (bit, _loc) _rs)
       if bestSkip ^. halts then Stopped hops newT bestSkip
         else Stepped hops newP newT bestSkip
 
-simulateWithSkips :: Int -> Turing -> Results (ExpTape Bit InfCount Location)
+simulateWithSkips :: Int -> Turing -> Results (ExpTape Bit InfCount)
 simulateWithSkips limit startMachine
   = loop (startMachine, SimState (Phase 0) (initExpTape False) (initBook startMachine) 0) [] Empty where
   loop :: (Turing, SimState) -> [(Turing, SimState)]
-    -> Results (ExpTape Bit InfCount Location) -> Results (ExpTape Bit InfCount Location)
+    -> Results (ExpTape Bit InfCount) -> Results (ExpTape Bit InfCount)
   loop (t, (SimState p tape _book steps@((>= limit) -> True))) todos rs =
     recurse todos $ addResult t (Continue steps p tape) rs
   loop (t, (SimState p tape book steps)) todos rs = case skipStep t book p tape of
@@ -203,10 +203,10 @@ simulateWithSkips limit startMachine
   recurse [] result = result
   recurse (x : xs) result = loop x xs result
 
-simulateOneMachine :: Int -> Turing -> SimResult (ExpTape Bit InfCount Location)
+simulateOneMachine :: Int -> Turing -> SimResult (ExpTape Bit InfCount)
 simulateOneMachine limit machine
   = loop machine $ SimState (Phase 0) (initExpTape False) (initBook machine) 0 where
-  loop :: Turing -> SimState -> SimResult (ExpTape Bit InfCount Location)
+  loop :: Turing -> SimState -> SimResult (ExpTape Bit InfCount)
   loop _t (SimState p tape _book steps@((>= limit) -> True)) = Continue steps p tape
   loop t (SimState p tape book steps) = case skipStep t book p tape of
     Unknown _e -> Continue steps p tape
