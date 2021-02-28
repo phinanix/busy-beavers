@@ -1,0 +1,10 @@
+,,,,(4n+1)^(2n-1),,,
+N,Program ,Program Ratio,,Unrefined,Unref. Ratio,,Improvement
+3,4052,,,371293,,,91.6
+4,618296,152.6,,410338673,1105.2,,663.7
+5,126382022,204.4,,794280046581,1935.7,,6284.8
+,,,,,,,
+3 types of non-halt proofs were used,,,,,,,
+cycle,,,,,,,
+backward search,,,,,,,
+End-of-tape-cycle,,,,,,,

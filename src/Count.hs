@@ -164,6 +164,9 @@ divMap m d = Sum <$$> traverse (flip maybeDiv d) (getSum <$> m)
 divCount :: Count -> Natural -> Maybe Count
 divCount (Count n as xs) d = Count <$> (n `maybeDiv` d) <*> (as `divMap` d) <*> (xs `divMap` d)
 
+subNatFromCount :: Count -> Natural -> Maybe Count 
+subNatFromCount (Count n as xs) m = guard (n >= m) $> Count (n - m) as xs 
+
 --given two counts, returns a count of their like terms and the two leftovers, in that order 
 likeTerms :: Count -> Count -> (Count, Count, Count) 
 likeTerms (Count n as xs) (Count m bs ys) = (likes, leftOvers, rightOvers) where 

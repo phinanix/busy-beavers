@@ -12,6 +12,7 @@ import Util
 import Count
 import Skip hiding (HeadMatch(..))
 import ExpTape
+import Turing
 
 
 {-
@@ -35,9 +36,9 @@ glueCounts c d = case likeTerms c d of
   --this is the two zerovar case, in which case all terms must be alike 
   (likes, Empty, Empty) -> pure likes
   --if one side has a var, it unifies if the other side's leftovers are divisible by that coefficient
-  (likes, OneVar 0 Empty k x, ZeroVar m bs) -> divStatics k m bs >> pure d
+  (_likes, OneVar 0 Empty k _x, ZeroVar m bs) -> divStatics k m bs >> pure d
   --pops to the above case
-  (likes, ZeroVar _ _, OneVar _ _ _ _) -> glueCounts d c
+  (_likes, ZeroVar _ _, OneVar _ _ _ _) -> glueCounts d c
   --both sides leftovers must be divisible by the other var, in which case you add together the 
   --leftovers and make a new var that is the LCM of the two coefficents
   --TODO :: this function currently doesn't know how to create a new var
@@ -46,109 +47,87 @@ glueCounts c d = case likeTerms c d of
   -- TODO :: emit a warning here?
   _ -> Nothing 
 
+--returns the part of the longer list that is not matched up via zip, 
+--ie returns the longer list with the first (length shortlist) elements dropped 
+remainingLonger :: [a] -> [b] -> Either [a] [b]
+remainingLonger xs ys = if (length xs < length ys) then Right (drop (length xs) ys) else Left (drop (length ys) xs)
 
--- data VarOrU s a = Symbol s deriving (Functor, Foldable, Traversable)
+--takes two lists, fails if they are incompatible, else returns a Left if some of the first list was leftover, or a Right if 
+--some of the second list was leftover 
+glueTapeHalves :: forall s. (Eq s) => [(s, Count)] -> [(s, Count)] -> Maybe (Leftover s)
+glueTapeHalves xs ys = matched >> pure answer where
+  zipped = (zip xs ys) --discards longer 
+  matchOne :: ((s, Count), (s, Count)) -> Maybe ()
+  matchOne ((s, c), (t, d)) = glueCounts c d >> guard (s == t) 
+  matched :: Maybe ()
+  matched = traverse_ matchOne zipped 
+  answer :: Leftover s
+  answer = case remainingLonger xs ys of 
+    Left xs -> Start xs 
+    Right ys -> End ys
 
--- instance (Eq s) => Unifiable (VarOrU s) where
---   zipMatch (Symbol s) (Symbol t) = if s == t
---     then Just (Symbol s)
---     else Nothing
+--things you add to the left and right of a Config or SkipEnd
+data Tails s = Tails [(s, Count)] [(s, Count)]
 
--- varOrToUnify :: (BindingMonad (VarOrU s) v m) => VarOr s -> m (UTerm (VarOrU s) v)
--- varOrToUnify = \case
---   NotVar s -> pure $ UTerm $ Symbol s
---   Var _v -> UVar <$> freeVar
+--Left if you add the list to the start of the skip, Right if you add it to the end of the skip
+data Leftover s = Start [(s, Count)] | End [(s, Count)]
 
--- varOrFromUnify :: (Variable v) => UTerm (VarOrU s) v -> VarOr s
--- varOrFromUnify (UVar v) = Var $ TapeVar $ getVarID v
--- varOrFromUnify (UTerm (Symbol s)) = NotVar s
+leftoverTails :: (Leftover s, Leftover s) -> (Tails s, Tails s) 
+leftoverTails (ls, rs) = (Tails (getStart ls) (getStart rs), Tails (getEnd ls) (getEnd rs)) where
+  getStart (Start xs) = xs 
+  getStart (End _) = [] 
+  getEnd (Start _) = [] 
+  getEnd (End xs) = xs 
 
--- type FreeVars = MMap SymbolVar (Sum Natural)
+applyTailsConfig :: Tails s -> Config s -> Config s
+applyTailsConfig (Tails lTail rTail) (Config p ls point rs) = Config p (ls <> lTail) point (rs <> rTail)
 
--- data CountAtom a = Natural | SymbolAtom SymbolVar | BoundAtom a
---   deriving (Functor, Foldable, Traversable)
+applyTailsSkipEnd :: Tails s -> SkipEnd s -> SkipEnd s 
+applyTailsSkipEnd tails (EndMiddle c) = EndMiddle (applyTailsConfig tails c)
+applyTailsSkipEnd (Tails [] rTail) (EndSide p L rs) = EndSide p L (rs <> rTail) 
+applyTailsSkipEnd (Tails ((s, c) : lTail) rTail) (EndSide p L rs) = EndMiddle (Config p lTail (s, makeLoc c R) (rs <> rTail))
+applyTailsSkipEnd (Tails lTail []) (EndSide p R ls) = EndSide p R (ls <> lTail) 
+applyTailsSkipEnd (Tails lTail ((s, c) : rTail)) (EndSide p R ls) = EndMiddle (Config p (ls <> lTail) (s, makeLoc c L) rTail)
 
--- --this should really be a map or something, since the CountAtoms are unique and we
--- --want to search for them, but CountU has to be traversable
--- --invariant: the list is sorted with a possible natural at the beginning, then a
--- --sorted list of symbolAtoms, then an unknown order list of boundatoms
--- data CountU a = CountU [(Natural, CountAtom a)] deriving (Functor, Foldable, Traversable)
+nothingLeft :: Leftover s
+nothingLeft = Start []
 
--- -- countToUnify :: Count -> CountU IntVar
--- -- countToUnify (Count n as xs) = CountU $ naturalAtom ++ symbolAtoms ++ boundAtoms where
--- --   naturalAtom = if n == 0 then [] else [(n, Natural)]
--- --   --assocs returns the list sorted
--- --   symbolAtoms = (\(v, Sum n) -> (n, SymbolAtom v)) <$> (assocs as)
--- --   boundAtoms :: _
--- --   boundAtoms = (\(BoundVar x, Sum n) -> (n, BoundAtom $ intVar x)) <$> assocs xs
+select :: Dir -> (a, a) -> a 
+select d (l, r) = case d of 
+  L -> l 
+  R -> r 
+
+--the leftovers on the left and right sides respectively
+glueEndToBeginning :: (Eq s) => (SkipEnd s) -> Config s -> Maybe (Leftover s, Leftover s)
+glueEndToBeginning (EndMiddle (Config p ls (s, loc) rs)) (Config q ls' (s', loc') rs') 
+  = guard (p == q) >> guard (s == s') >> case (loc, loc') of 
+    (One, One) -> glueRest
+    (Side c d, Side c' d') -> guard (d == d') >> glueCounts c c' >> glueRest
+    (_, _) -> Nothing
+    where 
+      glueRest = (,) <$> glueTapeHalves ls ls' <*> glueTapeHalves rs rs'
+glueEndToBeginning (EndSide p L rs) (Config q ls' (s', loc') rs') = guard (p == q) >> case loc' of 
+  One -> (,) <$> pure (Start ((s', finiteCount 1) : ls')) <*> glueTapeHalves rs rs'
+  Side c L -> do 
+    c' <- subNatFromCount c 1 
+    (,) <$> pure (Start ((s', finiteCount 1) : ls')) <*> glueTapeHalves rs ((s', c') : rs')
+  Side c R -> (,) <$> pure (Start ((s', c) : ls')) <*> glueTapeHalves rs rs'
+glueEndToBeginning (EndSide p R ls) (Config q ls' (s', loc') rs') = guard (p == q) >> case loc' of 
+  One -> (,) <$> glueTapeHalves ls ls' <*> pure (Start ((s', finiteCount 1) : rs'))
+  Side c R -> do 
+    c' <- subNatFromCount c 1 
+    (,) <$> glueTapeHalves ls ((s', c') : ls') <*> pure (Start ((s', finiteCount 1) : rs'))
+  Side c L -> (,) <$> glueTapeHalves ls ls' <*> pure (Start ((s', c) : rs'))
 
 
 
--- data UnifyResult a = PerfectU | FirstU a | SecondU a deriving (Eq, Ord, Show)
+--takes a first and a second skip and returns, if it is possible, a skip that
+--results from applying one then the next. Tries to keep universals as general as
+--possible but this is not guaranteed to find the most general universal quantifiers
+glueSkips :: (Eq s) => Skip s -> Skip s -> Maybe (Skip s)
+glueSkips (Skip startConfig middleSkipEnd c b) (Skip middleConfig endSkipEnd c' b') = do 
+  guard b 
+  leftovers <- glueEndToBeginning middleSkipEnd middleConfig 
+  let (startTails, endTails) = leftoverTails leftovers
+  pure $ Skip (applyTailsConfig startTails startConfig) (applyTailsSkipEnd endTails endSkipEnd) (c <> c') b'
 
--- -- combineUnifyResults :: (Monoid m) => UnifyResult m -> UnifyResult m -> Maybe (UnifyResult m)
--- -- combineUnifyResults PerfectU r = Just r
--- -- combineUnifyResults r PerfectU = Just r
--- -- combineUnifyResults (FirstU r) (FirstU r') = Just (FirstU (r <> r'))
--- -- combineUnifyResults (SecondU r) (SecondU r') = Just (SecondU (r <> r'))
--- -- combineUnifyResults _ _ = Nothing
--- --
--- -- unifyNaturals :: Natural -> Natural -> UnifyResult Natural
--- -- unifyNaturals n m = case compare n m of
--- --   LT -> SecondU (m - n)
--- --   EQ -> PerfectU
--- --   GT -> FirstU (n - m)
--- --
--- -- unifyFreeVars :: FreeVars -> FreeVars -> Maybe (UnifyResult (FreeVars))
--- -- unifyFreeVars Empty Empty = Just PerfectU
--- -- unifyFreeVars Empty bs = Just $ SecondU bs
--- -- unifyFreeVars as Empty = Just $ FirstU as
--- -- unifyFreeVars (deleteFindMin -> ((v, n), as)) (deleteFindMin -> ((w, m), bs))
--- --   = if v /= w then error "assert that mins are equal" else
--- --     case compare n m of
--- --       LT -> combineUnifyResults (SecondU $ singleton v (m-n)) =<< unifyFreeVars as bs
--- --       EQ -> unifyFreeVars as bs
--- --       GT -> combineUnifyResults (FirstU $ singleton v (n-m)) =<< unifyFreeVars as bs
-
--- -- unifyCounts :: (BindingMonad CountU v m)
--- --   => CountU v -> CountU v -> m (UnifyResult Count)
--- -- unifyCounts (CountU m as xs) (CountU n bs ys) = let
--- --   uniNs = unifyNaturals m n
--- --   uniFrees = unifyFreeVars as bs
--- --   in
--- --   undefined
-
--- --suppose (x, T) unifies with (4, T) -- this is a perfect match and we learn x -> 4
--- --but it is a bit tricky because we could continue matching x against more stuff, since
--- --it's univerally quantified :V
--- --this complexity is a cost of the fact that skips no longer have the no-repeat-symbols
--- --invariant, which might be a mistake
--- data HeadUnify s = PerfectH | FirstH (VarOr s) Count | SecondH (VarOr s) Count
---   deriving (Eq, Ord, Show)
-
--- unifyTapeHeads :: (Eq s) => (VarOr s, Count) -> (VarOr s, Count)
---   -> Equations s (HeadUnify s)
--- unifyTapeHeads f s = undefined -- pure PerfectH
-
--- --tape from end of first and start of second skip, respectively
--- --returns the suffix that you'd have to add to the end of the first skip for second
--- --skip to apply
--- unifyTapes :: (Eq s) => [(VarOr s, Count)] -> [(VarOr s, Count)]
---   -> Equations s [(VarOr s, Count)]
--- unifyTapes ls rs = undefined
-
--- unifyPoints :: (Eq s) => (VarOr s, Location Count) -> (VarOr s, Location Count)
---   -> Equations s _
--- unifyPoints p1 p2 = undefined
-
--- --takes a first config and a second config and if possible produces the suffixes
--- --necessary to apply to the first config that result in the second config applying
--- unifyConfigs :: (Eq s) => Config s -> Config s
---   -> Equations s ([(VarOr s, Count)], [(VarOr s, Count)])
--- unifyConfigs c1 c2 = undefined
-
--- --takes a first and a second skip and returns, if it is possible, a skip that
--- --results from applying one then the next. Tries to keep universals as general as
--- --possible but this is not guaranteed to find the most general universal quantifiers
--- glueSkips :: (Eq s) => Skip s -> Skip s -> Maybe (Skip s)
--- glueSkips first second = undefined

@@ -169,11 +169,11 @@ simProgram display results = do
 --TODO:: make database that stores results of machines, so that results can be compared between different runs
 main :: IO ()
 main = do
-  -- let results = Simulate.simulate 30 $ startMachine1 3
-  -- simProgram dispTape results
+  let results = Simulate.simulate 1000 $ startMachine1 5
+  simProgram dispTape results
 
-  let skipResults = simulateWithSkips 30 $ startMachine1 2
-  simProgram dispExpTape skipResults
+  -- let skipResults = simulateWithSkips 130 $ startMachine1 4
+  -- simProgram dispExpTape skipResults
 
   -- putTextLn $ showOneMachine bb2 10
   -- putTextLn $ displaySkipSimulation jumps_to_end 2
@@ -185,3 +185,7 @@ main = do
   --putTextLn $ showOneMachine bb3 100
   -- putStrLn $ force $ simpleSimulator 2 20
 
+-- num states and num machines
+-- 3 4,052
+-- 4 618,296
+-- 5 126,382,022

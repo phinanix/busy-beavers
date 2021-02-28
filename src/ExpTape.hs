@@ -14,6 +14,13 @@ instance (NFData c) => NFData (Location c)
 
 $(makePrisms ''Location)
 
+canonicalizeLoc :: Location Count -> Location Count
+canonicalizeLoc (Side ((\c -> (c == finiteCount 1)) -> True) _) = One 
+canonicalizeLoc l = l 
+
+makeLoc :: Count -> Dir -> Location Count 
+makeLoc ((\c -> (c == finiteCount 1)) -> True) _ = One 
+makeLoc c d = Side c d 
 
 data ExpTape s c = ExpTape
   { left :: [(s, c)]

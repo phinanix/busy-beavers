@@ -1,0 +1,215 @@
+n = 3 limit 30 
+checked: 4052 machines.
+1232 machines halted
+the most steps was Just 21, performed by
+0 False | 1 True R
+0 True | Halt
+1 False | 1 True L
+1 True | 2 False R
+2 False | 2 True L
+2 True | 0 True L
+final tape: Just "1>1<1 1 1 1"
+the most ones was Just 6, performed by
+0 False | 1 True R
+0 True | Halt
+1 False | 2 False R
+1 True | 1 True R
+2 False | 2 True L
+2 True | 0 True L
+final tape:Just "1>1<1 1 1 1"
+2789 machines were proven to run forever
+0 by lack of halt-reachability
+180 by cycling
+1273 by running off the tape in a cycle
+1336 by backwards search
+0 by a skip to infinity
+
+31 machines were not proven to halt, including:
+after: 31 steps,
+0 False | 1 True R
+1 False | 2 False L
+1 True | 0 False R
+2 False | 0 False R
+2 True | 1 True L
+
+was not shown to halt or run forever
+final state: phase: 0 tape: 1 0 1 0>0<1
+
+after: 31 steps,
+0 False | 1 True R
+1 False | 2 False L
+1 True | 1 False R
+2 False | 2 True L
+2 True | 0 True L
+
+was not shown to halt or run forever
+final state: phase: 2 tape: 1 0 0>0<1
+
+after: 31 steps,
+0 False | 1 True R
+0 True | 2 False L
+1 False | 2 False L
+1 True | 0 True R
+2 True | 0 True L
+
+was not shown to halt or run forever
+final state: phase: 2 tape: 1 1 1 1>1<0 1
+
+
+Would you like to run a machine listed above?
+ If so, enter it's index, else hit enter to exit
+
+
+--------------------------------------------------------------------------------------------------------
+
+n = 4 limit 130 
+checked: 618296 machines.
+180361 machines halted
+the most steps was Just 107, performed by
+0 False | 1 True R
+0 True | 1 True L
+1 False | 0 True L
+1 True | 2 False L
+2 False | Halt
+2 True | 3 True L
+3 False | 3 True R
+3 True | 0 False R
+final tape: Just "1 1 1 1 1 1 1 1 1 1 1 1>0<1"
+the most ones was Just 13, performed by
+0 False | 1 True R
+0 True | 2 False R
+1 False | 0 True L
+1 True | 0 True R
+2 False | Halt
+2 True | 3 True R
+3 False | 3 True L
+3 True | 1 False L
+final tape:Just "1 1 1 1 1 1 1 1 1 1 1 1>0<1"
+431286 machines were proven to run forever
+0 by lack of halt-reachability
+28441 by cycling
+203377 by running off the tape in a cycle
+199468 by backwards search
+0 by a skip to infinity
+
+6649 machines were not proven to halt, including:
+after: 131 steps,
+0 False | 1 True R
+0 True | 2 False L
+1 False | 2 False L
+1 True | 0 False R
+2 False | 0 True L
+2 True | 3 False L
+3 False | 0 True L
+
+was not shown to halt or run forever
+final state: phase: 2 tape: 1 0 1 0 1 0 1 0 1 0 1>0<0 1
+
+after: 131 steps,
+0 False | 1 True R
+0 True | 0 True R
+1 False | 2 False L
+1 True | 0 False R
+2 True | 3 False L
+3 False | 0 True L
+3 True | 2 True L
+
+was not shown to halt or run forever
+final state: phase: 1 tape: 1 0 1 0 1>1<0 1
+
+after: 131 steps,
+0 False | 1 True R
+0 True | 0 True L
+1 False | 2 False L
+1 True | 0 False R
+2 True | 3 False L
+3 False | 0 True L
+
+was not shown to halt or run forever
+final state: phase: 0 tape: 1 1 1 1 1>1<1 1
+
+
+Would you like to run a machine listed above?
+ If so, enter it's index, else hit enter to exit:
+
+--------------------------------------------------------------------------------------------------------------
+
+n = 5 limit 1000 
+checked: 126382022 machines.
+34250383 machines halted
+the most steps was Just 1001, performed by
+0 False | 1 True R
+0 True | 4 False R
+1 False | 2 True R
+1 True | 1 True R
+2 False | 3 True L
+2 True | 0 False R
+3 False | 1 True L
+3 True | 3 True L
+4 False | Halt
+4 True | 0 False L
+final tape: Just ">0<1 1 0 1 1 1 1 1 0 1 1 1 1 1 0 1 1 1 1 1 0 1 1 1 1 1 0 1 1 1 1 1 0 1 1 1 1 1 1 1 1 1 1 0 1 1 1 1 1 0 1 1 1 1 1"
+the most ones was Just 47, performed by
+0 False | 1 True R
+0 True | 4 False L
+1 False | 2 True L
+1 True | 0 False R
+2 False | Halt
+2 True | 3 True L
+3 False | 4 True L
+3 True | 1 False L
+4 False | 0 True L
+4 True | 0 False L
+final tape:Just ">0<1 1 0 1 1 1 1 1 0 1 1 1 1 1 0 1 1 1 1 1 0 1 1 1 1 1 0 1 1 1 1 1 0 1 1 1 1 1 1 1 1 1 1 0 1 1 1 1 1 0 1 1 1 1 1"
+90358538 machines were proven to run forever
+0 by lack of halt-reachability
+5950933 by cycling
+42830056 by running off the tape in a cycle
+41577549 by backwards search
+0 by a skip to infinity
+
+1773101 machines were not proven to halt, including:
+after: 1001 steps,
+0 False | 1 True R
+1 False | 2 False L
+1 True | 0 False R
+2 False | 3 True L
+2 True | 3 False L
+3 False | 4 False L
+4 False | 0 True L
+4 True | 1 False R
+
+was not shown to halt or run forever
+final state: phase: 2 tape: 1 0>0<0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1
+
+after: 1001 steps,
+0 False | 1 True R
+1 False | 2 False L
+1 True | 0 False R
+2 False | 3 True L
+2 True | 3 False L
+3 False | 4 False L
+3 True | 2 False L
+4 False | 0 True L
+4 True | 0 True R
+
+was not shown to halt or run forever
+final state: phase: 1 tape: 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 1>0<
+
+after: 1001 steps,
+0 False | 1 True R
+0 True | 2 True R
+1 False | 2 False L
+1 True | 0 False L
+2 False | 0 False R
+2 True | 3 False L
+3 False | 4 False L
+4 False | 0 True L
+4 True | 3 True L
+
+was not shown to halt or run forever
+final state: phase: 4 tape: 1 0 1 0>1<0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1
+
+
+Would you like to run a machine listed above?
+ If so, enter it's index, else hit enter to exit:(base)
