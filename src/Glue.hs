@@ -126,7 +126,7 @@ glueEndToBeginning (EndSide p R ls) (Config q ls' (s', loc') rs') = guard (p == 
 --possible but this is not guaranteed to find the most general universal quantifiers
 glueSkips :: (Eq s) => Skip s -> Skip s -> Maybe (Skip s)
 glueSkips (Skip startConfig middleSkipEnd c b) (Skip middleConfig endSkipEnd c' b') = do 
-  guard b 
+  guard (not b) 
   leftovers <- glueEndToBeginning middleSkipEnd middleConfig 
   let (startTails, endTails) = leftoverTails leftovers
   pure $ Skip (applyTailsConfig startTails startConfig) (applyTailsSkipEnd endTails endSkipEnd) (c <> c') b'

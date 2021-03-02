@@ -2,6 +2,7 @@ module Count where
 
 import Turing (Bit, dispBit)
 import Relude hiding (filter)
+import qualified Text.Show 
 import qualified Relude.Unsafe as Unsafe (head)
 import Control.Lens
 import qualified Data.Map as M (assocs)
@@ -65,8 +66,12 @@ data Count = Count
   { num :: Natural
   , symbols :: MMap SymbolVar (Sum Natural)
   , bound :: MMap BoundVar (Sum Natural)
-  } deriving (Eq, Show, Generic)
+  } deriving (Eq, Generic)
 instance NFData Count
+
+instance Show Count where 
+  show (Count num symbols bound) = "Count " <> show num <> " (fromList " <> show (toList symbols)
+    <> ") (fromList " <> show (toList bound) <> ")"
 
 pattern ZeroVar :: Natural -> MMap SymbolVar (Sum Natural) -> Count 
 pattern ZeroVar n as = Count n as Empty

@@ -3,13 +3,17 @@ module Turing where
 import Relude
 import Relude.Unsafe as Unsafe (init, last)
 import Relude.Extra.Bifunctor
+import qualified Text.Show
 import Control.Lens hiding ((<|))
 import Control.Lens.Extras
 import Data.List.NonEmpty ((<|))
 
 
 --the Phase a turing machine is in, to not conflict with State
-newtype Phase = Phase { unPhase :: Int} deriving (Eq, Ord, Show, Generic)
+newtype Phase = Phase { unPhase :: Int} deriving (Eq, Ord, Generic)
+instance Show Phase where 
+  show (Phase i) = "Phase " <> (show i)
+
 data Dir = L | R deriving (Eq, Ord, Show, Generic)
 type Bit = Bool
 type Edge = (Phase, Bit)
