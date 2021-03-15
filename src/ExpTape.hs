@@ -80,23 +80,23 @@ invariantifyList ((s, c) : (t, d) : xs) | s == t = invariantifyList ((s, c <> d)
 invariantifyList (x : xs) = x : invariantifyList xs
 invariantifyList [] =  []
 
-glomPointLeft :: (Eq s) => ExpTape s InfCount -> ExpTape s InfCount
+glomPointLeft :: (Eq s, Countable c) => ExpTape s c -> ExpTape s c
 glomPointLeft (ExpTape ((s_l, c_l):ls) (s_p, One) rs) | s_l == s_p =
-  ExpTape ls (s_p, Side (NotInfinity (finiteCount 1) <> c_l) R) rs
+  ExpTape ls (s_p, Side (unit <> c_l) R) rs
 --note: suppose you're at the left of two ones and to your
 --left is two more ones. you can't glom at all, that's why the Side has to be R
 glomPointLeft (ExpTape ((s_l, c_l):ls) (s_p, Side c_p R) rs) | s_l == s_p =
   ExpTape ls (s_p, Side (c_p <> c_l) R) rs
 glomPointLeft e = e
 
-glomPointRight :: (Eq s) => ExpTape s InfCount -> ExpTape s InfCount
+glomPointRight :: (Eq s, Countable c) => ExpTape s c -> ExpTape s c
 glomPointRight (ExpTape ls (s_p, One) ((s_r, c_r):rs)) | s_p == s_r =
-  ExpTape ls (s_p, Side (NotInfinity (finiteCount 1) <> c_r) L) rs
+  ExpTape ls (s_p, Side (unit <> c_r) L) rs
 glomPointRight (ExpTape ls (s_p, Side c_p L) ((s_r, c_r):rs)) | s_p == s_r =
   ExpTape ls (s_p, Side (c_p <> c_r) L) rs
 glomPointRight e = e
 
-glomPoint :: (Eq s) => ExpTape s InfCount -> ExpTape s InfCount
+glomPoint :: (Eq s, Countable c) => ExpTape s c -> ExpTape s c
 glomPoint = glomPointLeft . glomPointRight
 
 dispBitCount :: (Bit, InfCount) -> Text

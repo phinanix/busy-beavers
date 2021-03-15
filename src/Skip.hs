@@ -62,6 +62,17 @@ getSkipEndPhase :: SkipEnd s -> Phase
 getSkipEndPhase (EndSide p _ _) = p
 getSkipEndPhase (EndMiddle (Config p _ _ _)) = p
 
+--TODO: this code is not pretty but it works
+configToET :: Config s -> (Phase, ExpTape s Count)
+configToET (Config p ls point rs) = (p, ExpTape ls point rs)
+
+etToConfig :: (Phase, ExpTape s Count) -> Config s
+etToConfig (p, ExpTape ls point rs) = Config p ls point rs 
+
+glomPointConfig :: (Eq s) => Config s -> Config s
+glomPointConfig = etToConfig . fmap glomPointRight . fmap glomPointLeft . configToET
+--   configToET & fmap glomPointLeft & fmap glomPointRight & etToConfig
+
 matchBits :: (Eq s) => s -> s -> Equations s ()
 matchBits b c = maybeES $ guard (b == c)
 

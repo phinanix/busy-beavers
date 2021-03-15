@@ -47,18 +47,10 @@ dispBoundVar (BoundVar i, Sum count) = show count <> "*x_" <> show i <> " "
 dispTapeVar :: TapeVar -> Text
 dispTapeVar (TapeVar i) = "t_" <> show i <> " "
 
-{- data VarOr s = Var TapeVar | NotVar s deriving (Eq, Ord, Show, Generic)
-instance NFData s => NFData (VarOr s)
-$(makePrisms ''VarOr)
- -}
--- dispVarOrBit :: VarOr Bit -> Text
--- dispVarOrBit (Var v) = dispTapeVar v
--- dispVarOrBit (NotVar b) = dispBit b
-
--- --returns () because if the match fails, the ES will just fail the whole computation
--- matchTapeVar :: (Eq s) => VarOr s -> s -> Equations s ()
--- matchTapeVar (Var v) s = addTapeVar (v, s) $ pure ()
--- matchTapeVar (NotVar t) s = maybeES $ guard (t == s)
+-- a class that currently generalizes over Count and InfCount, which both have counts that are the "unit"
+-- not sure there are any laws here other than that when your location is One your count is the unit
+class (Monoid c) => Countable c where 
+  unit :: c 
 
 --a finite number, plus some number of symbols multiplied by a given natural (which must be positive)
 --and some number of bound variables also multiplied by a given natural which also must be positive
@@ -72,6 +64,9 @@ instance NFData Count
 instance Show Count where 
   show (Count num symbols bound) = "Count " <> show num <> " (fromList " <> show (toList symbols)
     <> ") (fromList " <> show (toList bound) <> ")"
+
+instance Countable Count where 
+  unit = finiteCount 1
 
 pattern ZeroVar :: Natural -> MMap SymbolVar (Sum Natural) -> Count 
 pattern ZeroVar n as = Count n as Empty
@@ -114,6 +109,9 @@ dispCount (Count n symbols bound)
 --infinity comes second so it's bigger than NotInfinity
 data InfCount = NotInfinity Count | Infinity deriving (Eq, Ord, Show, Generic)
 instance NFData InfCount
+
+instance Countable InfCount where 
+  unit = NotInfinity unit
 
 dispInfCount :: InfCount -> Text
 dispInfCount Infinity = "inf"

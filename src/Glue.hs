@@ -17,15 +17,12 @@ import Turing
 
 {-
 Things to do: 
- - change from using tapevars to using "at the end of the skip it boops left or right"
- - write applyskip given this 
- - test / use glueing stuff to write
  --- skips that skip infinitely detector
  --- glue two skips together plan
  - heuristics for things around gluing making induction hypotheses 
  - i n d u c t i o n   m a c h i n e
- 
 -}
+
 divStatics :: Natural -> Natural -> MMap k (Sum Natural) -> Maybe (Natural, MMap k (Sum Natural)) 
 divStatics d n m = (,) <$> (n `maybeDiv` d) <*> (m `divMap` d) 
 
@@ -50,9 +47,12 @@ glueCounts c d = case likeTerms c d of
 --returns the part of the longer list that is not matched up via zip, 
 --ie returns the longer list with the first (length shortlist) elements dropped 
 remainingLonger :: [a] -> [b] -> Either [a] [b]
-remainingLonger xs ys = if (length xs < length ys) then Right (drop (length xs) ys) else Left (drop (length ys) xs)
+remainingLonger xs ys = if (length xs < length ys) 
+  then Right (drop (length xs) ys) 
+  else Left (drop (length ys) xs)
 
---takes two lists, fails if they are incompatible, else returns a Left if some of the first list was leftover, or a Right if 
+--takes two lists, fails if they are incompatible, else returns a Left if some 
+--of the first list was leftover, or a Right if 
 --some of the second list was leftover 
 glueTapeHalves :: forall s. (Eq s) => [(s, Count)] -> [(s, Count)] -> Maybe (Leftover s)
 glueTapeHalves xs ys = matched >> pure answer where
@@ -61,33 +61,42 @@ glueTapeHalves xs ys = matched >> pure answer where
   matchOne ((s, c), (t, d)) = glueCounts c d >> guard (s == t) 
   matched :: Maybe ()
   matched = traverse_ matchOne zipped 
+  --if the start one is longer, it means we need to add to the *end*
+  --if the end one is longer, we need to add to the start
   answer :: Leftover s
   answer = case remainingLonger xs ys of 
-    Left xs -> Start xs 
-    Right ys -> End ys
+    Left xs -> End xs 
+    Right ys -> Start ys
 
 --things you add to the left and right of a Config or SkipEnd
-data Tails s = Tails [(s, Count)] [(s, Count)]
+data Tails s = Tails [(s, Count)] [(s, Count)] deriving (Eq, Ord, Show)
 
---Left if you add the list to the start of the skip, Right if you add it to the end of the skip
-data Leftover s = Start [(s, Count)] | End [(s, Count)]
+--whether you add the list to the start of the skip or you add it to the end of the skip
+data Leftover s = Start [(s, Count)] | End [(s, Count)] deriving (Eq, Ord, Show)
 
 leftoverTails :: (Leftover s, Leftover s) -> (Tails s, Tails s) 
-leftoverTails (ls, rs) = (Tails (getStart ls) (getStart rs), Tails (getEnd ls) (getEnd rs)) where
-  getStart (Start xs) = xs 
-  getStart (End _) = [] 
-  getEnd (Start _) = [] 
-  getEnd (End xs) = xs 
+leftoverTails (ls, rs) 
+  = (Tails (getStart ls) (getStart rs), Tails (getEnd ls) (getEnd rs)) 
+    where
+      getStart (Start xs) = xs 
+      getStart (End _) = [] 
+      getEnd (Start _) = [] 
+      getEnd (End xs) = xs 
 
-applyTailsConfig :: Tails s -> Config s -> Config s
-applyTailsConfig (Tails lTail rTail) (Config p ls point rs) = Config p (ls <> lTail) point (rs <> rTail)
+applyTailsConfig :: (Eq s) => Tails s -> Config s -> Config s
+applyTailsConfig (Tails lTail rTail) (Config p ls point rs) 
+  = glomPointConfig $ Config p (ls `etApp` lTail) point (rs `etApp` rTail)
 
-applyTailsSkipEnd :: Tails s -> SkipEnd s -> SkipEnd s 
+applyTailsSkipEnd :: (Eq s) => Tails s -> SkipEnd s -> SkipEnd s 
 applyTailsSkipEnd tails (EndMiddle c) = EndMiddle (applyTailsConfig tails c)
-applyTailsSkipEnd (Tails [] rTail) (EndSide p L rs) = EndSide p L (rs <> rTail) 
-applyTailsSkipEnd (Tails ((s, c) : lTail) rTail) (EndSide p L rs) = EndMiddle (Config p lTail (s, makeLoc c R) (rs <> rTail))
-applyTailsSkipEnd (Tails lTail []) (EndSide p R ls) = EndSide p R (ls <> lTail) 
-applyTailsSkipEnd (Tails lTail ((s, c) : rTail)) (EndSide p R ls) = EndMiddle (Config p (ls <> lTail) (s, makeLoc c L) rTail)
+
+applyTailsSkipEnd (Tails [] rTail) (EndSide p L rs) = EndSide p L (rs `etApp` rTail) 
+applyTailsSkipEnd (Tails ((s, c) : lTail) rTail) (EndSide p L rs) 
+  = EndMiddle (Config p lTail (s, makeLoc c R) (rs `etApp` rTail))
+
+applyTailsSkipEnd (Tails lTail []) (EndSide p R ls) = EndSide p R (ls `etApp` lTail) 
+applyTailsSkipEnd (Tails lTail ((s, c) : rTail)) (EndSide p R ls)
+  = EndMiddle (Config p (ls `etApp` lTail) (s, makeLoc c L) rTail)
 
 nothingLeft :: Leftover s
 nothingLeft = Start []
@@ -124,10 +133,13 @@ glueEndToBeginning (EndSide p R ls) (Config q ls' (s', loc') rs') = guard (p == 
 --takes a first and a second skip and returns, if it is possible, a skip that
 --results from applying one then the next. Tries to keep universals as general as
 --possible but this is not guaranteed to find the most general universal quantifiers
-glueSkips :: (Eq s) => Skip s -> Skip s -> Maybe (Skip s)
+glueSkips :: (Eq s, Show s) => Skip s -> Skip s -> Maybe (Skip s)
 glueSkips (Skip startConfig middleSkipEnd c b) (Skip middleConfig endSkipEnd c' b') = do 
   guard (not b) 
   leftovers <- glueEndToBeginning middleSkipEnd middleConfig 
   let (startTails, endTails) = leftoverTails leftovers
-  pure $ Skip (applyTailsConfig startTails startConfig) (applyTailsSkipEnd endTails endSkipEnd) (c <> c') b'
+  pure $ Skip (applyTailsConfig startTails startConfig) 
+              (applyTailsSkipEnd endTails endSkipEnd) 
+              (c <> c') 
+              b'
 
