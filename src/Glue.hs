@@ -97,10 +97,10 @@ applyTailsSkipEnd (Tails ((s, c) : lTail) rTail) (EndSide p L rs)
 applyTailsSkipEnd (Tails lTail []) (EndSide p R ls) = EndSide p R (ls `etApp` lTail) 
 applyTailsSkipEnd (Tails lTail ((s, c) : rTail)) (EndSide p R ls)
   = EndMiddle (Config p (ls `etApp` lTail) (s, makeLoc c L) rTail)
-
+{- 
 nothingLeft :: Leftover s
 nothingLeft = Start []
-
+ -}
 select :: Dir -> (a, a) -> a 
 select d (l, r) = case d of 
   L -> l 
