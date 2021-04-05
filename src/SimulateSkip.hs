@@ -244,9 +244,9 @@ simulateByGluing limit startMachine
          newBook = case prevSkip of 
            Nothing -> book 
            Just realPrevSkip -> case glueSkips realPrevSkip skip of 
-            Nothing -> error $ "used two skips in a row but couldn't glue:\n" 
-              <> dispSkip realPrevSkip <> "\nsecond skip\n" <> dispSkip skip
-            Just gluedSkip -> addSkipToBook gluedSkip book 
+            Left err -> error $ "used two skips in a row but couldn't glue:\n" 
+              <> "reason: " <> err <> "\n" <> dispSkip realPrevSkip <> "\nsecond skip\n" <> dispSkip skip
+            Right gluedSkip -> addSkipToBook gluedSkip book 
 
   recurse [] result = result
   recurse (x : xs) result = loop x xs result

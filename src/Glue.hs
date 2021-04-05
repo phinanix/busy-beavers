@@ -26,23 +26,26 @@ Things to do:
 divStatics :: Natural -> Natural -> MMap k (Sum Natural) -> Maybe (Natural, MMap k (Sum Natural)) 
 divStatics d n m = (,) <$> (n `maybeDiv` d) <*> (m `divMap` d) 
 
+
 --given two counts, either produces the most general count that encompasses both of them or fails 
 --probably this should be an Equations and that monad should be upgraded to have a spawn new var field
-glueCounts :: Count -> Count -> Maybe Count 
+glueCounts :: Count -> Count -> Either Text Count 
 glueCounts c d = case likeTerms c d of 
   --this is the two zerovar case, in which case all terms must be alike 
   (likes, Empty, Empty) -> pure likes
   --if one side has a var, it unifies if the other side's leftovers are divisible by that coefficient
-  (_likes, OneVar 0 Empty k _x, ZeroVar m bs) -> divStatics k m bs >> pure d
+  (_likes, OneVar 0 Empty k _x, ZeroVar m bs) -> 
+    maybe (Left "one/zero var failed to divide") Right $ divStatics k m bs >> pure d
   --pops to the above case
   (_likes, ZeroVar _ _, OneVar _ _ _ _) -> glueCounts d c
   --both sides leftovers must be divisible by the other var, in which case you add together the 
   --leftovers and make a new var that is the LCM of the two coefficents
   --TODO :: this function currently doesn't know how to create a new var
-  (likes, OneVar n as k x, OneVar m bs j y) -> divStatics k m bs >> divStatics j n as >> 
-    (pure $ likes <> ZeroVar n as <> ZeroVar m bs <> OneVar 0 Empty (lcm j k) undefined)
+  (likes, OneVar n as k x, OneVar m bs j y) -> maybe (Left "one/one failed to divide") Right $ 
+    divStatics k m bs >> divStatics j n as >> 
+    pure (likes <> ZeroVar n as <> ZeroVar m bs <> OneVar 0 Empty (lcm j k) undefined)
   -- TODO :: emit a warning here?
-  _ -> Nothing 
+  _ -> Left "one side had more than one var" 
 
 --returns the part of the longer list that is not matched up via zip, 
 --ie returns the longer list with the first (length shortlist) elements dropped 
@@ -54,12 +57,14 @@ remainingLonger xs ys = if (length xs < length ys)
 --takes two lists, fails if they are incompatible, else returns a Left if some 
 --of the first list was leftover, or a Right if 
 --some of the second list was leftover 
-glueTapeHalves :: forall s. (Eq s) => [(s, Count)] -> [(s, Count)] -> Maybe (Leftover s)
+glueTapeHalves :: forall s. (Eq s) => [(s, Count)] -> [(s, Count)] -> Either Text (Leftover s)
 glueTapeHalves xs ys = matched >> pure answer where
   zipped = (zip xs ys) --discards longer 
-  matchOne :: ((s, Count), (s, Count)) -> Maybe ()
-  matchOne ((s, c), (t, d)) = glueCounts c d >> guard (s == t) 
-  matched :: Maybe ()
+  matchOne :: ((s, Count), (s, Count)) -> Either Text ()
+  matchOne ((s, c), (t, d)) = do 
+    glueCounts c d 
+    if s == t then pure () else Left "matched tapes with different bits"
+  matched :: Either Text ()
   matched = traverse_ matchOne zipped 
   --if the start one is longer, it means we need to add to the *end*
   --if the end one is longer, we need to add to the start
@@ -107,35 +112,45 @@ select d (l, r) = case d of
   R -> r 
 
 --the leftovers on the left and right sides respectively
-glueEndToBeginning :: (Eq s) => (SkipEnd s) -> Config s -> Maybe (Leftover s, Leftover s)
-glueEndToBeginning (EndMiddle (Config p ls (s, loc) rs)) (Config q ls' (s', loc') rs') 
-  = guard (p == q) >> guard (s == s') >> case (loc, loc') of 
+glueEndToBeginning :: (Eq s) => (SkipEnd s) -> Config s -> Either Text (Leftover s, Leftover s)
+glueEndToBeginning (EndMiddle (Config p ls (s, loc) rs)) (Config q ls' (s', loc') rs') = do 
+  if p == q then Right () else Left "phases were different"
+  if s == s' then Right () else Left "points were different"
+  case (loc, loc') of 
     (One, One) -> glueRest
-    (Side c d, Side c' d') -> guard (d == d') >> glueCounts c c' >> glueRest
-    (_, _) -> Nothing
+    (Side c d, Side c' d') -> do
+      if d == d' then Right () else Left ""
+      glueCounts c c'
+      glueRest
+    -- TODO: I think it's ok if locations of end and beginning are different
+    (_, _) -> Left "locations of end and beginning were different"
     where 
       glueRest = (,) <$> glueTapeHalves ls ls' <*> glueTapeHalves rs rs'
-glueEndToBeginning (EndSide p L rs) (Config q ls' (s', loc') rs') = guard (p == q) >> case loc' of 
-  One -> (,) <$> pure (Start ((s', finiteCount 1) : ls')) <*> glueTapeHalves rs rs'
-  Side c L -> do 
-    c' <- subNatFromCount c 1 
-    (,) <$> pure (Start ((s', finiteCount 1) : ls')) <*> glueTapeHalves rs ((s', c') : rs')
-  Side c R -> (,) <$> pure (Start ((s', c) : ls')) <*> glueTapeHalves rs rs'
-glueEndToBeginning (EndSide p R ls) (Config q ls' (s', loc') rs') = guard (p == q) >> case loc' of 
-  One -> (,) <$> glueTapeHalves ls ls' <*> pure (Start ((s', finiteCount 1) : rs'))
-  Side c R -> do 
-    c' <- subNatFromCount c 1 
-    (,) <$> glueTapeHalves ls ((s', c') : ls') <*> pure (Start ((s', finiteCount 1) : rs'))
-  Side c L -> (,) <$> glueTapeHalves ls ls' <*> pure (Start ((s', c) : rs'))
+glueEndToBeginning (EndSide p L rs) (Config q ls' (s', loc') rs') = do 
+  if p == q then Right () else Left "phases were different"
+  case loc' of 
+    One -> (,) <$> pure (Start ((s', finiteCount 1) : ls')) <*> glueTapeHalves rs rs'
+    Side c L -> do 
+      c' <- maybe (Left "subnat side L") Right $ subNatFromCount c 1 
+      (,) <$> pure (Start ((s', finiteCount 1) : ls')) <*> glueTapeHalves rs ((s', c') : rs')
+    Side c R -> (,) <$> pure (Start ((s', c) : ls')) <*> glueTapeHalves rs rs'
+glueEndToBeginning (EndSide p R ls) (Config q ls' (s', loc') rs') = do
+  if p == q then Right () else Left "phases were different" 
+  case loc' of 
+    One -> (,) <$> glueTapeHalves ls ls' <*> pure (Start ((s', finiteCount 1) : rs'))
+    Side c R -> do 
+      c' <- maybe (Left "subnat side R") Right $ subNatFromCount c 1 
+      (,) <$> glueTapeHalves ls ((s', c') : ls') <*> pure (Start ((s', finiteCount 1) : rs'))
+    Side c L -> (,) <$> glueTapeHalves ls ls' <*> pure (Start ((s', c) : rs'))
 
 
 
 --takes a first and a second skip and returns, if it is possible, a skip that
 --results from applying one then the next. Tries to keep universals as general as
 --possible but this is not guaranteed to find the most general universal quantifiers
-glueSkips :: (Eq s, Show s) => Skip s -> Skip s -> Maybe (Skip s)
+glueSkips :: (Eq s, Show s) => Skip s -> Skip s -> Either Text (Skip s)
 glueSkips (Skip startConfig middleSkipEnd c b) (Skip middleConfig endSkipEnd c' b') = do 
-  guard (not b) 
+  if not b then Right () else Left "first skip halted"
   leftovers <- glueEndToBeginning middleSkipEnd middleConfig 
   let (startTails, endTails) = leftoverTails leftovers
   pure $ Skip (applyTailsConfig startTails startConfig) 
