@@ -14,7 +14,7 @@ import ExpTape
 data Config s = Config
   { _cstate :: Phase
   , _ls :: [(s, Count)]
-  , _c_point :: (s, Location Count)
+  , _c_point :: s
   , _rs :: [(s, Count)]
   } deriving (Eq, Ord, Show, Generic)
 instance (NFData s) => NFData (Config s)
@@ -35,23 +35,15 @@ instance (NFData s) => NFData (Skip s)
 $(makeLenses ''Config)
 $(makeLenses ''Skip)
 
-dispBitAndCount :: (Bit, Count) -> Text
-dispBitAndCount (b, count) = "(" <> dispBit b <> ", " <> dispCount count <> ") "
-
-dispBitAndLocCount :: (Bit, Location Count) -> Text
-dispBitAndLocCount (b, Side count L) = "|>" <> dispBitAndCount (b, count)
-dispBitAndLocCount (b, Side count R) = dispBitAndCount (b, count) <> "<|"
-dispBitAndLocCount (b, One) = dispBitAndCount (b, finiteCount 1) <> "<|"
-
 dispConfig :: Config Bit -> Text
 dispConfig (Config p ls point rs) = "phase: " <> dispPhase p <> "  "
-  <> (mconcat $ dispBitAndCount <$> reverse ls)
-  <> dispBitAndLocCount point
-  <> (mconcat $ dispBitAndCount <$> rs)
+  <> (mconcat $ dispBitCount <$> reverse ls)
+  <> dispPoint point
+  <> (mconcat $ dispBitCount <$> rs)
 
 dispSkipEnd :: SkipEnd Bit -> Text 
-dispSkipEnd (EndSide p L ls) =  "phase: " <> dispPhase p <> "  <|" <> (mconcat $ dispBitAndCount <$> ls)
-dispSkipEnd (EndSide p R ls) =  "phase: " <> dispPhase p <> " " <> (mconcat $ dispBitAndCount <$> ls) <> "|>"
+dispSkipEnd (EndSide p L ls) =  "phase: " <> dispPhase p <> "  <|" <> (mconcat $ dispBitCount <$> ls)
+dispSkipEnd (EndSide p R ls) =  "phase: " <> dispPhase p <> " " <> (mconcat $ dispBitCount <$> ls) <> "|>"
 dispSkipEnd (EndMiddle c) = dispConfig c 
 
 dispSkip :: Skip Bit -> Text
@@ -62,15 +54,15 @@ getSkipEndPhase :: SkipEnd s -> Phase
 getSkipEndPhase (EndSide p _ _) = p
 getSkipEndPhase (EndMiddle (Config p _ _ _)) = p
 
---TODO: this code is not pretty but it works
-configToET :: Config s -> (Phase, ExpTape s Count)
-configToET (Config p ls point rs) = (p, ExpTape ls point rs)
+-- --TODO: this code is not pretty but it works
+-- configToET :: Config s -> (Phase, ExpTape s Count)
+-- configToET (Config p ls point rs) = (p, ExpTape ls point rs)
 
-etToConfig :: (Phase, ExpTape s Count) -> Config s
-etToConfig (p, ExpTape ls point rs) = Config p ls point rs 
+-- etToConfig :: (Phase, ExpTape s Count) -> Config s
+-- etToConfig (p, ExpTape ls point rs) = Config p ls point rs 
 
-glomPointConfig :: (Eq s) => Config s -> Config s
-glomPointConfig = etToConfig . fmap glomPointRight . fmap glomPointLeft . configToET
+-- glomPointConfig :: (Eq s) => Config s -> Config s
+-- glomPointConfig = etToConfig . fmap glomPointRight . fmap glomPointLeft . configToET
 --   configToET & fmap glomPointLeft & fmap glomPointRight & etToConfig
 
 matchBits :: (Eq s) => s -> s -> Equations s ()
@@ -146,42 +138,41 @@ getTapeRemain (SkipLeft _) = Nothing
 
 --if you match two points, either they match perfectly, or some symbols of some count
 --remain on one side
-data PointMatch s = PerfectP | Lremains (s, InfCount) | Rremains (s, InfCount) deriving (Eq, Ord, Show, Generic)
+-- data PointMatch s = PerfectP | Lremains (s, InfCount) | Rremains (s, InfCount) deriving (Eq, Ord, Show, Generic)
 
-matchPoints :: (Eq s) => (s, Location Count) -> (s, Location InfCount) -> Equations s (PointMatch s)
---if there is one of each symbol then they just match
-matchPoints (skipS, One) (tapeS, One) = matchBits skipS tapeS $> PerfectP
---if there is a single symbol in the skip, then the skip applies regardless of the tapeD
---and the rest of the matching is the same
-matchPoints (skipS, One) (tapeS, Side tapeC tapeD) = matchBits skipS tapeS
-  >> matchInfsAndReturn (finiteCount 1) tapeS tapeC tapeD
-matchPoints (_skipS, Side skipC _skipD) (_tapeS, One) = if skipC == finiteCount 1
-  then error "Side may not contain a count of exactly 1"
-  else nothingES
-matchPoints (skipS, Side skipC skipD) (tapeS, Side tapeC tapeD)
-  | skipD == tapeD = do
-      matchBits skipS tapeS
-      matchInfsAndReturn skipC tapeS tapeC tapeD
-matchPoints _ _ = nothingES
---strictly a helper function for the above
-matchInfsAndReturn :: (Eq s) => Count -> s -> InfCount -> Dir -> Equations s (PointMatch s)
-matchInfsAndReturn skipC tapeS tapeC tapeD = matchInfCount skipC tapeC >>= \case
-      Empty -> pure PerfectP
-      --if some of the tape's point is not matched, then it remains on the tape
-      --if we start matching from the right, the unmatched point is on the left
-      remainC -> case mirrorDir tapeD of
-        L -> pure $ Lremains (tapeS, remainC)
-        R -> pure $ Rremains (tapeS, remainC)
+-- matchPoints :: (Eq s) => (s, Location Count) -> (s, Location InfCount) -> Equations s (PointMatch s)
+-- --if there is one of each symbol then they just match
+-- matchPoints (skipS, One) (tapeS, One) = matchBits skipS tapeS $> PerfectP
+-- --if there is a single symbol in the skip, then the skip applies regardless of the tapeD
+-- --and the rest of the matching is the same
+-- matchPoints (skipS, One) (tapeS, Side tapeC tapeD) = matchBits skipS tapeS
+--   >> matchInfsAndReturn (finiteCount 1) tapeS tapeC tapeD
+-- matchPoints (_skipS, Side skipC _skipD) (_tapeS, One) = if skipC == finiteCount 1
+--   then error "Side may not contain a count of exactly 1"
+--   else nothingES
+-- matchPoints (skipS, Side skipC skipD) (tapeS, Side tapeC tapeD)
+--   | skipD == tapeD = do
+--       matchBits skipS tapeS
+--       matchInfsAndReturn skipC tapeS tapeC tapeD
+-- matchPoints _ _ = nothingES
+-- --strictly a helper function for the above
+-- matchInfsAndReturn :: (Eq s) => Count -> s -> InfCount -> Dir -> Equations s (PointMatch s)
+-- matchInfsAndReturn skipC tapeS tapeC tapeD = matchInfCount skipC tapeC >>= \case
+--       Empty -> pure PerfectP
+--       --if some of the tape's point is not matched, then it remains on the tape
+--       --if we start matching from the right, the unmatched point is on the left
+--       remainC -> case mirrorDir tapeD of
+--         L -> pure $ Lremains (tapeS, remainC)
+--         R -> pure $ Rremains (tapeS, remainC)
 
 --match a config to a tape, and return the lists that remain on each side of the
 --tape after matching
 matchConfigTape :: (Eq s) => Config s -> ExpTape s InfCount
   -> Equations s ([(s, InfCount)], [(s, InfCount)])
 matchConfigTape (Config _p lsC pointC rsC) (ExpTape lsT pointT rsT)
-  = matchPoints pointC pointT >>= \case
-    Lremains remainP -> matchSides (remainP : lsT) rsT
-    Rremains remainP -> matchSides lsT (remainP : rsT)
-    PerfectP -> matchSides lsT rsT
+  = do 
+    matchBits pointC pointT 
+    matchSides lsT rsT
   where
   matchSides left right = bisequence (mapMaybe getTapeRemain $ matchTape lsC left
                                      , mapMaybe getTapeRemain $ matchTape rsC right)

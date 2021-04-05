@@ -44,7 +44,7 @@ $(makeLenses ''SkipResult)
 $(makeLenses ''SimState)
 
 initExpTape :: s -> ExpTape s InfCount
-initExpTape s = ExpTape [(s, Infinity)] (s, One) [(s, Infinity)]
+initExpTape s = ExpTape [(s, Infinity)] s [(s, Infinity)]
 
 dispSkipResult :: SkipResult Bit InfCount -> Text
 dispSkipResult (Skipped c p tape)
@@ -66,16 +66,16 @@ packageResult (Skip _ e hopCount _) (boundVs, (newLs, newRs)) = Skipped
   $ getFinalET e (newLs, newRs)
   where
     getFinalET :: SkipEnd s -> ([(s, InfCount)], [(s, InfCount)]) -> ExpTape s InfCount
-    getFinalET (EndMiddle c) (remLs, remRs) = glomPoint $ ExpTape
+    getFinalET (EndMiddle c) (remLs, remRs) = ExpTape
       (finalizeList (c^.ls) `etApp` remLs)
-      (updatePoint boundVs $ c ^. c_point)
+      (c ^. c_point)
       (finalizeList (c^.rs) `etApp` remRs)
-    getFinalET (EndSide _ L newRs) (remLs, remRs) = case getNewPoint L remLs of
+    getFinalET (EndSide _ L newRs) (remLs, remRs) = case getNewPoint remLs of
       Nothing -> error "getting new point failed, what?"
-      Just (point, remremLs) -> glomPoint $ ExpTape remremLs point (finalizeList newRs `etApp` remRs)
-    getFinalET (EndSide _ R newLs) (remLs, remRs) = case getNewPoint R remRs of
+      Just (point, remremLs) -> ExpTape remremLs point (finalizeList newRs `etApp` remRs)
+    getFinalET (EndSide _ R newLs) (remLs, remRs) = case getNewPoint remRs of
       Nothing -> error "getting new point failed, what?"
-      Just (point, remremRs) -> glomPoint $ ExpTape (finalizeList newLs `etApp` remLs) point remremRs
+      Just (point, remremRs) -> ExpTape (finalizeList newLs `etApp` remLs) point remremRs
     updateInfCount :: Map BoundVar InfCount -> InfCount -> InfCount
     updateInfCount _m Infinity = Infinity
     updateInfCount m (NotInfinity c) = updateCount m c
@@ -88,8 +88,8 @@ packageResult (Skip _ e hopCount _) (boundVs, (newLs, newRs)) = Skipped
     getVar m x = case m^.at x of
       Just c -> c
       Nothing -> error "a bound var wasn't mapped in a skip"
-    updatePoint :: Map BoundVar InfCount -> (s, Location Count) -> (s, Location InfCount)
-    updatePoint bs = (_2. _Side . _1 %~ updateCount bs)
+    -- updatePoint :: Map BoundVar InfCount -> (s, Location Count) -> (s, Location InfCount)
+    -- updatePoint bs = (_2. _Side . _1 %~ updateCount bs)
     updateList :: Map BoundVar InfCount -> [(s, InfCount)] -> [(s, InfCount)]
     updateList bs = fmap $ fmap (updateInfCount bs)
     finalizeList :: [(s, Count)] -> [(s, InfCount)]
@@ -102,7 +102,7 @@ packageResult (Skip _ e hopCount _) (boundVs, (newLs, newRs)) = Skipped
 --transition of the specified Phase, Bit, Dir
 oneStepSkip :: Edge -> Phase -> Bit -> Dir -> Skip Bit
 oneStepSkip (p, b) q c d = Skip
-  (Config p [] (b, One) [])
+  (Config p [] b [])
   (EndSide q d [(c, finiteCount 1)])
   (finiteCount 1)
   False
@@ -111,12 +111,14 @@ oneStepSkip (p, b) q c d = Skip
 --writing the given bit and dir
 infiniteSkip :: Edge -> Bit -> Dir -> Skip Bit
 infiniteSkip (p, b) c L = Skip
-  (Config p [] (b, Side (newBoundVar 0) R) [])
+  -- (Config p [] (b, Side (newBoundVar 0) R) [])
+  (Config p [(b, newBoundVar 0)] b [])
   (EndSide p L [(c, newBoundVar 0)])
   (newBoundVar 0)
   False
 infiniteSkip (p, b) c R = Skip
-  (Config p [] (b, Side (newBoundVar 0) L) [])
+  -- (Config p [] (b, Side (newBoundVar 0) L) [])
+  (Config p [] b [(b, newBoundVar 0)])
   (EndSide p R [(c, newBoundVar 0)])
   (newBoundVar 0)
   False
@@ -131,7 +133,7 @@ initTransSkip e@(p, _b) (Step q c d) | p == q = fromList
 initTransSkip e (Step q c d) = one $ oneStepSkip e q c d
 
 addSkipToBook :: (Ord s) => Skip s -> SkipBook s -> SkipBook s
-addSkipToBook skip = atE (skip^.start.cstate, skip^.start.c_point._1)
+addSkipToBook skip = atE (skip^.start.cstate, skip^.start.c_point)
   . contains skip .~ True
 
 initBook :: Turing -> SkipBook Bit
@@ -158,7 +160,7 @@ skipFarthest (_, Skipped c _ _) (_, Skipped c' _ _) = compare c c'
 --a TapeSymbol has a function (s, Location c) -> Bit called getPointBit or something
 skipStep :: Turing -> SkipBook Bit -> Phase -> ExpTape Bit InfCount
   -> PartialStepResult (ExpTape Bit InfCount)
-skipStep (Turing _ trans) book p tape@(ExpTape _ls (bit, _loc) _rs)
+skipStep (Turing _ trans) book p tape@(ExpTape _ls bit _rs)
   = case trans ^. at (p, bit) of -- **
     Nothing -> Unknown (p,bit)
     Just _ -> let

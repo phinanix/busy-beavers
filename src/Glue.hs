@@ -62,7 +62,10 @@ glueTapeHalves xs ys = matched >> pure answer where
   zipped = (zip xs ys) --discards longer 
   matchOne :: ((s, Count), (s, Count)) -> Either Text ()
   matchOne ((s, c), (t, d)) = do 
-    glueCounts c d 
+    -- TODO :: this works / makes sense as long as we never spawn any new variables, otherwise
+    --  this really needs to be returning the new list as a result, which is built out of the
+    --  thing unified from c and d 
+    _unsafeDiscarded <- glueCounts c d 
     if s == t then pure () else Left "matched tapes with different bits"
   matched :: Either Text ()
   matched = traverse_ matchOne zipped 
@@ -90,60 +93,33 @@ leftoverTails (ls, rs)
 
 applyTailsConfig :: (Eq s) => Tails s -> Config s -> Config s
 applyTailsConfig (Tails lTail rTail) (Config p ls point rs) 
-  = glomPointConfig $ Config p (ls `etApp` lTail) point (rs `etApp` rTail)
+  = Config p (ls `etApp` lTail) point (rs `etApp` rTail)
 
 applyTailsSkipEnd :: (Eq s) => Tails s -> SkipEnd s -> SkipEnd s 
 applyTailsSkipEnd tails (EndMiddle c) = EndMiddle (applyTailsConfig tails c)
-
-applyTailsSkipEnd (Tails [] rTail) (EndSide p L rs) = EndSide p L (rs `etApp` rTail) 
-applyTailsSkipEnd (Tails ((s, c) : lTail) rTail) (EndSide p L rs) 
-  = EndMiddle (Config p lTail (s, makeLoc c R) (rs `etApp` rTail))
-
-applyTailsSkipEnd (Tails lTail []) (EndSide p R ls) = EndSide p R (ls `etApp` lTail) 
-applyTailsSkipEnd (Tails lTail ((s, c) : rTail)) (EndSide p R ls)
-  = EndMiddle (Config p (ls `etApp` lTail) (s, makeLoc c L) rTail)
-{- 
-nothingLeft :: Leftover s
-nothingLeft = Start []
- -}
-select :: Dir -> (a, a) -> a 
-select d (l, r) = case d of 
-  L -> l 
-  R -> r 
+applyTailsSkipEnd (Tails lTail rTail) (EndSide p L rs) = case lTail of 
+  [] -> EndSide p L (rs `etApp` rTail) 
+  ((s, One) : remLTail) -> EndMiddle (Config p remLTail s (rs `etApp` rTail))
+  ((s, c) : remLTail) -> 
+    EndMiddle (Config p ((s, unsafeSubNatFromCount c 1) :remLTail) s (rs `etApp` rTail))
+applyTailsSkipEnd (Tails lTail rTail) (EndSide p R ls) = case rTail of 
+  [] -> EndSide p R (ls `etApp` lTail) 
+  ((s, One) : remRTail) -> EndMiddle (Config p (ls `etApp` lTail) s remRTail)
+  ((s, c) : remRTail) -> 
+    EndMiddle (Config p (ls `etApp` lTail) s ((s, unsafeSubNatFromCount c 1) : remRTail))
 
 --the leftovers on the left and right sides respectively
-glueEndToBeginning :: (Eq s) => (SkipEnd s) -> Config s -> Either Text (Leftover s, Leftover s)
-glueEndToBeginning (EndMiddle (Config p ls (s, loc) rs)) (Config q ls' (s', loc') rs') = do 
+glueEndToBeginning :: (Eq s) => SkipEnd s -> Config s -> Either Text (Leftover s, Leftover s)
+glueEndToBeginning (EndMiddle (Config p ls s rs)) (Config q ls' s' rs') = do 
   if p == q then Right () else Left "phases were different"
   if s == s' then Right () else Left "points were different"
-  case (loc, loc') of 
-    (One, One) -> glueRest
-    (Side c d, Side c' d') -> do
-      if d == d' then Right () else Left ""
-      glueCounts c c'
-      glueRest
-    -- TODO: I think it's ok if locations of end and beginning are different
-    (_, _) -> Left "locations of end and beginning were different"
-    where 
-      glueRest = (,) <$> glueTapeHalves ls ls' <*> glueTapeHalves rs rs'
-glueEndToBeginning (EndSide p L rs) (Config q ls' (s', loc') rs') = do 
+  (,) <$> glueTapeHalves ls ls' <*> glueTapeHalves rs rs'
+glueEndToBeginning (EndSide p L rs) (Config q ls' s' rs') = do 
   if p == q then Right () else Left "phases were different"
-  case loc' of 
-    One -> (,) <$> pure (Start ((s', finiteCount 1) : ls')) <*> glueTapeHalves rs rs'
-    Side c L -> do 
-      c' <- maybe (Left "subnat side L") Right $ subNatFromCount c 1 
-      (,) <$> pure (Start ((s', finiteCount 1) : ls')) <*> glueTapeHalves rs ((s', c') : rs')
-    Side c R -> (,) <$> pure (Start ((s', c) : ls')) <*> glueTapeHalves rs rs'
-glueEndToBeginning (EndSide p R ls) (Config q ls' (s', loc') rs') = do
+  (,) <$> pure (Start ((s', finiteCount 1) : ls')) <*> glueTapeHalves rs rs'
+glueEndToBeginning (EndSide p R ls) (Config q ls' s' rs') = do
   if p == q then Right () else Left "phases were different" 
-  case loc' of 
-    One -> (,) <$> glueTapeHalves ls ls' <*> pure (Start ((s', finiteCount 1) : rs'))
-    Side c R -> do 
-      c' <- maybe (Left "subnat side R") Right $ subNatFromCount c 1 
-      (,) <$> glueTapeHalves ls ((s', c') : ls') <*> pure (Start ((s', finiteCount 1) : rs'))
-    Side c L -> (,) <$> glueTapeHalves ls ls' <*> pure (Start ((s', c) : rs'))
-
-
+  (,) <$> glueTapeHalves ls ls' <*> pure (Start ((s', finiteCount 1) : rs'))
 
 --takes a first and a second skip and returns, if it is possible, a skip that
 --results from applying one then the next. Tries to keep universals as general as

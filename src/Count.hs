@@ -61,6 +61,9 @@ data Count = Count
   } deriving (Eq, Generic)
 instance NFData Count
 
+pattern One :: Count
+pattern One = Count 1 Empty Empty 
+
 instance Show Count where 
   show (Count num symbols bound) = "Count " <> show num <> " (fromList " <> show (toList symbols)
     <> ") (fromList " <> show (toList bound) <> ")"
@@ -109,6 +112,9 @@ dispCount (Count n symbols bound)
 --infinity comes second so it's bigger than NotInfinity
 data InfCount = NotInfinity Count | Infinity deriving (Eq, Ord, Show, Generic)
 instance NFData InfCount
+
+pattern IOne :: InfCount 
+pattern IOne = NotInfinity One 
 
 instance Countable InfCount where 
   unit = NotInfinity unit
@@ -169,6 +175,11 @@ divCount (Count n as xs) d = Count <$> (n `maybeDiv` d) <*> (as `divMap` d) <*> 
 
 subNatFromCount :: Count -> Natural -> Maybe Count 
 subNatFromCount (Count n as xs) m = guard (n >= m) $> Count (n - m) as xs 
+
+unsafeSubNatFromCount :: Count -> Natural -> Count
+unsafeSubNatFromCount c n = case subNatFromCount c n of 
+  Nothing -> error "unsafesubnatfromcount" 
+  Just r -> r
 
 --given two counts, returns a count of their like terms and the two leftovers, in that order 
 likeTerms :: Count -> Count -> (Count, Count, Count) 
