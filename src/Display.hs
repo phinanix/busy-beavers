@@ -25,7 +25,7 @@ showOneMachine t n =
 displaySkipSimulation :: Turing -> Steps -> Text
 displaySkipSimulation t limit =
   dispTuring t <> "\n" <> (mconcat $
-  (\steps -> dispResult dispExpTape (simulateOneMachine steps t) <> "\n") <$>
+  (\steps -> dispResult dispExpTape (SimulateSkip.simulateOneMachine steps t) <> "\n") <$>
   [0 .. limit]
   )
 

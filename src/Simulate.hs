@@ -31,9 +31,9 @@ data SimState a = SimState
   --positive
   { _stepCount :: Int
   --(stepCount `div` 2) steps after initTMState
-  , _slowState :: (TMState a)
+  , _slowState :: TMState a
   --stepCount steps after initTMState
-  , _fastState :: (TMState a)
+  , _fastState :: TMState a
   } deriving (Eq, Ord, Show, Generic)
 instance NFData a => NFData (SimState a)
 
@@ -46,11 +46,11 @@ simStep (Turing _ trans ) (TMState p (Tape ls bit rs))
     Nothing -> Unknown (p,bit)
     --we assume WLOG that the machine goes left and writes True when it halts
     Just Halt ->
-      (Stopped L $ tapeLeft $ Tape ls True rs)
+      Stopped L $ tapeLeft $ Tape ls True rs
     Just (Step q newBit L) ->
-      (Stepped L (TMState q $ tapeLeft $ Tape ls newBit rs))
+      Stepped L (TMState q $ tapeLeft $ Tape ls newBit rs)
     Just (Step q newBit R) ->
-      (Stepped R (TMState q $ tapeRight $ Tape ls newBit rs))
+      Stepped R (TMState q $ tapeRight $ Tape ls newBit rs)
 
 
 $(makeLenses ''TMState)
@@ -69,30 +69,38 @@ collision (SimState steps slow fast) = steps > 1 && slow == fast
 getSteps :: SimState a -> (Steps, Steps)
 getSteps (SimState steps _ _) = (steps `div` 2, steps)
 
+-- step limit, machine, current state
+-- if we hit an unknown edge, we have to stop, and we return that. else we'll get to a result and return the result
+simulateOneMachine :: Int -> Turing -> SimState Tape -> Either Edge (SimResult Tape)
+simulateOneMachine limit t = \case
+  s@(collision -> True) -> Right $ ContinueForever $ uncurry Cycle $ getSteps s
+  SimState stepCount@((> limit) -> True) _ (TMState p finalTape) -> Right $ Continue stepCount p finalTape
+  s@(SimState stepsTaken slow fast) ->case proveForever t s of
+    Just hp -> Right $ ContinueForever hp
+    Nothing -> let newStepsTaken = stepsTaken + 1 in
+      case simStep t fast of
+        Unknown e -> Left e
+        Stopped _ tape -> Right $ Halted newStepsTaken tape
+        Stepped _ newFast -> let
+          newSlow = if even newStepsTaken  then forceAdvance t slow else slow
+          newState = SimState newStepsTaken newSlow newFast
+          in
+            simulateOneMachine limit t newState
+  where
+    forceAdvance t s = case simStep t s of
+      Stepped _ newState -> newState
+      _ -> error "forceAdvanced a state that doesn't advance"
+
+
 --step limit, machine to start with
 simulate :: Int -> Turing -> Results Tape
 simulate limit startMachine = loop (startMachine, initSimState) [] Empty where
   -- current machine and state, next (machine&state)s, previous Results, returns updated Results
   loop :: (Turing, SimState Tape) -> [(Turing, SimState Tape)] -> Results Tape -> Results Tape
-  loop (t, s@(collision -> True)) todoList !rs
-    = recurse todoList $ addResult t (ContinueForever $ uncurry Cycle $ getSteps s) rs
-  loop (t, (SimState (stepCount@((\stepsTaken -> stepsTaken > limit) -> True))
-    _ (TMState p finalTape))) todoList !rs =
-        recurse todoList $ addResult t (Continue stepCount p finalTape) rs
-  loop (t, s@(SimState stepsTaken slow fast)) todoList !rs = case proveForever t s of
-    Just proof -> recurse todoList $ addResult t (ContinueForever proof) rs
-    Nothing -> let newStepsTaken = stepsTaken+1 in
-      case simStep t fast of
-        Unknown e -> recurse ((toList $ (,s) <$> branchOnEdge e t) ++ todoList) rs
-        Stopped _ tape -> recurse todoList $ addResult t (Halted newStepsTaken tape) rs
-        Stepped _ newFast -> let
-          newSlow = if newStepsTaken `mod` 2 == 0  then forceAdvance t slow else slow
-          newState = SimState newStepsTaken newSlow newFast
-          in
-          loop (t, newState) todoList rs
-  forceAdvance t s = case simStep t s of
-    Stepped _ newState -> newState
-    _ -> error "forceAdvanced a state that doesn't advance"
+  loop (t, s) todoList !rs = case simulateOneMachine limit t s of
+    Left e -> recurse (toList ((,s) <$> branchOnEdge e t) ++ todoList) rs
+    Right result -> recurse todoList $ addResult t result rs
+  recurse :: [(Turing, SimState Tape)] -> Results Tape -> Results Tape
   recurse [] result = result
   recurse ((t,s) : xs) result = case staticAnalyze t of
     Just proof -> recurse xs $ addResult t (ContinueForever proof) result
@@ -119,12 +127,12 @@ infiniteRight limit t (SimState originalSteps _ mState@(TMState startPhase (Tape
   -- third arg counts max leftward distance (in positive terms)
   step :: Steps -> Int -> Int -> TMState Tape -> Maybe HaltProof
   --we hit our step limit
-  step ((\i -> i >= limit) -> True) _ _ _ = Nothing
+  step ((>= limit) -> True) _ _ _ = Nothing
   --here, distance is negative, so we just simulate another step
-  step steps dist@((\d -> d <= 0) -> True) maxL s = stepRecurse steps dist maxL s
+  step steps dist@((<= 0) -> True) maxL s = stepRecurse steps dist maxL s
   --here, distance is positive, so we have a chance to fulfull the conditions
   --to prove infinite rightward movement
-  step steps dist maxL s@(TMState (((==) startPhase) -> True) (Tape ls False [])) =
+  step steps dist maxL s@(TMState ((startPhase ==) -> True) (Tape ls False [])) =
     if take maxL ls == take maxL startLs then Just $ OffToInfinityN originalSteps R
     else stepRecurse steps dist maxL s
   step steps dist maxL s = stepRecurse steps dist maxL s
@@ -135,7 +143,7 @@ infiniteRight limit t (SimState originalSteps _ mState@(TMState startPhase (Tape
   --first arg is old max, second arg is (signed) distance
   --max can only be beaten by a negative distance, since it's the farthest left
   newMax :: Int -> Int -> Int
-  newMax oldMax ((\i -> i >= 0) -> True) = oldMax
+  newMax oldMax ((>= 0) -> True) = oldMax
   newMax oldMax (negate -> newPosDist) = max oldMax newPosDist
 infiniteRight _ _ _ = Nothing
 
