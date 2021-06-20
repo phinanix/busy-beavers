@@ -8,6 +8,7 @@ import Data.Text.Read
 import System.IO (hSetBuffering, stdout, BufferMode(..))
 
 import Turing
+import TuringExamples
 import Count hiding (num)
 import Skip
 import Tape (dispTape)
@@ -38,10 +39,10 @@ import Display
 
 bb2 :: Turing
 bb2 = Turing {states = 2, transitions = fromList
-  [((Phase {unPhase = 0},False),Step (Phase {unPhase = 1}) True L)
-  ,((Phase {unPhase = 0},True),Step (Phase {unPhase = 1}) True R)
-  ,((Phase {unPhase = 1},False),Step (Phase {unPhase = 0}) True R)
-  ,((Phase {unPhase = 1},True),Halt)
+  [((Phase 0, False), Step (Phase 1) True L)
+  ,((Phase 0, True), Step (Phase 1) True R)
+  ,((Phase 1, False), Step (Phase 0) True R)
+  ,((Phase 1, True), Halt)
   ]}
 
 loop2 :: Turing
@@ -64,47 +65,6 @@ jumps_to_end = Turing {states = 2, transitions = fromList
 --this halted after a bit more time to simulate the OffToInfinityN proof
 not_halt3 :: Turing
 not_halt3 = Turing {states = 3, transitions = fromList [((Phase {unPhase = 0},False),Step (Phase {unPhase = 1}) False L),((Phase {unPhase = 0},True),Halt),((Phase {unPhase = 1},False),Step (Phase {unPhase = 0}) True R),((Phase {unPhase = 1},True),Step (Phase {unPhase = 2}) False L),((Phase {unPhase = 2},False),Step (Phase {unPhase = 1}) True R),((Phase {unPhase = 2},True),Step (Phase {unPhase = 0}) True L)]}
-
---woah, this is a counting machine !!!
-weird3 :: Turing
-weird3 = Turing {states = 3, transitions = fromList
-  [((Phase 0,False),Step (Phase 1) False L)
-  ,((Phase 0,True) ,Step (Phase 0) False R)
-  ,((Phase 1,False),Step (Phase 2) True L)
-  ,((Phase 1,True ),Halt)
-  ,((Phase 2,False),Step (Phase 0) True R)
-  ,((Phase 2,True ),Step (Phase 2) True L)
-  ]}
-
-almostweird3 :: Turing
-almostweird3 = Turing {states = 3, transitions = fromList
-  [((Phase {unPhase = 0},False),Step (Phase {unPhase = 2}) False L)
-  ,((Phase {unPhase = 0},True) ,Step (Phase {unPhase = 0}) False R)
-  ,((Phase {unPhase = 1},False),Step (Phase {unPhase = 2}) True L)
-  ,((Phase {unPhase = 1},True ),Halt)
-  ,((Phase {unPhase = 2},False),Step (Phase {unPhase = 0}) True R)
-  ,((Phase {unPhase = 2},True ),Step (Phase {unPhase = 2}) True L)
-  ]}
-
-fullsim_not_halt3 :: Turing
-fullsim_not_halt3 = Turing {states = 3, transitions = fromList
-  [((Phase 0,False),Step (Phase 1) True  R)
-  ,((Phase 0,True ),Step (Phase 2) False R)
-  ,((Phase 1,False),Step (Phase 2) False L)
-  ,((Phase 1,True ),Step (Phase 0) True  L)
-  ,((Phase 2,True ),Step (Phase 0) True  L)
-  ]}
-
---0 False | 1 True R\n0 True | Halt\n1 False | 1 True L\n1 True | 2 False L\n2 False | 0 True R\n2 True | 2 True R\n
-bb3 :: Turing
-bb3 = Turing {states = 3, transitions = fromList
-  [((Phase 0, False), Step (Phase 1) True R)
-  ,((Phase 0, True ), Halt)
-  ,((Phase 1, False), Step (Phase 2) False R)
-  ,((Phase 1, True ), Step (Phase 1) True  R)
-  ,((Phase 2, False), Step (Phase 2) True  L)
-  ,((Phase 2, True ), Step (Phase 0) True  L)
-  ]}
 
 false_backward_search :: Turing
 false_backward_search = Turing {states = 3, transitions = fromList
@@ -159,25 +119,24 @@ simProgram display results = do
                 putTextLn $ showOneMachine machine steps
                 interact r
 
---
---TODO:: write unification
---TODO:: write skip gluing logic
+
+--TODO:: test skip gluing logic
 --TODO:: write skip-proves-infinity logic
---TODO:: fix end-of-tape detection issue
+--TODO:: fix end-of-tape detection issue --seraphina two months later doesn't remember what this is
 --TODO:: make simple induction
 --TODO:: make macro machine simulator
 --TODO:: make database that stores results of machines, so that results can be compared between different runs
 main :: IO ()
 main = do
-  let results = Simulate.simulate 140 $ startMachine1 4
-  simProgram dispTape results
+  -- let results = Simulate.simulate 140 $ startMachine1 4
+  -- simProgram dispTape results
 
-  -- let skipResults = simulateWithSkips 40 $ startMachine1 2
-  -- simProgram dispExpTape skipResults
+  let skipResults = simulateWithSkips 140 $ startMachine1 4
+  simProgram dispExpTape skipResults
 
   -- putTextLn $ showOneMachine bb2 10
   -- putTextLn $ displaySkipSimulation jumps_to_end 2
-
+ 
   -- print $ backwardSearch $ startMachine1 3 --this returns a proof which is bad
   -- print $ backwardSearch $ false_backward_search
   -- traverse_ putTextLn $ show <$> backwardSearch <$> tnfPrecursors 25 bb3

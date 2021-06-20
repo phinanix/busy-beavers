@@ -17,17 +17,26 @@ import SimulateSkip
 
 showOneMachine :: Turing -> Steps -> Text
 showOneMachine t n =
-  dispTuring t <> "\n" <> (mconcat $
-  (\steps -> Simple.dispResult (Simple.simulate steps Simple.dispStartState t) <> "\n") <$>
+  dispTuring t <> "\n" <> foldMap 
+  (\steps -> Simple.dispResult (Simple.simulate steps Simple.dispStartState t) <> "\n") 
   [0.. n]
-  )
---
+
+
+displaySkipSimStep :: Turing -> Steps -> Text
+displaySkipSimStep t steps = dispResult dispExpTape $ SimulateSkip.simulateOneTotalMachine steps t ^. _2
+
 displaySkipSimulation :: Turing -> Steps -> Text
 displaySkipSimulation t limit =
-  dispTuring t <> "\n" <> (mconcat $
-  (\steps -> dispResult dispExpTape (SimulateSkip.simulateOneMachine steps t) <> "\n") <$>
-  [0 .. limit]
-  )
+  dispTuring t <> "\n" <> foldMap (\i -> displaySkipSimStep t i <> "\n") [0 .. limit]
+
+displaySkipStepAndSkip :: Turing -> Steps -> Text
+displaySkipStepAndSkip t limit = case SimulateSkip.simulateOneTotalMachine limit t of 
+  (lastSkip : _, res) -> dispResult dispExpTape res <> "\nresulted from the skip:" <> dispSkip lastSkip
+  ([], res) -> error ("there were no skips for some reason, res:\n" <> show res)
+
+displaySkipSimulationWithSkips :: Turing -> Steps -> Text 
+displaySkipSimulationWithSkips t limit = 
+  dispTuring t <> "\n" <> foldMap (\i -> displaySkipStepAndSkip t i <> "\n") [1.. limit]
 
 totalMachines :: Results a -> Int
 totalMachines r = r ^. haltCount + r ^. provenForever + r ^. unproven

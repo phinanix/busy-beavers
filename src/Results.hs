@@ -9,10 +9,13 @@ import Turing
 import Tape
 import HaltProof
 
+-- the type var here is the type of tape 
 data SimResult a = Halted Steps a
                | Continue Steps Phase a
                | ContinueForever HaltProof
                deriving (Eq, Ord, Show, Functor)
+
+$(makePrisms ''SimResult)
 
 dispResult :: (a -> Text) -> SimResult a -> Text
 dispResult dispTape (Halted steps tape) = "After " <> show steps

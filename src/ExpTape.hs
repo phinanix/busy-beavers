@@ -1,26 +1,13 @@
 module ExpTape where
 
 import Relude
+import qualified Relude.Unsafe as Unsafe (init)
 import Control.Lens
 
 import Turing
 import Count
 import Tape
 
---when the machine is pointing to a block containing one symbol, then it isn't on a particular side
---else it's pointing to a count, which is not 1, and it's on one side of that count
--- data Location c = One | Side c Dir deriving (Eq, Ord, Show, Generic)
--- instance (NFData c) => NFData (Location c)
-
--- $(makePrisms ''Location)
-
--- canonicalizeLoc :: Location Count -> Location Count
--- canonicalizeLoc (Side ((\c -> (c == finiteCount 1)) -> True) _) = One 
--- canonicalizeLoc l = l 
-
--- makeLoc :: Count -> Dir -> Location Count 
--- makeLoc ((\c -> (c == finiteCount 1)) -> True) _ = One 
--- makeLoc c d = Side c d 
 
 data ExpTape s c = ExpTape
   { left :: [(s, c)]
@@ -65,7 +52,7 @@ invariantifyList [] =  []
 -- glomPoint :: (Eq s, Countable c) => ExpTape s c -> ExpTape s c
 -- glomPoint = glomPointLeft . glomPointRight
 
-dispBitCount :: (Bit, Count) -> Text 
+dispBitCount :: (Bit, Count) -> Text
 dispBitCount (b, c) = "(" <> dispBit b <> ", " <> dispCount c <> ") "
 
 dispBitICount :: (Bit, InfCount) -> Text
@@ -76,19 +63,28 @@ dispPoint bit = "|>" <> dispBit bit <> "<|"
 
 dispExpTape :: ExpTape Bit InfCount -> Text
 dispExpTape (ExpTape ls point rs)
-  = (mconcat $ dispBitICount <$> reverse ls)
+  = mconcat (dispBitICount <$> reverse ls)
   <> dispPoint point
-  <> (mconcat $ dispBitICount <$> rs)
+  <> mconcat (dispBitICount <$> rs)
 
-instance Tapeable (ExpTape Bit InfCount ) where
+instance Tapeable (ExpTape Bit InfCount) where
   ones (ExpTape ls point rs) = countPoint point + countList ls + countList rs where
     countPoint b = if b then 1 else 0
     countList :: [(Bit, InfCount)] -> Int
     countList = getSum . foldMap Sum . mapMaybe (\(bit, c) -> guard bit $> infCountToInt c)
 
 getNewPoint :: [(s, InfCount)] -> Maybe (s, [(s, InfCount)])
-getNewPoint [] = Nothing 
+getNewPoint [] = Nothing
 getNewPoint xs@((b, Infinity) : _) = Just (b, xs)
-getNewPoint  ((b, NotInfinity c) : xs) = if c == finiteCount 1 
-  then Just (b, xs) 
+getNewPoint  ((b, NotInfinity c) : xs) = if c == finiteCount 1
+  then Just (b, xs)
   else Just (b, (b, NotInfinity $ unsafeSubNatFromCount c 1) : xs)
+
+expTapeToTape :: ExpTape Bit InfCount -> Tape
+expTapeToTape (ExpTape left point right) = Tape newLeft point newRight where
+  intify :: [(s, InfCount)] -> [(s, Int)]
+  intify = fmap $ fmap infCountToInt
+  flatten :: [(s, Int)] -> [s]
+  flatten = foldMap $ uncurry (flip replicate)
+  newLeft = flatten $ intify $ Unsafe.init left
+  newRight = flatten $ intify $ Unsafe.init right

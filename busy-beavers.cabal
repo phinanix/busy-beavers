@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 27818cafbc2304bd4c5f909e797d1fde193aeed651bf988f4996f124761f647a
+-- hash: d12ab15a3975814f862d99d785658a3cff3e7426346344a4b8492444a495b86a
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -42,6 +42,7 @@ library
       Skip
       Tape
       Turing
+      TuringExamples
       Util
   other-modules:
       Paths_busy_beavers
