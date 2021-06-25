@@ -20,19 +20,19 @@ extra-source-files:
 description:         Please see the README on GitHub at <https://github.com/githubuser/busy-beavers#readme>
 
 dependencies:
-- base >= 4.7 && < 5
+- base
 
 library:
   source-dirs: src
   dependencies:
   - containers
   - lens
-  - monoidal-containers
   - mtl
   - relude
-  - unification-fd
+  - monoidal-containers
   - witherable
-  - pretty-printer
+  - prettyprinter
+
 executables:
   busy-beavers-exe:
     main:                Main.hs
@@ -64,7 +64,6 @@ tests:
     - relude
     - hspec
     - quickcheck-instances
-    - monoidal-containers
 
 default-extensions:
   - ApplicativeDo

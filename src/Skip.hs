@@ -3,9 +3,8 @@ module Skip where
 import Relude hiding (mapMaybe)
 import Control.Lens
 import Data.Witherable
-import Text.PrettyPrint.Annotated.HughesPJClass (Pretty, pPrint, text)
-
-
+import Data.Text.Prettyprint.Doc
+import Prettyprinter 
 
 import Turing
 import Count
@@ -39,15 +38,15 @@ $(makeLenses ''Config)
 $(makeLenses ''Skip)
 
 instance Pretty (Config Bit) where
-  pPrint (Config p ls point rs) = text $ "phase: " <> dispPhase p <> "  "
+  pretty (Config p ls point rs) = text $ "phase: " <> dispPhase p <> "  "
     <> mconcat (dispBitCount <$> reverse ls)
     <> dispPoint point
     <> mconcat (dispBitCount <$> rs)
 
 instance Pretty (SkipEnd Bit) where
-  pPrint (EndSide p L ls) =  "phase: " <> dispPhase p <> "  <|" <> mconcat (dispBitCount <$> ls)
-  pPrint (EndSide p R ls) =  "phase: " <> dispPhase p <> " " <> mconcat (dispBitCount <$> ls) <> "|>"
-  pPrint (EndMiddle c) = dispConfig c
+  pretty (EndSide p L ls) =  "phase: " <> dispPhase p <> "  <|" <> mconcat (dispBitCount <$> ls)
+  pretty (EndSide p R ls) =  "phase: " <> dispPhase p <> " " <> mconcat (dispBitCount <$> ls) <> "|>"
+  pretty (EndMiddle c) = dispConfig c
 
 dispSkip :: (Show s) => Skip s -> Text
 dispSkip (Skip s e c halts) = "in " <> dispCount c <> " steps we turn\n"

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 54cb824e0a6bfb0f9d1cc1b0ced3a580cf673409224c1f3d9ea9904c87dd751d
+-- hash: 2a53da22ec33e460ecd310d7af2239cd1bbbbc5e483c656365c2366d9ff48b9c
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -51,14 +51,13 @@ library
   default-extensions: ApplicativeDo BangPatterns ConstraintKinds DataKinds DefaultSignatures DeriveFoldable DeriveFunctor DeriveGeneric DeriveLift DeriveTraversable DerivingStrategies EmptyCase ExistentialQuantification FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving InstanceSigs KindSignatures LambdaCase MultiParamTypeClasses MultiWayIf NamedFieldPuns NoImplicitPrelude OverloadedStrings PartialTypeSignatures PatternSynonyms PolyKinds QuasiQuotes RankNTypes ScopedTypeVariables StrictData StandaloneDeriving TemplateHaskell TupleSections TypeApplications TypeOperators ViewPatterns
   ghc-options: -Wall -Wno-name-shadowing -Wno-unused-imports -Wcompat -Wredundant-constraints -Wincomplete-record-updates -Wincomplete-uni-patterns
   build-depends:
-      base >=4.7 && <5
+      base
     , containers
     , lens
     , monoidal-containers
     , mtl
-    , pretty-printer
+    , prettyprinter
     , relude
-    , unification-fd
     , witherable
   default-language: Haskell2010
 
@@ -71,7 +70,7 @@ executable busy-beavers-exe
   default-extensions: ApplicativeDo BangPatterns ConstraintKinds DataKinds DefaultSignatures DeriveFoldable DeriveFunctor DeriveGeneric DeriveLift DeriveTraversable DerivingStrategies EmptyCase ExistentialQuantification FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving InstanceSigs KindSignatures LambdaCase MultiParamTypeClasses MultiWayIf NamedFieldPuns NoImplicitPrelude OverloadedStrings PartialTypeSignatures PatternSynonyms PolyKinds QuasiQuotes RankNTypes ScopedTypeVariables StrictData StandaloneDeriving TemplateHaskell TupleSections TypeApplications TypeOperators ViewPatterns
   ghc-options: -Wall -Wno-name-shadowing -Wno-unused-imports -Wcompat -Wredundant-constraints -Wincomplete-record-updates -Wincomplete-uni-patterns -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      base
     , busy-beavers
     , lens
     , prettyprinter
@@ -95,11 +94,10 @@ test-suite busy-beavers-test
   ghc-options: -Wall -Wno-name-shadowing -Wno-unused-imports -Wcompat -Wredundant-constraints -Wincomplete-record-updates -Wincomplete-uni-patterns -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       QuickCheck
-    , base >=4.7 && <5
+    , base
     , busy-beavers
     , hspec
     , lens
-    , monoidal-containers
     , quickcheck-instances
     , relude
   default-language: Haskell2010
