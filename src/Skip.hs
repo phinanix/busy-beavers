@@ -3,6 +3,9 @@ module Skip where
 import Relude hiding (mapMaybe)
 import Control.Lens
 import Data.Witherable
+import Text.PrettyPrint.Annotated.HughesPJClass (Pretty, pPrint, text)
+
+
 
 import Turing
 import Count
@@ -22,7 +25,7 @@ instance (NFData s) => NFData (Config s)
 --at the end of a skip, you might've fallen off the L of the given pile of bits, or you might be in the middle of some 
 --known bits, which is a config
 data SkipEnd s = EndSide Phase Dir [(s, Count)] | EndMiddle (Config s) deriving (Eq, Ord, Show, Generic)
-instance (NFData s) => NFData (SkipEnd s) 
+instance (NFData s) => NFData (SkipEnd s)
 
 data Skip s = Skip
   { _start :: Config s
@@ -35,22 +38,22 @@ instance (NFData s) => NFData (Skip s)
 $(makeLenses ''Config)
 $(makeLenses ''Skip)
 
-dispConfig :: Config Bit -> Text
-dispConfig (Config p ls point rs) = "phase: " <> dispPhase p <> "  "
-  <> (mconcat $ dispBitCount <$> reverse ls)
-  <> dispPoint point
-  <> (mconcat $ dispBitCount <$> rs)
+instance Pretty (Config Bit) where
+  pPrint (Config p ls point rs) = text $ "phase: " <> dispPhase p <> "  "
+    <> mconcat (dispBitCount <$> reverse ls)
+    <> dispPoint point
+    <> mconcat (dispBitCount <$> rs)
 
-dispSkipEnd :: SkipEnd Bit -> Text 
-dispSkipEnd (EndSide p L ls) =  "phase: " <> dispPhase p <> "  <|" <> (mconcat $ dispBitCount <$> ls)
-dispSkipEnd (EndSide p R ls) =  "phase: " <> dispPhase p <> " " <> (mconcat $ dispBitCount <$> ls) <> "|>"
-dispSkipEnd (EndMiddle c) = dispConfig c 
+instance Pretty (SkipEnd Bit) where
+  pPrint (EndSide p L ls) =  "phase: " <> dispPhase p <> "  <|" <> mconcat (dispBitCount <$> ls)
+  pPrint (EndSide p R ls) =  "phase: " <> dispPhase p <> " " <> mconcat (dispBitCount <$> ls) <> "|>"
+  pPrint (EndMiddle c) = dispConfig c
 
-dispSkip :: Skip Bit -> Text
+dispSkip :: (Show s) => Skip s -> Text
 dispSkip (Skip s e c halts) = "in " <> dispCount c <> " steps we turn\n"
   <> dispConfig s <> "\ninto: \n" <> dispSkipEnd e <> (if halts then "\n and halt" else "")
 
-getSkipEndPhase :: SkipEnd s -> Phase 
+getSkipEndPhase :: SkipEnd s -> Phase
 getSkipEndPhase (EndSide p _ _) = p
 getSkipEndPhase (EndMiddle (Config p _ _ _)) = p
 
@@ -76,7 +79,7 @@ data HeadMatch s c = PerfectH | TapeHLeft (s, c) deriving (Eq, Ord, Show)
 -- and return what's left of the tape if any
 matchTapeHeads :: (Eq s) => (s, Count) -> (s, InfCount) -> Equations s (HeadMatch s InfCount)
 matchTapeHeads (sb, skipC) (tb, tapeC) = do
-  matchBits sb tb 
+  matchBits sb tb
   matchInfCount skipC tapeC >>= \case
     Empty -> pure PerfectH
     newCount -> pure (TapeHLeft (tb, newCount))
@@ -170,8 +173,8 @@ getTapeRemain (SkipLeft _) = Nothing
 matchConfigTape :: (Eq s) => Config s -> ExpTape s InfCount
   -> Equations s ([(s, InfCount)], [(s, InfCount)])
 matchConfigTape (Config _p lsC pointC rsC) (ExpTape lsT pointT rsT)
-  = do 
-    matchBits pointC pointT 
+  = do
+    matchBits pointC pointT
     matchSides lsT rsT
   where
   matchSides left right = bisequence (mapMaybe getTapeRemain $ matchTape lsC left
