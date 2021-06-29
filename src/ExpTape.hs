@@ -3,6 +3,7 @@ module ExpTape where
 import Relude
 import qualified Relude.Unsafe as Unsafe (init)
 import Control.Lens
+import Prettyprinter 
 
 import Turing
 import Count
@@ -52,14 +53,14 @@ invariantifyList [] =  []
 -- glomPoint :: (Eq s, Countable c) => ExpTape s c -> ExpTape s c
 -- glomPoint = glomPointLeft . glomPointRight
 
-dispBitCount :: (Bit, Count) -> Text
-dispBitCount (b, c) = "(" <> dispBit b <> ", " <> dispCount c <> ") "
+dispBitCount :: (Pretty s) => (s, Count) -> Text
+dispBitCount (b, c) = "(" <> show (pretty b) <> ", " <> dispCount c <> ") "
 
 dispBitICount :: (Bit, InfCount) -> Text
 dispBitICount (b, c) = "(" <> dispBit b <> ", " <> dispInfCount c <> ") "
 
-dispPoint :: Bit -> Text
-dispPoint bit = "|>" <> dispBit bit <> "<|"
+dispPoint :: (Pretty s) => s -> Text
+dispPoint bit = "|>" <> show (pretty bit) <> "<|"
 
 dispExpTape :: ExpTape Bit InfCount -> Text
 dispExpTape (ExpTape ls point rs)

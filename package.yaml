@@ -64,7 +64,7 @@ tests:
     - relude
     - hspec
     - quickcheck-instances
-
+    - monoidal-containers
 default-extensions:
   - ApplicativeDo
   - BangPatterns

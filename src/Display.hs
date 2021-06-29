@@ -2,6 +2,7 @@ module Display where
 
 import Relude
 import Control.Lens
+import Prettyprinter
 
 import Turing
 import Tape
@@ -22,21 +23,21 @@ showOneMachine t n =
   [0.. n]
 
 
-displaySkipSimStep :: Turing -> Steps -> Text
+displaySkipSimStep :: Turing -> Steps -> Doc ann
 displaySkipSimStep t steps = dispResult dispExpTape $ SimulateSkip.simulateOneTotalMachine steps t ^. _2
 
-displaySkipSimulation :: Turing -> Steps -> Text
+displaySkipSimulation :: Turing -> Steps -> Doc ann
 displaySkipSimulation t limit =
-  dispTuring t <> "\n" <> foldMap (\i -> displaySkipSimStep t i <> "\n") [0 .. limit]
+  prettyText (dispTuring t <> "\n") <> foldMap (\i -> displaySkipSimStep t i <> "\n") [0 .. limit]
 
-displaySkipStepAndSkip :: Turing -> Steps -> Text
+displaySkipStepAndSkip :: Turing -> Steps -> Doc ann
 displaySkipStepAndSkip t limit = case SimulateSkip.simulateOneTotalMachine limit t of 
-  (lastSkip : _, res) -> dispResult dispExpTape res <> "\nresulted from the skip:" <> dispSkip lastSkip
+  (lastSkip : _, res) -> dispResult dispExpTape res <> "\nresulted from the skip:" <> show (pretty lastSkip)
   ([], res) -> error ("there were no skips for some reason, res:\n" <> show res)
 
-displaySkipSimulationWithSkips :: Turing -> Steps -> Text 
+displaySkipSimulationWithSkips :: Turing -> Steps -> Doc ann 
 displaySkipSimulationWithSkips t limit = 
-  dispTuring t <> "\n" <> foldMap (\i -> displaySkipStepAndSkip t i <> "\n") [1.. limit]
+  prettyText (dispTuring t <> "\n") <> foldMap (\i -> displaySkipStepAndSkip t i <> "\n") [1.. limit]
 
 totalMachines :: Results a -> Int
 totalMachines r = r ^. haltCount + r ^. provenForever + r ^. unproven
@@ -81,4 +82,4 @@ tnfPrecursors steps t@(Turing n trans) = Turing n <$> restrictKeys trans <$> edg
   edgeSets = fromList <$> (drop 1 $ inits signature)
 
 dispSkipBook :: SkipBook Bit -> Text
-dispSkipBook skips = foldMap (\s -> dispSkip s <> "\n") $ fold skips
+dispSkipBook skips = foldMap (\s -> show (pretty s) <> "\n") $ fold skips

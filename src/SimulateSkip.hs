@@ -55,12 +55,12 @@ dispSkipResult (Skipped c p tape)
   <> " in " <> dispInfCount c <> " hops"
 
 --returns nothing if the skip is inapplicable, else returns a new tape
-applySkip :: forall s. (Show s, Eq s) => Skip s -> (Phase, ExpTape s InfCount)
+applySkip :: forall s. (Pretty s, Eq s) => Skip s -> (Phase, ExpTape s InfCount)
   -> Maybe (SkipResult s InfCount)
 applySkip skip@(Skip s _ _ _) (p, tape)
   = guard (s^.cstate == p) >> packageResult skip <$> runEquations (matchConfigTape s tape)
 
-packageResult :: forall s. (Show s, Eq s) => Skip s -> (Map BoundVar InfCount, ([(s, InfCount)], [(s, InfCount)]))
+packageResult :: forall s. (Pretty s, Eq s) => Skip s -> (Map BoundVar InfCount, ([(s, InfCount)], [(s, InfCount)]))
   -> SkipResult s InfCount
 packageResult theSkip@(Skip _ e hopCount _) (boundVs, (newLs, newRs)) = Skipped
   (updateCount boundVs hopCount)

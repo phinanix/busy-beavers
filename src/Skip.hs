@@ -18,12 +18,12 @@ data Config s = Config
   , _ls :: [(s, Count)]
   , _c_point :: s
   , _rs :: [(s, Count)]
-  } deriving (Eq, Ord, Show, Generic)
+  } deriving (Eq, Ord, Show, Generic, Functor)
 instance (NFData s) => NFData (Config s)
 
 --at the end of a skip, you might've fallen off the L of the given pile of bits, or you might be in the middle of some 
 --known bits, which is a config
-data SkipEnd s = EndSide Phase Dir [(s, Count)] | EndMiddle (Config s) deriving (Eq, Ord, Show, Generic)
+data SkipEnd s = EndSide Phase Dir [(s, Count)] | EndMiddle (Config s) deriving (Eq, Ord, Show, Generic, Functor)
 instance (NFData s) => NFData (SkipEnd s)
 
 data Skip s = Skip
@@ -31,7 +31,7 @@ data Skip s = Skip
   , _end :: SkipEnd s
   , _hops :: Count --number of atomic TM steps
   , _halts :: Bool --true if the skip results in the machine halting
-  } deriving (Eq, Ord, Show, Generic)
+  } deriving (Eq, Ord, Show, Generic, Functor)
 instance (NFData s) => NFData (Skip s)
 
 $(makeLenses ''Config)
@@ -40,18 +40,18 @@ $(makeLenses ''Skip)
 prettyText :: Text -> Doc ann 
 prettyText = pretty 
 
-instance Pretty (Config Bit) where
+instance Pretty s => Pretty (Config s) where
   pretty (Config p ls point rs) = pretty $ "phase: " <> dispPhase p <> "  "
     <> mconcat (dispBitCount <$> reverse ls)
     <> dispPoint point
     <> mconcat (dispBitCount <$> rs)
 
-instance Pretty (SkipEnd Bit) where
+instance Pretty s => Pretty (SkipEnd s) where
   pretty (EndSide p L ls) =  pretty $ "phase: " <> dispPhase p <> "  <|" <> mconcat (dispBitCount <$> ls)
   pretty (EndSide p R ls) =  pretty $ "phase: " <> dispPhase p <> " " <> mconcat (dispBitCount <$> ls) <> "|>"
   pretty (EndMiddle c) = pretty c
 
-instance Pretty (Skip Bit) where
+instance Pretty s => Pretty (Skip s) where
   pretty (Skip s e c halts) = prettyText "in " <> pretty (dispCount c) <> prettyText " steps we turn\n"
     <> pretty s <> prettyText "\ninto: \n" <> pretty e <> prettyText (if halts then "\n and halt" else "")
 
