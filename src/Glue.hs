@@ -29,12 +29,12 @@ divStatics d n m = (,) <$> (n `maybeDiv` d) <*> (m `divMap` d)
 
 --given two counts, either produces the most general count that encompasses both of them or fails 
 --probably this should be an Equations and that monad should be upgraded to have a spawn new var field
-glueCounts :: Count -> Count -> Either Text Count 
+glueCounts :: Count -> Count -> Either Text (Equations Count) 
 glueCounts c d = case likeTerms c d of 
   --this is the two zerovar case, in which case all terms must be alike 
   (likes, Empty, Empty) -> pure likes
   --if one side has a var, it unifies if the other side's leftovers are divisible by that coefficient
-  (_likes, OneVar 0 Empty k _x, ZeroVar m bs) -> 
+  (_likes, OneVar 0 Empty k _x, ZeroVar m bs) ->  
     maybe (Left "one/zero var failed to divide") Right $ divStatics k m bs >> pure d
   --pops to the above case
   (_likes, ZeroVar _ _, OneVar _ _ _ _) -> glueCounts d c
@@ -57,18 +57,18 @@ remainingLonger xs ys = if (length xs < length ys)
 --takes two lists, fails if they are incompatible, else returns a Left if some 
 --of the first list was leftover, or a Right if 
 --some of the second list was leftover 
-glueTapeHalves :: forall s. (Eq s) => [(s, Count)] -> [(s, Count)] -> Either Text (Leftover s)
-glueTapeHalves xs ys = matched >> pure answer where
-  zipped = (zip xs ys) --discards longer 
-  matchOne :: ((s, Count), (s, Count)) -> Either Text ()
+glueTapeHalves :: forall s. (Eq s) => [(s, Count)] -> [(s, Count)] -> Either Text ([(s, Count)], Leftover s)
+glueTapeHalves xs ys = (,) <$> matched <*> pure answer where
+  zipped = zip xs ys --discards longer 
+  matchOne :: ((s, Count), (s, Count)) -> Either Text (s, Count)
   matchOne ((s, c), (t, d)) = do 
     -- TODO :: this works / makes sense as long as we never spawn any new variables, otherwise
     --  this really needs to be returning the new list as a result, which is built out of the
     --  thing unified from c and d 
-    _unsafeDiscarded <- glueCounts c d 
-    if s == t then pure () else Left "matched tapes with different bits"
-  matched :: Either Text ()
-  matched = traverse_ matchOne zipped 
+    newCount <- glueCounts c d 
+    if s == t then pure (s, newCount) else Left "matched tapes with different bits"
+  matched :: Either Text [(s, Count)]
+  matched = traverse matchOne zipped 
   --if the start one is longer, it means we need to add to the *end*
   --if the end one is longer, we need to add to the start
   answer :: Leftover s
@@ -113,7 +113,9 @@ glueEndToBeginning :: (Eq s) => SkipEnd s -> Config s -> Either Text (Leftover s
 glueEndToBeginning (EndMiddle (Config p ls s rs)) (Config q ls' s' rs') = do 
   if p == q then Right () else Left "phases were different"
   if s == s' then Right () else Left "points were different"
-  (,) <$> glueTapeHalves ls ls' <*> glueTapeHalves rs rs'
+  (newLs, lsLeftovers) <- glueTapeHalves ls ls' 
+  (newRs, rsLeftovers) <- glueTapeHalves rs rs'
+  undefined 
 glueEndToBeginning (EndSide p L rs) (Config q ls' s' rs') = do 
   if p == q then Right () else Left "phases were different"
   (,) <$> pure (Start ((s', finiteCount 1) : ls')) <*> glueTapeHalves rs rs'

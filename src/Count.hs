@@ -2,7 +2,7 @@ module Count where
 
 import Turing (Bit, dispBit)
 import Relude hiding (filter)
-import qualified Text.Show 
+import qualified Text.Show
 import qualified Relude.Unsafe as Unsafe (head)
 import Control.Lens
 import qualified Data.Map as M (assocs)
@@ -49,8 +49,8 @@ dispTapeVar (TapeVar i) = "t_" <> show i <> " "
 
 -- a class that currently generalizes over Count and InfCount, which both have counts that are the "unit"
 -- not sure there are any laws here other than that when your location is One your count is the unit
-class (Monoid c) => Countable c where 
-  unit :: c 
+class (Monoid c) => Countable c where
+  unit :: c
 
 --a finite number, plus some number of symbols multiplied by a given natural (which must be positive)
 --and some number of bound variables also multiplied by a given natural which also must be positive
@@ -62,23 +62,23 @@ data Count = Count
 instance NFData Count
 
 pattern One :: Count
-pattern One = Count 1 Empty Empty 
+pattern One = Count 1 Empty Empty
 
-instance Show Count where 
+instance Show Count where
   show (Count num symbols bound) = "Count " <> show num <> " (fromList " <> show (toList symbols)
     <> ") (fromList " <> show (toList bound) <> ")"
 
-instance Countable Count where 
+instance Countable Count where
   unit = finiteCount 1
 
-pattern ZeroVar :: Natural -> MMap SymbolVar (Sum Natural) -> Count 
+pattern ZeroVar :: Natural -> MMap SymbolVar (Sum Natural) -> Count
 pattern ZeroVar n as = Count n as Empty
 
 pattern SingletonMap :: k -> v -> MMap k v
-pattern SingletonMap k v <- (assocs -> [(k,v)]) where 
+pattern SingletonMap k v <- (assocs -> [(k,v)]) where
   SingletonMap k v = singleton k v
 
-pattern OneVar :: Natural -> MMap SymbolVar (Sum Natural) -> Natural -> BoundVar -> Count 
+pattern OneVar :: Natural -> MMap SymbolVar (Sum Natural) -> Natural -> BoundVar -> Count
 pattern OneVar n as k x = Count n as (SingletonMap x (Sum k))
 
 --bound vars bigger than free vars bigger than bare numbers
@@ -86,16 +86,20 @@ pattern OneVar n as k x = Count n as (SingletonMap x (Sum k))
 instance Ord Count where
   (Count n Empty Empty) <= (Count m Empty Empty) = n <= m
   (Count _ Empty Empty) <= (Count _ _ne Empty) = True
-  c@(Count n as Empty) <= d@(Count m bs Empty) = if c == d then True else
-    if fold as < fold bs then True else case compare n m of
+  c@(Count n as Empty) <= d@(Count m bs Empty)
+    | c == d = True
+    | fold as < fold bs = True
+    | otherwise = case compare n m of
       LT -> True
       GT -> False
       EQ -> as < bs
   (Count _ _ Empty) <= (Count _ _ _ne) = True
   --hang, on, I'm worried this ord instance isn't compatible with the semigroup
   --I now think it is but still want like, a proof TODO
-  c@(Count n as xs) <= d@(Count m bs ys) = if c == d then True else
-    if fold xs < fold ys then True else case compare (Count n as Empty) (Count m bs Empty) of
+  c@(Count n as xs) <= d@(Count m bs ys)
+    | c == d = True
+    | fold xs < fold ys = True
+    | otherwise = case compare (Count n as Empty) (Count m bs Empty) of
       LT -> True
       GT -> False
       EQ -> xs < ys
@@ -104,8 +108,8 @@ dispCount :: Count -> Text
 dispCount (Count n Empty Empty) = show n
 dispCount (Count n symbols bound)
   = show n <> " + "
-  <> (mconcat $ dispSymbolVar <$> assocs symbols)
-  <> (mconcat $ dispBoundVar <$> assocs bound)
+  <> mconcat (dispSymbolVar <$> assocs symbols)
+  <> mconcat (dispBoundVar <$> assocs bound)
 
 --a count which has the potential to be "infinity" eg the infinite string of zeros at the
 --end of a Turing Machine's tape
@@ -113,10 +117,10 @@ dispCount (Count n symbols bound)
 data InfCount = NotInfinity Count | Infinity deriving (Eq, Ord, Show, Generic)
 instance NFData InfCount
 
-pattern IOne :: InfCount 
-pattern IOne = NotInfinity One 
+pattern IOne :: InfCount
+pattern IOne = NotInfinity One
 
-instance Countable InfCount where 
+instance Countable InfCount where
   unit = NotInfinity unit
 
 dispInfCount :: InfCount -> Text
@@ -173,23 +177,23 @@ divMap m d = Sum <$$> traverse (flip maybeDiv d) (getSum <$> m)
 divCount :: Count -> Natural -> Maybe Count
 divCount (Count n as xs) d = Count <$> (n `maybeDiv` d) <*> (as `divMap` d) <*> (xs `divMap` d)
 
-subNatFromCount :: Count -> Natural -> Maybe Count 
-subNatFromCount (Count n as xs) m = guard (n >= m) $> Count (n - m) as xs 
+subNatFromCount :: Count -> Natural -> Maybe Count
+subNatFromCount (Count n as xs) m = guard (n >= m) $> Count (n - m) as xs
 
 unsafeSubNatFromCount :: Count -> Natural -> Count
-unsafeSubNatFromCount c n = case subNatFromCount c n of 
-  Nothing -> error "unsafesubnatfromcount" 
+unsafeSubNatFromCount c n = case subNatFromCount c n of
+  Nothing -> error "unsafesubnatfromcount"
   Just r -> r
 
 --given two counts, returns a count of their like terms and the two leftovers, in that order 
-likeTerms :: Count -> Count -> (Count, Count, Count) 
-likeTerms (Count n as xs) (Count m bs ys) = (likes, leftOvers, rightOvers) where 
-  likeN = min n m 
-  combineNats (Sum n) (Sum m) = Sum $ min n m 
+likeTerms :: Count -> Count -> (Count, Count, Count)
+likeTerms (Count n as xs) (Count m bs ys) = (likes, leftOvers, rightOvers) where
+  likeN = min n m
+  combineNats (Sum n) (Sum m) = Sum $ min n m
   -- likeAs :: MMap SymbolVar (Sum Natural)
   likeAs = intersectionWith combineNats as bs
   -- likeXs :: MMap BoundVar (Sum Natural)
-  likeXs = intersectionWith combineNats xs ys 
+  likeXs = intersectionWith combineNats xs ys
   likes = Count likeN likeAs likeXs
   subMaps :: (Ord k, Num a) => MMap k a -> MMap k a -> MMap k a
   subMaps = unionWith (-)
@@ -199,7 +203,7 @@ likeTerms (Count n as xs) (Count m bs ys) = (likes, leftOvers, rightOvers) where
 
 --trying to match the first count against the second, returns Nothing on fail,
 --or the remaining part of the second count on success
-matchCount :: (Eq s) => Count -> Count -> Equations s Count
+matchCount :: Count -> Count -> Equations Count
 matchCount Empty c = pure c
 matchCount (Count 0 Empty xs) c@(Count m bs ys) = case assocs xs of
   [] -> error "xs can't be empty due to pattern match"
@@ -222,7 +226,7 @@ matchCount (Count 0 Empty xs) c@(Count m bs ys) = case assocs xs of
         addEquations ((,NotInfinity $ finiteCount 1) . fst <$> remaining) $ case maybeX1 of
           Just x1 -> addEquation (x1, NotInfinity $ Count (m - remainingSum) newBs newYs) $
             --the leftovers are empty because x1 matched everything
-            pure $ Empty
+            pure Empty
           --there's some stuff leftover because there was no x1 to eat it all
           --TODO:: we might could do better in this case but it seems hard
           Nothing -> pure $ Count (m - remainingSum) newBs newYs
@@ -246,9 +250,9 @@ matchCount (Count 0 Empty xs) c@(Count m bs ys) = case assocs xs of
   --takes a var, and tries to match it with a symbol in the map. if it succeeds, it
   --removes that symbol from the map and returns the list unchanged. if it fails, it
   --adds the var to the list to be handled later.
-  matchVar :: (Eq s) => (BoundVar, Sum Natural)
+  matchVar :: (BoundVar, Sum Natural)
     -> (MMap (Either SymbolVar BoundVar) (Sum Natural), [(BoundVar, Sum Natural)])
-    -> Equations s (MMap (Either SymbolVar BoundVar) (Sum Natural), [(BoundVar, Sum Natural)])
+    -> Equations (MMap (Either SymbolVar BoundVar) (Sum Natural), [(BoundVar, Sum Natural)])
   matchVar var@(x, Sum d) (m, rest) =
     case listToMaybe $ filter (\(_y, Sum  e) -> e `mod` d == 0) $ assocs m of
       --no var in the map works here
@@ -258,7 +262,7 @@ matchCount (Count 0 Empty xs) c@(Count m bs ys) = case assocs xs of
         let newM = m & at y .~ Nothing
             eqn = (x, NotInfinity $ makeCount y $ e `div` d) in
           addEquation eqn $ pure (newM, rest)
-  makeCount :: (Either SymbolVar BoundVar) -> Natural -> Count
+  makeCount :: Either SymbolVar BoundVar -> Natural -> Count
   makeCount (Left symbol) d = symbolVarCount symbol d
   makeCount (Right bound) d = boundVarCount bound d
 --if the LHS has symbolic vars, they must also appear on the RHS or the match will fail
@@ -278,7 +282,7 @@ matchCount (Count n as xs) (Count m bs ys) = if n <= m
   then matchCount (Count 0 as xs) (Count (m-n) bs ys)
   else nothingES
 
-matchInfCount :: (Eq s) => Count -> InfCount -> Equations s InfCount
+matchInfCount :: Count -> InfCount -> Equations InfCount
 --if you consume a finite number of symbols from an infinity, then an infinite number remain
 matchInfCount (Count _ _ Empty) Infinity = pure Infinity
 --if there is a "forall x" in the count, then morally you can think of it as consuming the infinite
@@ -326,49 +330,49 @@ addEquationToMap (v, c) m = case m ^. at v of
   --if that ends up being a good feature to do
   Just c' -> guard (c == c') >> Just m
 
-addEquation :: (BoundVar, InfCount) -> Equations s a -> Equations s a
+addEquation :: (BoundVar, InfCount) -> Equations a -> Equations a
 addEquation eqn (Equations (Just (m, a))) = case addEquationToMap eqn m of
   Nothing -> Equations Nothing
   (Just m') -> Equations (Just (m', a))
 addEquation _ _ = Equations Nothing
 
-addEquations :: (Foldable t) => t (BoundVar, InfCount) -> Equations s a -> Equations s a
+addEquations :: (Foldable t) => t (BoundVar, InfCount) -> Equations a -> Equations a
 addEquations = appEndo . foldMap (Endo . addEquation)
 
 mergeEqns :: Map BoundVar InfCount -> Map BoundVar InfCount -> Maybe (Map BoundVar InfCount)
 mergeEqns = mergeA preserveMissing preserveMissing
   (zipWithAMatched (\_k v1 v2 -> if v1 == v2 then Just v1 else Nothing))
 
-newtype Equations s a = Equations
+newtype Equations a = Equations
   {runEquations :: Maybe (Map BoundVar InfCount, a)}
   deriving newtype (Eq, Ord, Show)
 
-getEquations :: Equations s a -> Maybe a
+getEquations :: Equations a -> Maybe a
 getEquations = fmap (view _2) . runEquations
 
-nothingES :: Equations s a
+nothingES :: Equations a
 nothingES = Equations Nothing
 
-maybeES :: Maybe a -> Equations s a
+maybeES :: Maybe a -> Equations a
 maybeES = Equations . fmap (Empty,)
 
-instance Functor (Equations s) where
+instance Functor Equations where
   fmap f (Equations e) = Equations $ fmap (fmap f) e
-instance (Eq s) => Applicative (Equations s) where
+instance Applicative Equations where
   pure s = Equations $ Just (Empty, s)
   (Equations f) <*> (Equations a) = Equations $ join $ mergeApp <$> f <*> a where
-    mergeApp (eqns, f) (moreEqns, a) = (, f a) <$> mergeEqns eqns moreEqns 
+    mergeApp (eqns, f) (moreEqns, a) = (, f a) <$> mergeEqns eqns moreEqns
 
-instance (Eq s) => Monad (Equations s) where
+instance  Monad Equations where
   (Equations k) >>= f = Equations $ bind combine $ runEquations . f <$$> k
     where
     combine (eqns, Just (moreEqns, b))
       = (,b) <$> mergeEqns eqns moreEqns
     combine (_, Nothing) = Nothing
 
-instance (Eq s) => MonadFail (Equations s) where
+instance MonadFail Equations where
   fail _ = Equations Nothing
 
-instance Filterable (Equations s) where
+instance Filterable Equations where
   mapMaybe fm (Equations (Just (eqns, a))) = Equations $ (eqns,) <$> fm a
   mapMaybe _ (Equations Nothing) = Equations Nothing

@@ -70,7 +70,7 @@ getSkipEndPhase (EndMiddle (Config p _ _ _)) = p
 -- glomPointConfig = etToConfig . fmap glomPointRight . fmap glomPointLeft . configToET
 --   configToET & fmap glomPointLeft & fmap glomPointRight & etToConfig
 
-matchBits :: (Eq s) => s -> s -> Equations s ()
+matchBits :: (Eq s) => s -> s -> Equations ()
 matchBits b c = maybeES $ guard (b == c)
 
 --a Perfect match had no leftovers
@@ -79,7 +79,7 @@ data HeadMatch s c = PerfectH | TapeHLeft (s, c) deriving (Eq, Ord, Show)
 
 --we take the start of a skip and the start of a tape, match the symbols, match the counts
 -- and return what's left of the tape if any
-matchTapeHeads :: (Eq s) => (s, Count) -> (s, InfCount) -> Equations s (HeadMatch s InfCount)
+matchTapeHeads :: (Eq s) => (s, Count) -> (s, InfCount) -> Equations (HeadMatch s InfCount)
 matchTapeHeads (sb, skipC) (tb, tapeC) = do
   matchBits sb tb
   matchInfCount skipC tapeC >>= \case
@@ -103,7 +103,7 @@ data TapeMatch s = Perfect
 --fails, returning nothing
 --example :: matchBitTape [(F, 2), (T, 1)] [(F, 2), (T, 3), (F, x)] == [(T, 2), (F, x)]
 --returns Nothing if the match fails, else the match
-matchTape :: (Eq s) => [(s, Count)] -> [(s, InfCount)] -> Equations s (TapeMatch s)
+matchTape :: (Eq s) => [(s, Count)] -> [(s, InfCount)] -> Equations (TapeMatch s)
 matchTape [] [] = pure Perfect
 matchTape [] (t:ts) = pure $ TapeLeft (t :| ts)
 matchTape (s:rest) []  = pure $ SkipLeft (s :| rest)
@@ -173,7 +173,7 @@ getTapeRemain (SkipLeft _) = Nothing
 --match a config to a tape, and return the lists that remain on each side of the
 --tape after matching
 matchConfigTape :: (Eq s) => Config s -> ExpTape s InfCount
-  -> Equations s ([(s, InfCount)], [(s, InfCount)])
+  -> Equations ([(s, InfCount)], [(s, InfCount)])
 matchConfigTape (Config _p lsC pointC rsC) (ExpTape lsT pointT rsT)
   = do
     matchBits pointC pointT
