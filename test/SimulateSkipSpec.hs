@@ -32,8 +32,8 @@ simulateBasicAndGlue limit t = (normalRes, skipRes) where
           Left e -> error $ show e <> " was not a known edge simulateBasicAndGlue"
           Right res -> res 
   skipRes = case SimulateSkip.simulateOneMachineByGluing limit t (initSkipState t) of 
-    (_, Left e) -> error $ show e <> " was not a known edge simulateBasicAndGlue 2"
-    (_, Right res) -> res 
+    (_, _, Left e) -> error $ show e <> " was not a known edge simulateBasicAndGlue 2"
+    (_, _, Right res) -> res 
 
 twoThingsSimulatesSame :: SimResult Tape -> SimResult SkipTape -> Expectation 
 twoThingsSimulatesSame normalRes skipRes = if normalSteps == skipSteps 

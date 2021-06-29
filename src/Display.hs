@@ -39,6 +39,20 @@ displaySkipSimulationWithSkips :: Turing -> Steps -> Doc ann
 displaySkipSimulationWithSkips t limit = 
   prettyText (dispTuring t <> "\n") <> foldMap (\i -> displaySkipStepAndSkip t i <> "\n") [1.. limit]
 
+displayGlueStepAndSkip :: Turing -> Steps -> Bool -> Doc ann 
+displayGlueStepAndSkip t limit displayBook = case SimulateSkip.simulateOneMachineByGluing limit t (initSkipState t) of 
+  ([], _book, res) -> error ("there were no skips for some reason, res:\n" <> show res)
+  (_, _book, Left e) -> error $ "I think you meant to simulate a total machine but " <> 
+      show e <> " was not a defined edge"
+  (lastSkip : _, book, Right res) -> dispResult dispExpTape res <> "\nresulted from the skip:" <> show (pretty lastSkip) 
+    <> "\n" <> if displayBook then pretty book else ""
+  
+displayGlueSimulationAndBook :: Turing -> Steps -> Doc ann 
+displayGlueSimulationAndBook t limit = prettyText (dispTuring t <> "\n") 
+  <> foldMap (\i -> displayGlueStepAndSkip t i False <> "\n") [1.. limit-1]
+  <> displayGlueStepAndSkip t limit True 
+
+
 totalMachines :: Results a -> Int
 totalMachines r = r ^. haltCount + r ^. provenForever + r ^. unproven
 

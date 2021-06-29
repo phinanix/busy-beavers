@@ -129,7 +129,8 @@ glueSkips (Skip startConfig middleSkipEnd c b) (Skip middleConfig endSkipEnd c' 
   if not b then Right () else Left "first skip halted"
   leftovers <- glueEndToBeginning middleSkipEnd middleConfig 
   let (startTails, endTails) = leftoverTails leftovers
-  pure $ Skip (applyTailsConfig startTails startConfig) 
+  trace ("start tails were\n" <> show startTails <> "\n" <> "end tails were\n" <> show endTails) 
+    $ pure $ Skip (applyTailsConfig startTails startConfig) 
               (applyTailsSkipEnd endTails endSkipEnd) 
               (c <> c') 
               b'
