@@ -5,7 +5,8 @@ import Control.Lens
 import Data.Map.Monoidal (MonoidalMap(..))
 import Data.List (maximumBy)
 import Data.Map.Strict (assocs)
-import Data.Witherable
+import Witherable
+import Prettyprinter 
 
 import Util
 import Config
@@ -89,7 +90,7 @@ packageResult theSkip@(Skip _ e hopCount _) (boundVs, (newLs, newRs)) = Skipped
     getVar m x = case m^.at x of
       Just c -> c
       Nothing -> error $ show m <> "\n" <> show x 
-        <> " a bound var wasn't mapped in the skip:\n" <> dispSkip theSkip
+        <> " a bound var wasn't mapped in the skip:\n" <> show (pretty theSkip)
     -- updatePoint :: Map BoundVar InfCount -> (s, Location Count) -> (s, Location InfCount)
     -- updatePoint bs = (_2. _Side . _1 %~ updateCount bs)
     updateList :: Map BoundVar InfCount -> [(s, InfCount)] -> [(s, InfCount)]
@@ -150,7 +151,7 @@ lookupSkips (p, s) book = book ^. atE (p, s)
 skipFarthest :: (Eq s, Eq c)
   => (Skip s, SkipResult s c)
   -> (Skip s, SkipResult s c)
-  -> Ordering
+  -> Ordering 
 skipFarthest a b | a == b = EQ
 skipFarthest (Skip _ _ _ True, _)   _ = LT
 skipFarthest _   (Skip _ _ _ True, _) = GT
@@ -246,7 +247,8 @@ simulateOneMachineByGluing limit t = \case
           [] -> book 
           prevSkip : _rest -> case glueSkips prevSkip skip of 
             Left err -> error $ "used two skips in a row but couldn't glue:\n" 
-              <> "reason: " <> err <> "\n" <> dispSkip prevSkip <> "\nsecond skip\n" <> dispSkip skip
+              <> "reason: " <> err <> "\n" <> show (pretty prevSkip) 
+              <> "\nsecond skip\n" <> show (pretty skip)
             Right gluedSkip -> addSkipToBook gluedSkip book 
 
 simulateByGluing :: Int -> Turing -> Results (ExpTape Bit InfCount)

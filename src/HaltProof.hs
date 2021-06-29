@@ -6,6 +6,7 @@ import Data.Semigroup (Min(..), getMin)
 import qualified Data.List.NonEmpty as NE (filter)
 import Data.Map.Monoidal (MonoidalMap(..), findMin, deleteMin, deleteFindMin)
 import Data.Map.Strict (assocs)
+import Prettyprinter
 
 import Util
 import Config
@@ -39,16 +40,16 @@ mirrorHaltProof (OffToInfinityN s d) = OffToInfinityN s $ mirrorDir d
 --mirrorHaltProof (OffToInfinitySimple s d) = OffToInfinitySimple s $ mirrorDir d
 mirrorHaltProof h = h
 
-dispHaltProof :: HaltProof -> Text
-dispHaltProof (HaltUnreachable p) = "there is no path to halt from phase: " <> dispPhase p
-dispHaltProof (Cycle start end) = "the machine cycled over " <> show (end - start)
+dispHaltProof :: HaltProof -> Doc ann
+dispHaltProof (HaltUnreachable p) = prettyText $ "there is no path to halt from phase: " <> dispPhase p
+dispHaltProof (Cycle start end) = prettyText $ "the machine cycled over " <> show (end - start)
   <> " steps starting at step " <> show start
-dispHaltProof (OffToInfinityN steps dir) = "the machine will continue off to the "
+dispHaltProof (OffToInfinityN steps dir) = prettyText $ "the machine will continue off to the "
   <> show dir <> " forever after " <> show steps <> " steps"
-dispHaltProof BackwardSearch = "a backwards search implies the machine never halts"
-dispHaltProof (SkippedToInfinity steps skip) = "after " <> show steps
-  <> " steps, the machine applies the following skip which proves nonhalting:\n  "
-  <> dispSkip skip
+dispHaltProof BackwardSearch = prettyText "a backwards search implies the machine never halts"
+dispHaltProof (SkippedToInfinity steps skip) = prettyText ("after " <> show steps
+  <> " steps, the machine applies the following skip which proves nonhalting:\n  ")
+  <> pretty skip
 
 --runs a backward search from each halting state to see if it can reach a contradiction
 --if we show that all ways to halt don't have paths leading into them from valid tapes

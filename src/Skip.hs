@@ -2,7 +2,7 @@ module Skip where
 
 import Relude hiding (mapMaybe)
 import Control.Lens
-import Data.Witherable
+import Witherable
 import Data.Text.Prettyprint.Doc
 import Prettyprinter 
 
@@ -37,20 +37,23 @@ instance (NFData s) => NFData (Skip s)
 $(makeLenses ''Config)
 $(makeLenses ''Skip)
 
+prettyText :: Text -> Doc ann 
+prettyText = pretty 
+
 instance Pretty (Config Bit) where
-  pretty (Config p ls point rs) = text $ "phase: " <> dispPhase p <> "  "
+  pretty (Config p ls point rs) = pretty $ "phase: " <> dispPhase p <> "  "
     <> mconcat (dispBitCount <$> reverse ls)
     <> dispPoint point
     <> mconcat (dispBitCount <$> rs)
 
 instance Pretty (SkipEnd Bit) where
-  pretty (EndSide p L ls) =  "phase: " <> dispPhase p <> "  <|" <> mconcat (dispBitCount <$> ls)
-  pretty (EndSide p R ls) =  "phase: " <> dispPhase p <> " " <> mconcat (dispBitCount <$> ls) <> "|>"
-  pretty (EndMiddle c) = dispConfig c
+  pretty (EndSide p L ls) =  pretty $ "phase: " <> dispPhase p <> "  <|" <> mconcat (dispBitCount <$> ls)
+  pretty (EndSide p R ls) =  pretty $ "phase: " <> dispPhase p <> " " <> mconcat (dispBitCount <$> ls) <> "|>"
+  pretty (EndMiddle c) = pretty c
 
-dispSkip :: (Show s) => Skip s -> Text
-dispSkip (Skip s e c halts) = "in " <> dispCount c <> " steps we turn\n"
-  <> dispConfig s <> "\ninto: \n" <> dispSkipEnd e <> (if halts then "\n and halt" else "")
+instance Pretty (Skip Bit) where
+  pretty (Skip s e c halts) = prettyText "in " <> pretty (dispCount c) <> prettyText " steps we turn\n"
+    <> pretty s <> prettyText "\ninto: \n" <> pretty e <> prettyText (if halts then "\n and halt" else "")
 
 getSkipEndPhase :: SkipEnd s -> Phase
 getSkipEndPhase (EndSide p _ _) = p

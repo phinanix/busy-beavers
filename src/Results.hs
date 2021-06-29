@@ -2,12 +2,14 @@ module Results where
 
 import Relude
 import Control.Lens
+import Prettyprinter
 
 import Util
 import Config
 import Turing
 import Tape
 import HaltProof
+import Skip
 
 -- the type var here is the type of tape 
 data SimResult a = Halted Steps a
@@ -17,13 +19,13 @@ data SimResult a = Halted Steps a
 
 $(makePrisms ''SimResult)
 
-dispResult :: (a -> Text) -> SimResult a -> Text
-dispResult dispTape (Halted steps tape) = "After " <> show steps
+dispResult :: (a -> Text) -> SimResult a -> Doc ann
+dispResult dispTape (Halted steps tape) = prettyText $ "After " <> show steps
   <> " steps, halted with tape: \n" <> dispTape tape
-dispResult dispTape (Continue steps phase tape) = "step: " <> showInt3Wide steps
+dispResult dispTape (Continue steps phase tape) = prettyText $ "step: " <> showInt3Wide steps
   <> " state: " <> show phase
   <> " tape: " <> dispTape tape
-dispResult _ (ContinueForever proof) = "the machine will go forever via: "
+dispResult _ (ContinueForever proof) = prettyText "the machine will go forever via: "
   <> dispHaltProof proof
 
 --the results should be
