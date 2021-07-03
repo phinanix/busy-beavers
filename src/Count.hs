@@ -10,7 +10,7 @@ import Data.Map.Merge.Strict (mergeA, zipWithAMatched, preserveMissing)
 import Data.Map.Monoidal (MonoidalMap(..), assocs, mapKeys, unionWith, size, singleton,
   partitionWithKey, keys, intersectionWith)
 import Data.Foldable
-import Data.Witherable
+import Witherable
 
 import Util
 
@@ -210,7 +210,7 @@ matchCount (Count 0 Empty xs) c@(Count m bs ys) = case assocs xs of
   --if there's only one var, then it has to be the case that the RHS is a multiple
   --of the count of that var, and there's only one way to match
   [(x, Sum d)] -> case divCount c d of
-    Nothing -> nothingES
+    Nothing -> nothingES "tried to divCount 1 var and vailed"
     Just reducedC -> addEquation (x, NotInfinity reducedC) $ pure Empty
   xs -> case containsOne xs of
     (maybeX1, xs') -> foldrM matchVar (eitherKeys bs ys, []) xs' >>= \case
@@ -220,7 +220,7 @@ matchCount (Count 0 Empty xs) c@(Count m bs ys) = case assocs xs of
       --that requires that we have m big enough for that to actually work
       (unEitherKeys -> (newBs, newYs), remaining) ->
         let remainingSum = getSum $ foldMap snd remaining in
-        if remainingSum > m then nothingES else
+        if remainingSum > m then nothingES "ran out of nat" else
         --we need to do two things here: first, send all the remaining vars to one,
         --second send x1 to everything else
         addEquations ((,NotInfinity $ finiteCount 1) . fst <$> remaining) $ case maybeX1 of
@@ -269,18 +269,22 @@ matchCount (Count 0 Empty xs) c@(Count m bs ys) = case assocs xs of
 matchCount (Count 0 as xs) (Count m bs ys)
   = matchCount leftCount =<< maybeRightCount where
     leftCount = Count 0 Empty xs
-    maybeRightCount = Count m <$> matchSymbolVarMap (getSum <$> as) bs <*> pure ys
+    maybeRightCount = Count m <$> rightSymbolVarMap <*> pure ys
+    rightSymbolVarMap :: Equations (MMap SymbolVar (Sum Natural))
+    rightSymbolVarMap = matchSymbolVarMap (getSum <$> as) bs
+    matchSymbolVarMap :: MMap SymbolVar Natural -> MMap SymbolVar (Sum Natural) -> Equations (MMap SymbolVar (Sum Natural))
     matchSymbolVarMap as bs = ifoldrM subtractSymbolVar bs as
+    subtractSymbolVar :: SymbolVar -> Natural -> MMap SymbolVar (Sum Natural) -> Equations (MMap SymbolVar (Sum Natural))
     subtractSymbolVar var count m = case m ^. at var of
-      Nothing -> nothingES
+      Nothing -> nothingES ""
       Just (Sum occurs) -> case compare count occurs of
         LT -> pure $ m & at var . _Just . _Wrapped' -~ count
         EQ -> pure $ m & at var .~ Nothing
-        GT -> nothingES
+        GT -> nothingES ""
 --if the first count has a postive number, then we want to match it first
 matchCount (Count n as xs) (Count m bs ys) = if n <= m
   then matchCount (Count 0 as xs) (Count (m-n) bs ys)
-  else nothingES
+  else nothingES "matched a count with a bigger nat to a smaller nat"
 
 matchInfCount :: Count -> InfCount -> Equations InfCount
 --if you consume a finite number of symbols from an infinity, then an infinite number remain
@@ -322,57 +326,58 @@ newInfBoundVar :: Int -> InfCount
 newInfBoundVar = NotInfinity . newBoundVar
 
 --fails when the equation is inconsistent with what we already know
-addEquationToMap :: (BoundVar, InfCount) -> Map BoundVar InfCount -> Maybe (Map BoundVar InfCount)
+addEquationToMap :: (BoundVar, InfCount) -> Map BoundVar InfCount -> Either Text (Map BoundVar InfCount)
 addEquationToMap (v, c) m = case m ^. at v of
-  Nothing -> Just $ m & at v ?~ c
+  Nothing -> Right $ m & at v ?~ c
   --it's fine to assign the same count twice, but fails immediately if you assign
   --the same var to a new count. This is where we'd need to emit info to backtrack
   --if that ends up being a good feature to do
-  Just c' -> guard (c == c') >> Just m
+  Just c' -> unless (c == c') (Left "assigned to same var twice") >> Right m
 
 addEquation :: (BoundVar, InfCount) -> Equations a -> Equations a
-addEquation eqn (Equations (Just (m, a))) = case addEquationToMap eqn m of
-  Nothing -> Equations Nothing
-  (Just m') -> Equations (Just (m', a))
-addEquation _ _ = Equations Nothing
+addEquation eqn (Equations (Right (m, a))) = case addEquationToMap eqn m of
+  Left message -> Equations (Left message)
+  (Right m') -> Equations (Right (m', a))
+addEquation _eqn e@(Equations (Left _message)) = e
 
 addEquations :: (Foldable t) => t (BoundVar, InfCount) -> Equations a -> Equations a
 addEquations = appEndo . foldMap (Endo . addEquation)
 
-mergeEqns :: Map BoundVar InfCount -> Map BoundVar InfCount -> Maybe (Map BoundVar InfCount)
+mergeEqns :: Map BoundVar InfCount -> Map BoundVar InfCount -> Either Text (Map BoundVar InfCount)
 mergeEqns = mergeA preserveMissing preserveMissing
-  (zipWithAMatched (\_k v1 v2 -> if v1 == v2 then Just v1 else Nothing))
+  (zipWithAMatched (\_k v1 v2 -> if v1 == v2 then Right v1 else Left "values failed to match"))
 
 newtype Equations a = Equations
-  {runEquations :: Maybe (Map BoundVar InfCount, a)}
+  {runEquations :: Either Text (Map BoundVar InfCount, a)}
   deriving newtype (Eq, Ord, Show)
 
+--Discard the message
 getEquations :: Equations a -> Maybe a
-getEquations = fmap (view _2) . runEquations
+getEquations = preview (_Right . _2) . runEquations 
 
-nothingES :: Equations a
-nothingES = Equations Nothing
+nothingES :: Text -> Equations a
+nothingES text = Equations (Left text)
 
-maybeES :: Maybe a -> Equations a
+maybeES :: Either Text a -> Equations a
 maybeES = Equations . fmap (Empty,)
 
 instance Functor Equations where
   fmap f (Equations e) = Equations $ fmap (fmap f) e
 instance Applicative Equations where
-  pure s = Equations $ Just (Empty, s)
+  pure s = Equations $ Right (Empty, s)
   (Equations f) <*> (Equations a) = Equations $ join $ mergeApp <$> f <*> a where
     mergeApp (eqns, f) (moreEqns, a) = (, f a) <$> mergeEqns eqns moreEqns
 
 instance  Monad Equations where
   (Equations k) >>= f = Equations $ bind combine $ runEquations . f <$$> k
     where
-    combine (eqns, Just (moreEqns, b))
+    combine (eqns, Right (moreEqns, b))
       = (,b) <$> mergeEqns eqns moreEqns
-    combine (_, Nothing) = Nothing
+    combine (_, l@(Left _message)) = l
 
 instance MonadFail Equations where
-  fail _ = Equations Nothing
+  fail text = Equations $ Left $ fromString text
 
 instance Filterable Equations where
-  mapMaybe fm (Equations (Just (eqns, a))) = Equations $ (eqns,) <$> fm a
-  mapMaybe _ (Equations Nothing) = Equations Nothing
+  mapMaybe fm (Equations (Right (eqns, a))) = Equations $ (eqns,) <$> maybe (Left "wither") Right (fm a)
+  mapMaybe _ (Equations (Left m)) = Equations $ Left m 

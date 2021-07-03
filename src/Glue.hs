@@ -29,7 +29,7 @@ divStatics d n m = (,) <$> (n `maybeDiv` d) <*> (m `divMap` d)
 
 --given two counts, either produces the most general count that encompasses both of them or fails 
 --probably this should be an Equations and that monad should be upgraded to have a spawn new var field
-glueCounts :: Count -> Count -> Either Text (Equations Count) 
+glueCounts :: Count -> Count -> Either Text (Count) 
 glueCounts c d = case likeTerms c d of 
   --this is the two zerovar case, in which case all terms must be alike 
   (likes, Empty, Empty) -> pure likes
