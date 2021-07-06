@@ -99,7 +99,19 @@ packageResult (Skip _ e hopCount _) (boundVs, (newLs, newRs)) = Skipped
     updateList bs = fmap $ fmap (updateInfCount bs)
     finalizeList :: [(s, Count)] -> [(s, InfCount)]
     finalizeList = invariantifyList . updateList boundVs . fmap (fmap NotInfinity)
-
+    updateInfCount :: Map BoundVar InfCount -> InfCount -> InfCount
+    updateInfCount _m Infinity = Infinity
+    updateInfCount m (NotInfinity c) = updateCount m c
+    updateCount :: Map BoundVar InfCount -> Count -> InfCount
+    updateCount m (Count n as (MonoidalMap xs))
+      = NotInfinity (Count n as Empty) <> foldMap (updateVar m) (assocs xs) where
+      updateVar :: Map BoundVar InfCount -> (BoundVar, Sum Natural) -> InfCount
+      updateVar m (x, Sum n) = n `nTimes` getVar m x
+      getVar :: Map BoundVar InfCount -> BoundVar -> InfCount
+      getVar m x = case m^.at x of
+        Just c -> c
+        Nothing -> error $ show m <> "\n" <> show x 
+          <> " a bound var wasn't mapped"
 --we want to be able to apply a skip of counts to an ExpTape _ Count but also a
 --skip of counts to an ExpTape _ Nat
 

@@ -165,8 +165,11 @@ instance Monoid QuadCount where
 
 instance AsEmpty QuadCount
 
-nTimesCount :: (Integral n) => n -> InfCount -> InfCount
-nTimesCount n c = fold $ genericReplicate n c
+nTimes :: (Integral n, Monoid m) => n -> m -> m 
+nTimes n x = fold $ genericReplicate n x 
+
+nTimesInfCount :: (Integral n) => n -> InfCount -> InfCount
+nTimesInfCount n c = fold $ genericReplicate n c
 
 maybeDiv :: (Integral a) => a -> a -> Maybe a
 maybeDiv n d = if n `mod` d == 0 then Just $ n `div` d else Nothing
@@ -385,17 +388,3 @@ instance Filterable Equations where
   mapMaybe fm (Equations (Right (eqns, a))) = Equations $ (eqns,) <$> maybe (Left "wither") Right (fm a)
   mapMaybe _ (Equations (Left m)) = Equations $ Left m 
 
-
-updateInfCount :: Map BoundVar InfCount -> InfCount -> InfCount
-updateInfCount _m Infinity = Infinity
-updateInfCount m (NotInfinity c) = updateCount m c
-updateCount :: Map BoundVar InfCount -> Count -> InfCount
-updateCount m (Count n as (MonoidalMap xs))
-  = NotInfinity (Count n as Empty) <> foldMap (updateVar m) (M.assocs xs) where
-  updateVar :: Map BoundVar InfCount -> (BoundVar, Sum Natural) -> InfCount
-  updateVar m (x, Sum n) = n `nTimesCount` getVar m x
-  getVar :: Map BoundVar InfCount -> BoundVar -> InfCount
-  getVar m x = case m^.at x of
-    Just c -> c
-    Nothing -> error $ show m <> "\n" <> show x 
-      <> " a bound var wasn't mapped"

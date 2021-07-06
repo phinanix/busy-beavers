@@ -6,7 +6,10 @@ import Control.Lens
 -- import Control.Unification
 -- import Control.Unification.Types (UFailure(..))
 -- import Data.Functor.Fixedpoint
-import Data.Map.Monoidal (deleteFindMin, singleton, assocs)
+-- import Control.Unification
+-- import Control.Unification.Types (UFailure(..))
+-- import Data.Functor.Fixedpoint
+import Data.Map.Monoidal (deleteFindMin, singleton, assocs, MonoidalMap (MonoidalMap))
 
 import Util
 import Count
@@ -133,15 +136,25 @@ glueEndToBeginning (EndSide p R ls) (Config q ls' s' rs') = do
   if p == q then pure () else fail "phases were different" 
   (,) <$> glueTapeHalves ls ls' <*> pure (Start ((s', finiteCount 1) : rs'))
 
-updateConfig :: Map BoundVar InfCount -> Config s -> Config s 
+updateCount :: Map BoundVar Count -> Count -> Count 
+updateCount m (Count n as xs) = Count n as Empty 
+  <> foldMap (updateVar m) (assocs xs) where 
+    updateVar :: Map BoundVar Count -> (BoundVar, Sum Natural) -> Count 
+    updateVar m (x, Sum n) = n `nTimes` getVar m x 
+    getVar :: Map BoundVar Count -> BoundVar -> Count 
+    getVar m x = case m^.at x of 
+      Just c -> c 
+      Nothing -> boundVarCount x 1
+
+updateConfig :: Map BoundVar Count -> Config s -> Config s 
 updateConfig map (Config p ls point rs) = Config p (updateCount map <$$> ls) point (updateCount map <$$> rs) 
 
-updateSkipEnd :: Map BoundVar InfCount -> SkipEnd s -> SkipEnd s 
+updateSkipEnd :: Map BoundVar Count -> SkipEnd s -> SkipEnd s 
 updateSkipEnd map = \case 
   EndSide p d xs -> EndSide p d $ updateCount map <$$> xs --the problem is update count turns a count into an infcount but that doesn't work here
   EndMiddle config -> EndMiddle $ updateConfig map config 
 
-updateSkip :: Map BoundVar InfCount -> Skip s -> Skip s 
+updateSkip :: Map BoundVar Count -> Skip s -> Skip s 
 updateSkip map (Skip config end hops halts) = Skip 
   (updateConfig map config) 
   (updateSkipEnd map end) 
@@ -153,15 +166,22 @@ updateSkip map (Skip config end hops halts) = Skip
 --possible but this is not guaranteed to find the most general universal quantifiers
 glueSkips :: forall s. (Eq s, Show s) => Skip s -> Skip s -> Either Text (Skip s)
 glueSkips (Skip startConfig middleSkipEnd c b) (Skip middleConfig endSkipEnd c' b') 
- = uncurry updateSkip <$> runEquations skipWithEquations where
+ = uncurry updateSkip <$> munge (runEquations skipWithEquations) where
+  munge :: Either Text (Map BoundVar InfCount, a) -> Either Text (Map BoundVar Count, a)
+  munge = second $ first $ fmap unsafeDeInf
+  unsafeDeInf :: InfCount -> Count 
+  unsafeDeInf = \case 
+    NotInfinity c -> c 
+    Infinity -> error "unsafeDeInf" 
   skipWithEquations :: Equations (Skip s)
   skipWithEquations = do 
     if not b then pure () else fail "first skip halted"
     leftovers <- glueEndToBeginning middleSkipEnd middleConfig 
     let (startTails, endTails) = leftoverTails leftovers
-    trace ("start tails were\n" <> show startTails <> "\n" <> "end tails were\n" <> show endTails) 
-      $ pure $ Skip (applyTailsConfig startTails startConfig) 
+    --trace ("start tails were\n" <> show startTails <> "\n" <> "end tails were\n" <> show endTails) $
+    pure $ Skip (applyTailsConfig startTails startConfig) 
                 (applyTailsSkipEnd endTails endSkipEnd) 
                 (c <> c') 
                 b'
+              
 
