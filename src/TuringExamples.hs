@@ -1,6 +1,6 @@
 module TuringExamples where 
 
-import Relude 
+import Relude ( IsList(fromList), Bool(True, False) ) 
 
 import Turing 
 

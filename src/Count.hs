@@ -340,6 +340,9 @@ addEquation eqn (Equations (Right (m, a))) = case addEquationToMap eqn m of
   (Right m') -> Equations (Right (m', a))
 addEquation _eqn e@(Equations (Left _message)) = e
 
+emitEquation :: BoundVar -> InfCount -> Equations () 
+emitEquation l r = addEquation (l, r) $ pure ()
+
 addEquations :: (Foldable t) => t (BoundVar, InfCount) -> Equations a -> Equations a
 addEquations = appEndo . foldMap (Endo . addEquation)
 
@@ -358,8 +361,8 @@ getEquations = preview (_Right . _2) . runEquations
 nothingES :: Text -> Equations a
 nothingES text = Equations (Left text)
 
-maybeES :: Either Text a -> Equations a
-maybeES = Equations . fmap (Empty,)
+eitherES :: Either Text a -> Equations a
+eitherES = Equations . fmap (Empty,)
 
 instance Functor Equations where
   fmap f (Equations e) = Equations $ fmap (fmap f) e
@@ -381,3 +384,18 @@ instance MonadFail Equations where
 instance Filterable Equations where
   mapMaybe fm (Equations (Right (eqns, a))) = Equations $ (eqns,) <$> maybe (Left "wither") Right (fm a)
   mapMaybe _ (Equations (Left m)) = Equations $ Left m 
+
+
+updateInfCount :: Map BoundVar InfCount -> InfCount -> InfCount
+updateInfCount _m Infinity = Infinity
+updateInfCount m (NotInfinity c) = updateCount m c
+updateCount :: Map BoundVar InfCount -> Count -> InfCount
+updateCount m (Count n as (MonoidalMap xs))
+  = NotInfinity (Count n as Empty) <> foldMap (updateVar m) (M.assocs xs) where
+  updateVar :: Map BoundVar InfCount -> (BoundVar, Sum Natural) -> InfCount
+  updateVar m (x, Sum n) = n `nTimesCount` getVar m x
+  getVar :: Map BoundVar InfCount -> BoundVar -> InfCount
+  getVar m x = case m^.at x of
+    Just c -> c
+    Nothing -> error $ show m <> "\n" <> show x 
+      <> " a bound var wasn't mapped"

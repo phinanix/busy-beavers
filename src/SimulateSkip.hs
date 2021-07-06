@@ -71,11 +71,12 @@ instance (Ord s, Pretty s) => Pretty (SkipBook s) where
 applySkip :: forall s. (Pretty s, Eq s) => Skip s -> (Phase, ExpTape s InfCount)
   -> Maybe (SkipResult s InfCount)
 applySkip skip@(Skip s _ _ _) (p, tape)
-  = guard (s^.cstate == p) >> packageResult skip <$> runEquations (matchConfigTape s tape)
+  = guard (s^.cstate == p) >> either (const Nothing) Just
+      (packageResult skip <$> runEquations (matchConfigTape s tape))
 
 packageResult :: forall s. (Pretty s, Eq s) => Skip s -> (Map BoundVar InfCount, ([(s, InfCount)], [(s, InfCount)]))
   -> SkipResult s InfCount
-packageResult theSkip@(Skip _ e hopCount _) (boundVs, (newLs, newRs)) = Skipped
+packageResult (Skip _ e hopCount _) (boundVs, (newLs, newRs)) = Skipped
   (updateCount boundVs hopCount)
   (getSkipEndPhase e)
   $ getFinalET e (newLs, newRs)
@@ -91,19 +92,7 @@ packageResult theSkip@(Skip _ e hopCount _) (boundVs, (newLs, newRs)) = Skipped
     getFinalET (EndSide _ R newLs) (remLs, remRs) = case getNewPoint remRs of
       Nothing -> error "getting new point failed, what?"
       Just (point, remremRs) -> ExpTape (finalizeList newLs `etApp` remLs) point remremRs
-    updateInfCount :: Map BoundVar InfCount -> InfCount -> InfCount
-    updateInfCount _m Infinity = Infinity
-    updateInfCount m (NotInfinity c) = updateCount m c
-    updateCount :: Map BoundVar InfCount -> Count -> InfCount
-    updateCount m (Count n as (MonoidalMap xs))
-      = NotInfinity (Count n as Empty) <> foldMap (updateVar m) (assocs xs)
-    updateVar :: Map BoundVar InfCount -> (BoundVar, Sum Natural) -> InfCount
-    updateVar m (x, Sum n) = n `nTimesCount` getVar m x
-    getVar :: Map BoundVar InfCount -> BoundVar -> InfCount
-    getVar m x = case m^.at x of
-      Just c -> c
-      Nothing -> error $ show m <> "\n" <> show x 
-        <> " a bound var wasn't mapped in the skip:\n" <> show (pretty theSkip)
+
     -- updatePoint :: Map BoundVar InfCount -> (s, Location Count) -> (s, Location InfCount)
     -- updatePoint bs = (_2. _Side . _1 %~ updateCount bs)
     updateList :: Map BoundVar InfCount -> [(s, InfCount)] -> [(s, InfCount)]

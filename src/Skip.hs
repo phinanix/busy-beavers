@@ -71,7 +71,7 @@ getSkipEndPhase (EndMiddle (Config p _ _ _)) = p
 --   configToET & fmap glomPointLeft & fmap glomPointRight & etToConfig
 
 matchBits :: (Eq s) => s -> s -> Equations ()
-matchBits b c = maybeES $ unless (b == c) (Left "matched incorrect bits")
+matchBits b c = eitherES $ unless (b == c) (Left "matched incorrect bits")
 
 --a Perfect match had no leftovers
 --or we might have used up all of the skip and had some tape leftover

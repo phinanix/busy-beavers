@@ -23,51 +23,61 @@ Things to do:
  - i n d u c t i o n   m a c h i n e
 -}
 
+-- given a divisor d, a natural n and a map containing naturals m, either succeed at evenly dividing 
+-- the distinguised natural and all the naturals in the map by the divisor, or fail
 divStatics :: Natural -> Natural -> MMap k (Sum Natural) -> Maybe (Natural, MMap k (Sum Natural)) 
 divStatics d n m = (,) <$> (n `maybeDiv` d) <*> (m `divMap` d) 
 
 
 --given two counts, either produces the most general count that encompasses both of them or fails 
 --probably this should be an Equations and that monad should be upgraded to have a spawn new var field
-glueCounts :: Count -> Count -> Either Text (Count) 
+glueCounts :: Count -> Count -> Equations Count --Either Text (Count) 
 glueCounts c d = case likeTerms c d of 
   --this is the two zerovar case, in which case all terms must be alike 
   (likes, Empty, Empty) -> pure likes
   --if one side has a var, it unifies if the other side's leftovers are divisible by that coefficient
-  (_likes, OneVar 0 Empty k _x, ZeroVar m bs) ->  
-    maybe (Left "one/zero var failed to divide") Right $ divStatics k m bs >> pure d
+  (_likes, OneVar 0 Empty k x, ZeroVar m bs) -> case divStatics k m bs of 
+    Nothing -> fail "one/zero var failed to divide"
+    Just (m', bs') -> do 
+      emitEquation x $ NotInfinity $ ZeroVar m' bs'
+      pure d 
   --pops to the above case
   (_likes, ZeroVar _ _, OneVar _ _ _ _) -> glueCounts d c
   --both sides leftovers must be divisible by the other var, in which case you add together the 
   --leftovers and make a new var that is the LCM of the two coefficents
   --TODO :: this function currently doesn't know how to create a new var
-  (likes, OneVar n as k x, OneVar m bs j y) -> maybe (Left "one/one failed to divide") Right $ 
-    divStatics k m bs >> divStatics j n as >> 
-    pure (likes <> ZeroVar n as <> ZeroVar m bs <> OneVar 0 Empty (lcm j k) undefined)
+  (likes, OneVar n as k x, OneVar m bs j y) -> 
+    case bisequence (divStatics k m bs, divStatics j n as) of 
+      Nothing -> fail "one/one failed to divide"
+      Just ((m', bs'), (n', as')) -> do 
+        emitEquation x $ NotInfinity $ ZeroVar m' bs' 
+        emitEquation y $ NotInfinity $ ZeroVar n' as'
+        pure $ likes <> ZeroVar n as <> ZeroVar m bs 
+           <> OneVar 0 Empty (lcm j k) undefined --this needs to be a new variable
   -- TODO :: emit a warning here?
-  _ -> Left "one side had more than one var" 
+  _ -> fail "one side had more than one var" 
 
 --returns the part of the longer list that is not matched up via zip, 
 --ie returns the longer list with the first (length shortlist) elements dropped 
 remainingLonger :: [a] -> [b] -> Either [a] [b]
-remainingLonger xs ys = if (length xs < length ys) 
+remainingLonger xs ys = if length xs < length ys
   then Right (drop (length xs) ys) 
   else Left (drop (length ys) xs)
 
 --takes two lists, fails if they are incompatible, else returns a Left if some 
 --of the first list was leftover, or a Right if 
 --some of the second list was leftover 
-glueTapeHalves :: forall s. (Eq s) => [(s, Count)] -> [(s, Count)] -> Either Text ([(s, Count)], Leftover s)
-glueTapeHalves xs ys = (,) <$> matched <*> pure answer where
+glueTapeHalves :: forall s. (Eq s) => [(s, Count)] -> [(s, Count)] -> Equations (Leftover s)
+glueTapeHalves xs ys = matched >> pure answer where
   zipped = zip xs ys --discards longer 
-  matchOne :: ((s, Count), (s, Count)) -> Either Text (s, Count)
+  matchOne :: ((s, Count), (s, Count)) -> Equations (s, Count)
   matchOne ((s, c), (t, d)) = do 
     -- TODO :: this works / makes sense as long as we never spawn any new variables, otherwise
     --  this really needs to be returning the new list as a result, which is built out of the
     --  thing unified from c and d 
     newCount <- glueCounts c d 
-    if s == t then pure (s, newCount) else Left "matched tapes with different bits"
-  matched :: Either Text [(s, Count)]
+    if s == t then pure (s, newCount) else fail "matched tapes with different bits"
+  matched :: Equations [(s, Count)]
   matched = traverse matchOne zipped 
   --if the start one is longer, it means we need to add to the *end*
   --if the end one is longer, we need to add to the start
@@ -109,31 +119,49 @@ applyTailsSkipEnd (Tails lTail rTail) (EndSide p R ls) = case rTail of
     EndMiddle (Config p (ls `etApp` lTail) s ((s, unsafeSubNatFromCount c 1) : remRTail))
 
 --the leftovers on the left and right sides respectively
-glueEndToBeginning :: (Eq s) => SkipEnd s -> Config s -> Either Text (Leftover s, Leftover s)
+glueEndToBeginning :: (Eq s) => SkipEnd s -> Config s -> Equations (Leftover s, Leftover s)
 glueEndToBeginning (EndMiddle (Config p ls s rs)) (Config q ls' s' rs') = do 
-  if p == q then Right () else Left "phases were different"
-  if s == s' then Right () else Left "points were different"
-  (newLs, lsLeftovers) <- glueTapeHalves ls ls' 
-  (newRs, rsLeftovers) <- glueTapeHalves rs rs'
-  undefined 
+  if p == q then pure () else fail "phases were different"
+  if s == s' then pure () else fail "points were different"
+  lsLeftovers <- glueTapeHalves ls ls' 
+  rsLeftovers <- glueTapeHalves rs rs'
+  pure (lsLeftovers, rsLeftovers)
 glueEndToBeginning (EndSide p L rs) (Config q ls' s' rs') = do 
-  if p == q then Right () else Left "phases were different"
+  if p == q then pure () else fail "phases were different"
   (,) <$> pure (Start ((s', finiteCount 1) : ls')) <*> glueTapeHalves rs rs'
 glueEndToBeginning (EndSide p R ls) (Config q ls' s' rs') = do
-  if p == q then Right () else Left "phases were different" 
+  if p == q then pure () else fail "phases were different" 
   (,) <$> glueTapeHalves ls ls' <*> pure (Start ((s', finiteCount 1) : rs'))
+
+updateConfig :: Map BoundVar InfCount -> Config s -> Config s 
+updateConfig map (Config p ls point rs) = Config p (updateCount map <$$> ls) point (updateCount map <$$> rs) 
+
+updateSkipEnd :: Map BoundVar InfCount -> SkipEnd s -> SkipEnd s 
+updateSkipEnd map = \case 
+  EndSide p d xs -> EndSide p d $ updateCount map <$$> xs --the problem is update count turns a count into an infcount but that doesn't work here
+  EndMiddle config -> EndMiddle $ updateConfig map config 
+
+updateSkip :: Map BoundVar InfCount -> Skip s -> Skip s 
+updateSkip map (Skip config end hops halts) = Skip 
+  (updateConfig map config) 
+  (updateSkipEnd map end) 
+  (updateCount map hops) 
+  halts
 
 --takes a first and a second skip and returns, if it is possible, a skip that
 --results from applying one then the next. Tries to keep universals as general as
 --possible but this is not guaranteed to find the most general universal quantifiers
-glueSkips :: (Eq s, Show s) => Skip s -> Skip s -> Either Text (Skip s)
-glueSkips (Skip startConfig middleSkipEnd c b) (Skip middleConfig endSkipEnd c' b') = do 
-  if not b then Right () else Left "first skip halted"
-  leftovers <- glueEndToBeginning middleSkipEnd middleConfig 
-  let (startTails, endTails) = leftoverTails leftovers
-  trace ("start tails were\n" <> show startTails <> "\n" <> "end tails were\n" <> show endTails) 
-    $ pure $ Skip (applyTailsConfig startTails startConfig) 
-              (applyTailsSkipEnd endTails endSkipEnd) 
-              (c <> c') 
-              b'
+glueSkips :: forall s. (Eq s, Show s) => Skip s -> Skip s -> Either Text (Skip s)
+glueSkips (Skip startConfig middleSkipEnd c b) (Skip middleConfig endSkipEnd c' b') 
+ = uncurry updateSkip <$> runEquations skipWithEquations where
+  skipWithEquations :: Equations (Skip s)
+  skipWithEquations = do 
+    if not b then pure () else fail "first skip halted"
+    leftovers <- glueEndToBeginning middleSkipEnd middleConfig 
+    let (startTails, endTails) = leftoverTails leftovers
+    trace ("start tails were\n" <> show startTails <> "\n" <> "end tails were\n" <> show endTails) 
+      $ pure $ Skip (applyTailsConfig startTails startConfig) 
+                (applyTailsSkipEnd endTails endSkipEnd) 
+                (c <> c') 
+                b'
 

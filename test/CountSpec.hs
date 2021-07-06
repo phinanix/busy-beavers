@@ -12,7 +12,7 @@ import Test.QuickCheck.Instances
 
 import Count
 
-getBitES :: Equations Bool s -> Maybe s
+getBitES :: Equations s -> Maybe s
 getBitES = getEquations
 
 matchAndGet :: Count -> Count -> Maybe Count
