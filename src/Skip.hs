@@ -23,7 +23,8 @@ instance (NFData s) => NFData (Config s)
 
 --at the end of a skip, you might've fallen off the L of the given pile of bits, or you might be in the middle of some 
 --known bits, which is a config
-data SkipEnd s = EndSide Phase Dir [(s, Count)] | EndMiddle (Config s) deriving (Eq, Ord, Show, Generic, Functor)
+data SkipEnd s = EndSide Phase Dir [(s, Count)] | EndMiddle (Config s) 
+  deriving (Eq, Ord, Show, Generic, Functor)
 instance (NFData s) => NFData (SkipEnd s)
 
 data Skip s = Skip
@@ -60,8 +61,8 @@ getSkipEndPhase (EndSide p _ _) = p
 getSkipEndPhase (EndMiddle (Config p _ _ _)) = p
 
 -- --TODO: this code is not pretty but it works
--- configToET :: Config s -> (Phase, ExpTape s Count)
--- configToET (Config p ls point rs) = (p, ExpTape ls point rs)
+configToET :: Config s -> (Phase, ExpTape s Count)
+configToET (Config p ls point rs) = (p, ExpTape ls point rs)
 
 -- etToConfig :: (Phase, ExpTape s Count) -> Config s
 -- etToConfig (p, ExpTape ls point rs) = Config p ls point rs 

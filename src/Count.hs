@@ -168,9 +168,6 @@ instance AsEmpty QuadCount
 nTimes :: (Integral n, Monoid m) => n -> m -> m 
 nTimes n x = fold $ genericReplicate n x 
 
-nTimesInfCount :: (Integral n) => n -> InfCount -> InfCount
-nTimesInfCount n c = fold $ genericReplicate n c
-
 maybeDiv :: (Integral a) => a -> a -> Maybe a
 maybeDiv n d = if n `mod` d == 0 then Just $ n `div` d else Nothing
 

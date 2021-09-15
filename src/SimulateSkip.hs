@@ -23,7 +23,10 @@ data PartialStepResult a = Unknown Edge
                          | Stopped InfCount a (Skip Bit)
                          | Stepped InfCount Phase a (Skip Bit)
 
-data SkipOrigin s = Initial | Glued (Skip s) (Skip s) deriving (Eq, Ord, Show, Generic)
+data SkipOrigin s = Initial --from an atomic transition of the machine 
+                  | Glued (Skip s) (Skip s) --from gluing together the two skips in question in order
+                  | Induction (SkipBook s) Int --from stepping forward the given number of times, with the given skipbook
+                  deriving (Eq, Ord, Show, Generic)
 
 --the data type storing various proven skips associated with a machine
 --the "Phase, s" is the Phase on start and the "s" that the point is made of
@@ -179,6 +182,7 @@ skipFarthest (_, Skipped c _ _) (_, Skipped c' _ _) = compare c c'
 --on whether the base transition is present in the line marked **
 --but that should be generalizeable
 --a TapeSymbol has a function (s, Location c) -> Bit called getPointBit or something
+--or laterphina says the Skipbook maybe should be parameterized by s as well
 skipStep :: Turing -> SkipBook Bit -> Phase -> ExpTape Bit InfCount
   -> PartialStepResult (ExpTape Bit InfCount)
 skipStep (Turing _ trans) book p tape@(ExpTape _ls bit _rs)

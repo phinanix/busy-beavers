@@ -110,7 +110,7 @@ simProgram display results = do
           interact r
         Just machine -> showMachine r where
           showMachine r = do
-            putText $ "How many steps? Prompt:"
+            putText "How many steps? Prompt:"
             steps <- getLine
             case decimal steps of
               Left _ -> showMachine r
@@ -131,7 +131,7 @@ main = do
   -- let results = Simulate.simulate 140 $ startMachine1 4
   -- simProgram dispTape results
 
-  let skipResults = simulateWithSkips 140 $ startMachine1 4
+  let skipResults = simulateWithSkips 1000 $ startMachine1 5
   simProgram dispExpTape skipResults
 
   -- putTextLn $ showOneMachine bb2 10
