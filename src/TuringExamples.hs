@@ -44,3 +44,12 @@ bb3 = Turing {states = 3, transitions = fromList
   ,((Phase 2, False), Step (Phase 2) True  L)
   ,((Phase 2, True ), Step (Phase 0) True  L)
   ]}
+
+simple_sweeper :: Turing 
+simple_sweeper = Turing {states = 3, transitions  = fromList 
+  [((Phase 0, False), Step (Phase 1) True R)
+  ,((Phase 1, False), Step (Phase 2) False L)
+  ,((Phase 1, True), Step (Phase 1) False R)
+  ,((Phase 2, False), Step (Phase 2) True L)
+  ,((Phase 2, True), Step (Phase 0) True L)
+  ]}

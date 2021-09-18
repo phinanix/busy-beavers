@@ -71,13 +71,14 @@ instance (Ord s, Pretty s) => Pretty (SkipBook s) where
               $ assocs skipPile
 
 --returns nothing if the skip is inapplicable, else returns a new tape
-applySkip :: forall s. (Pretty s, Eq s) => Skip s -> (Phase, ExpTape s InfCount)
+applySkip :: forall s. (Eq s) => Skip s -> (Phase, ExpTape s InfCount)
   -> Maybe (SkipResult s InfCount)
 applySkip skip@(Skip s _ _ _) (p, tape)
   = guard (s^.cstate == p) >> either (const Nothing) Just
       (packageResult skip <$> runEquations (matchConfigTape s tape))
 
-packageResult :: forall s. (Pretty s, Eq s) => Skip s -> (Map BoundVar InfCount, ([(s, InfCount)], [(s, InfCount)]))
+packageResult :: forall s. (Eq s) => Skip s 
+  -> (Map BoundVar InfCount, ([(s, InfCount)], [(s, InfCount)]))
   -> SkipResult s InfCount
 packageResult (Skip _ e hopCount _) (boundVs, (newLs, newRs)) = Skipped
   (updateCount boundVs hopCount)
@@ -90,7 +91,8 @@ packageResult (Skip _ e hopCount _) (boundVs, (newLs, newRs)) = Skipped
       (c ^. c_point)
       (finalizeList (c^.rs) `etApp` remRs)
     getFinalET (EndSide _ L newRs) (remLs, remRs) = case getNewPoint remLs of
-      Nothing -> error "getting new point failed, what?"
+      --TODO, you can hit this if you are trying to prove an induction on a finite span of tape
+      Nothing -> error "getting new point failed, what?" 
       Just (point, remremLs) -> ExpTape remremLs point (finalizeList newRs `etApp` remRs)
     getFinalET (EndSide _ R newLs) (remLs, remRs) = case getNewPoint remRs of
       Nothing -> error "getting new point failed, what?"
