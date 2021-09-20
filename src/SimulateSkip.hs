@@ -22,6 +22,7 @@ import Glue
 data PartialStepResult a = Unknown Edge
                          | Stopped InfCount a (Skip Bit)
                          | Stepped InfCount Phase a (Skip Bit)
+                         | MachineStuck 
 
 data SkipOrigin s = Initial --from an atomic transition of the machine 
                   | Glued (Skip s) (Skip s) --from gluing together the two skips in question in order
@@ -75,28 +76,30 @@ applySkip :: forall s. (Eq s) => Skip s -> (Phase, ExpTape s InfCount)
   -> Maybe (SkipResult s InfCount)
 applySkip skip@(Skip s _ _ _) (p, tape)
   = guard (s^.cstate == p) >> either (const Nothing) Just
-      (packageResult skip <$> runEquations (matchConfigTape s tape))
+      (packageResult skip =<< runEquations (matchSkipTape skip tape))
 
 packageResult :: forall s. (Eq s) => Skip s 
   -> (Map BoundVar InfCount, ([(s, InfCount)], [(s, InfCount)]))
-  -> SkipResult s InfCount
+  -> Either Text (SkipResult s InfCount)
 packageResult (Skip _ e hopCount _) (boundVs, (newLs, newRs)) = Skipped
   (updateCount boundVs hopCount)
   (getSkipEndPhase e)
-  $ getFinalET e (newLs, newRs)
+  <$> getFinalET e (newLs, newRs)
   where
-    getFinalET :: SkipEnd s -> ([(s, InfCount)], [(s, InfCount)]) -> ExpTape s InfCount
-    getFinalET (EndMiddle c) (remLs, remRs) = ExpTape
+    getFinalET :: SkipEnd s -> ([(s, InfCount)], [(s, InfCount)]) -> Either Text (ExpTape s InfCount)
+    getFinalET (EndMiddle c) (remLs, remRs) = pure $ ExpTape
       (finalizeList (c^.ls) `etApp` remLs)
       (c ^. c_point)
       (finalizeList (c^.rs) `etApp` remRs)
-    getFinalET (EndSide _ L newRs) (remLs, remRs) = case getNewPoint remLs of
-      --TODO, you can hit this if you are trying to prove an induction on a finite span of tape
-      Nothing -> error "getting new point failed, what?" 
-      Just (point, remremLs) -> ExpTape remremLs point (finalizeList newRs `etApp` remRs)
-    getFinalET (EndSide _ R newLs) (remLs, remRs) = case getNewPoint remRs of
-      Nothing -> error "getting new point failed, what?"
-      Just (point, remremRs) -> ExpTape (finalizeList newLs `etApp` remLs) point remremRs
+      --TODO, this can fail if you are trying to prove an induction on a finite span of tape
+      --TODO, you can also hit this if you try to shift one point to the left but there is a 
+      --symbolvar on the tape there 
+    getFinalET (EndSide _ L newRs) (remLs, remRs) = do
+      (point, remremLs) <- getNewPoint remLs
+      pure $ ExpTape remremLs point (finalizeList newRs `etApp` remRs)
+    getFinalET (EndSide _ R newLs) (remLs, remRs) = do
+      (point, remremRs) <- getNewPoint remRs
+      pure $ ExpTape (finalizeList newLs `etApp` remLs) point remremRs
 
     -- updatePoint :: Map BoundVar InfCount -> (s, Location Count) -> (s, Location InfCount)
     -- updatePoint bs = (_2. _Side . _1 %~ updateCount bs)
@@ -198,10 +201,14 @@ skipStep (Turing _ trans) book p tape@(ExpTape _ls bit _rs)
       --maximumBy is safe, because we already checked the machine has this transition
       --defined, which implies at least one skip will apply
       --TODO :: unless we are at the end of the tape in which case we crash
-      (bestSkip, Skipped hops newP newT) = maximumBy skipFarthest appliedSkips
-      in --trace (toString $ (mconcat $ dispSkip . fst <$> appliedSkips) <> "\n") $
-      if bestSkip ^. halts then Stopped hops newT bestSkip
-        else Stepped hops newP newT bestSkip
+      in 
+      case appliedSkips of 
+        [] -> MachineStuck --TODO :: can we generate this message somewhere better?
+        _ -> let 
+          (bestSkip, Skipped hops newP newT) = maximumBy skipFarthest appliedSkips
+          in --trace (toString $ (mconcat $ dispSkip . fst <$> appliedSkips) <> "\n") $
+          if bestSkip ^. halts then Stopped hops newT bestSkip
+            else Stepped hops newP newT bestSkip
 type SkipTape = ExpTape Bit InfCount
 
 initSkipState :: Turing -> SimState 

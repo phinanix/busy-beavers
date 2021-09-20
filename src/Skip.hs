@@ -182,3 +182,16 @@ matchConfigTape (Config _p lsC pointC rsC) (ExpTape lsT pointT rsT)
   where
   matchSides left right = bisequence (mapMaybe getTapeRemain $ matchTape lsC left
                                      , mapMaybe getTapeRemain $ matchTape rsC right)
+
+matchSkipTape :: (Eq s) => Skip s -> ExpTape s InfCount 
+  -> Equations ([(s, InfCount)], [(s, InfCount)])
+matchSkipTape (Skip config end _hops _halts) tape = do 
+  out@(lRem, rRem) <- matchConfigTape config tape 
+  case end of     
+    EndMiddle _ -> pure out
+    EndSide _ph L _xs -> case lRem of 
+      [] -> nothingES "matched and fell off left side, but left side was end of tape"
+      _x1 : _x2 -> pure out 
+    EndSide _ph R _xs -> case rRem of 
+      [] -> nothingES "matched and fell off right side, but right side was end of tape"
+      _x1 : _x2 -> pure out

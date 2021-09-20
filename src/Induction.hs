@@ -20,7 +20,12 @@ import Data.Bits (Bits(bit))
 --returns Left with an error message 
 --or Right with success
 proveInductively :: Int -> Turing -> SkipBook Bit -> Skip Bit -> BoundVar -> Either Text (SkipOrigin Bit)
-proveInductively limit t book goal indVar = baseCase >> indCase >> pure origin where
+proveInductively limit t book goal indVar = case baseCase of 
+    Left m -> Left $ "failed base: " <> m 
+    Right _ -> case indCase of 
+        Left m -> Left $ "failed ind: " <> m 
+        Right _ ->  pure origin 
+    where
     origin :: SkipOrigin Bit 
     origin = Induction book limit
     baseCase :: Either Text Count
@@ -72,23 +77,37 @@ proveBySimulating limit t book (Skip start goal _ _)
     -- of the input, because unlike that normally being zeros, that is not ok here
     loop :: Int -> Phase -> ExpTape Bit InfCount -> Count -> Either Text Count
     loop numSteps p tape curCount
-      | indMatch p tape goal = pure curCount
+      |indMatch p tape goal = pure curCount
       | numSteps > limit = Left "exceeded limit while simulating"
       | otherwise = case skipStep t book p tape of
             Unknown e -> Left $ "hit unknown edge" <> show e
             Stopped {} -> Left "halted while simulating"
+            MachineStuck -> Left $ "machine stuck " <> show p 
+                <> " " <> show goal <> " " <> show tape 
             Stepped Infinity _ _ _ -> Left "hopped to infinity"
             Stepped (NotInfinity hopsTaken) newPhase newTape _
                 -> loop (numSteps + 1) newPhase newTape (curCount <> hopsTaken)
     indMatch :: Phase -> ExpTape Bit InfCount -> SkipEnd Bit -> Bool
-    indMatch p et se = case bitraverse pure deInfCount et of
+    indMatch cur_p et se = case bitraverse pure deInfCount et of
         Nothing -> False
-        Just (ExpTape ls point rs) -> case se of
-            EndSide ph dir xs -> (p == ph) && case dir of
-                L -> xs == ls
-                R -> xs == rs
+        Just tape@(ExpTape ls point rs) -> case se of
             EndMiddle (Config ph c_ls c_p c_rs)
-                -> (p == ph) && (ls == c_ls) && (point == c_p) && (rs == c_rs)
+                -> (cur_p == ph) && (ls == c_ls) && (point == c_p) && (rs == c_rs)
+            EndSide goalPhase dir xs -> endSideTapeMatch dir xs tape && 
+                endSideTransMatch dir goalPhase t cur_p tape
       where
+        endSideTapeMatch :: Dir -> [(Bit, Count)] -> ExpTape Bit Count -> Bool 
+        endSideTapeMatch L goal (ExpTape _ls point rs) = case getNewFinPoint goal of 
+            Nothing -> False 
+            Just (goal_p, goal_xs) -> (goal_p == point) && (goal_xs == rs) --yes this is reversed
+        endSideTapeMatch R goal (ExpTape ls point _rs) = case getNewFinPoint goal of 
+            Nothing -> False 
+            Just (goal_p, goal_xs) -> (goal_p == point) && (goal_xs == ls) --yes this is reversed
+        endSideTransMatch :: Dir -> Phase -> Turing -> Phase ->  ExpTape Bit Count -> Bool 
+        endSideTransMatch goal_d goalPhase (Turing _n map) curPhase (ExpTape _ p _) 
+            = case map ^. at (curPhase, p) of 
+                Nothing -> False 
+                (Just Halt) -> goal_d == L 
+                (Just (Step transPhase _bit d)) -> goal_d == d && goalPhase == transPhase
         deInfCount Infinity = Nothing
         deInfCount (NotInfinity c) = Just c

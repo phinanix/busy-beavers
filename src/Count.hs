@@ -65,8 +65,8 @@ pattern One :: Count
 pattern One = Count 1 Empty Empty
 
 instance Show Count where
-  show (Count num symbols bound) = "Count " <> show num <> " (fromList " <> show (toList symbols)
-    <> ") (fromList " <> show (toList bound) <> ")"
+  show (Count num symbols bound) = "Count " <> show num <> " (fromList " <> show (assocs symbols)
+    <> ") (fromList " <> show (assocs bound) <> ")"
 
 instance Countable Count where
   unit = finiteCount 1
@@ -182,7 +182,7 @@ subNatFromCount (Count n as xs) m = guard (n >= m) $> Count (n - m) as xs
 
 unsafeSubNatFromCount :: Count -> Natural -> Count
 unsafeSubNatFromCount c n = case subNatFromCount c n of
-  Nothing -> error "unsafesubnatfromcount"
+  Nothing -> error $ "unsafesubnatfromcount " <> show c 
   Just r -> r
 
 --given two counts, returns a count of their like terms and the two leftovers, in that order 

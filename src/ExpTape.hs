@@ -87,12 +87,20 @@ instance Tapeable (ExpTape Bit InfCount) where
     countList :: [(Bit, InfCount)] -> Int
     countList = getSum . foldMap Sum . mapMaybe (\(bit, c) -> guard bit $> infCountToInt c)
 
-getNewPoint :: [(s, InfCount)] -> Maybe (s, [(s, InfCount)])
-getNewPoint [] = Nothing
-getNewPoint xs@((b, Infinity) : _) = Just (b, xs)
+getNewPoint :: [(s, InfCount)] -> Either Text (s, [(s, InfCount)])
+getNewPoint [] = Left "tape Empty"
+getNewPoint xs@((b, Infinity) : _) = pure (b, xs)
 getNewPoint  ((b, NotInfinity c) : xs) = if c == finiteCount 1
+  then pure (b, xs)
+  else case subNatFromCount c 1 of 
+    Nothing -> Left $ "count didn't have an extra" <> show c
+    Just newC -> pure (b, (b, NotInfinity newC) : xs)
+
+getNewFinPoint :: [(s, Count)] -> Maybe (s, [(s, Count)])
+getNewFinPoint [] = Nothing
+getNewFinPoint  ((b, c) : xs) = if c == finiteCount 1
   then Just (b, xs)
-  else Just (b, (b, NotInfinity $ unsafeSubNatFromCount c 1) : xs)
+  else subNatFromCount c 1 <&> (\newC -> (b, (b, newC) : xs))
 
 expTapeToTape :: ExpTape Bit InfCount -> Tape
 expTapeToTape (ExpTape left point right) = Tape newLeft point newRight where

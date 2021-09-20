@@ -44,7 +44,7 @@ mirrorTrans (Step p b d) = Step p b $ mirrorDir d
 
 mirrorTuring :: Turing -> Turing
 mirrorTuring (Turing stateCount transitions)
-  = Turing stateCount $ mirrorTrans <$> transitions where
+  = Turing stateCount $ mirrorTrans <$> transitions
 --
 uniDir :: NonEmpty Dir
 uniDir = L :| [R]
@@ -94,7 +94,7 @@ uniTrans n = Halt :| toList (do
 --this universe is made of maps that have all the given keys, each associated with
 --every possible value
 uniMap :: forall k v. Ord k => NonEmpty k -> NonEmpty v -> NonEmpty (Map k v)
-uniMap ks vs = foldlM (addKey) Empty ks where
+uniMap ks vs = foldlM addKey Empty ks where
   addKey :: Map k v -> k -> NonEmpty (Map k v)
   addKey !m k = do
     v <- vs
