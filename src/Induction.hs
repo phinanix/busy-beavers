@@ -3,6 +3,7 @@ module Induction where
 import Relude
 import Control.Lens
 import Data.Map.Monoidal (assocs)
+import qualified Data.Map as M 
 
 import Util
 import Count
@@ -11,6 +12,7 @@ import ExpTape
 import Turing
 import SimulateSkip
 import Data.Bits (Bits(bit))
+import Data.List (minimumBy)
 
 --goal: make a thing that takes a skip that might apply to a certain machine, 
 --attempts to simulate forward to prove that skip using induction
@@ -73,8 +75,6 @@ proveBySimulating limit t book (Skip start goal _ _)
     where
     -- four conditions: we've taken more steps than the limit,
     -- we've succeeded, stepping fails for some reason, or we continue 
-    -- TODO :: we need to somehow figure out how to notice if we step off the edge
-    -- of the input, because unlike that normally being zeros, that is not ok here
     loop :: Int -> Phase -> ExpTape Bit InfCount -> Count -> Either Text Count
     loop numSteps p tape curCount
       |indMatch p tape goal = pure curCount
@@ -111,3 +111,20 @@ proveBySimulating limit t book (Skip start goal _ _)
                 (Just (Step transPhase _bit d)) -> goal_d == d && goalPhase == transPhase
         deInfCount Infinity = Nothing
         deInfCount (NotInfinity c) = Just c
+
+
+-- TODO: write a function that guesses a good induction hypothesis given a history of the tape 
+-- (first guess: the simplest signature that has occurred 3 times, guess the additive induction if one exists)
+guessInductionHypothesis :: [ExpTape Bit InfCount] -> Maybe (Skip Bit)
+guessInductionHypothesis tapes = undefined where 
+    tapeSignatures :: [Signature Bit]
+    tapeSignatures = tapeSignature <$> tapes  
+    sigFreqs :: Map (Signature Bit) Int
+    sigFreqs = M.fromListWith (+) $ (,1) <$> tapeSignatures
+    possibleSigs ::  [Signature Bit]
+    possibleSigs = filter (\s -> (sigFreqs ^?! ix s) >= 3) tapeSignatures 
+    simplestSig = minimumBy (compare `on` signatureComplexity) possibleSigs
+    goalTapes = filter (\tape -> tapeSignature tape == simplestSig) tapes 
+    --To complete this function, given the goal tapes, for each position, accumulate the counts at that position
+    --a list of counts leads to a generalized guess for the overall (more complex) count, eg 1, 2, 3, leads to n, and 2,4,6 leads to 2n
+    -- then you need to be able to union counts somehow maybe? or no, I think that's just it

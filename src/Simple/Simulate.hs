@@ -78,7 +78,6 @@ simpleInfiniteLeft (phase, steps, Tape [] False _) (Turing{transitions = trans})
 simpleInfiniteLeft _ _ = Nothing
 
 --this is analagous to the other case, but mirrored
--- TODO :: refactor this to not duplicate so much code
 simpleInfiniteRight :: SimState -> Turing -> Maybe HaltProof
 simpleInfiniteRight simState turing = mirrorHaltProof <$>
   simpleInfiniteLeft (mirrorSimState simState) (mirrorTuring turing)

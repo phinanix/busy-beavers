@@ -60,7 +60,7 @@ spec = do
         (BoundVar 0) `shouldBe` Left "failed ind: machine stuck Phase 1 EndSide Phase 0 R [(True,Count 3 (fromList [(SymbolVar 4,Sum {getSum = 1})]) (fromList []))] ExpTape {left = [(True,NotInfinity Count 1 (fromList []) (fromList []))], point = True, right = [(False,NotInfinity Count 0 (fromList [(SymbolVar 4,Sum {getSum = 1})]) (fromList [])),(True,NotInfinity Count 1 (fromList []) (fromList []))]}"
   describe "replaceVarInSkip" $ do 
     --TODO:: I think we break the tape invariant if we replace a var maybe? But maybe not
-    -- 1hr later phina thinks we don't actually
+    -- 1hr later phina thinks we don't actually, but writing a test still seems good
     it "solves a simple case" $ do 
       3 `shouldBe` 4
   describe "proveBySimulating" $ do 
