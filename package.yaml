@@ -29,6 +29,7 @@ library:
   - lens
   - mtl
   - relude
+  - safe
   - monoidal-containers
   - witherable
   - prettyprinter

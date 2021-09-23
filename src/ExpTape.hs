@@ -3,13 +3,12 @@ module ExpTape where
 import Relude
 import qualified Relude.Unsafe as Unsafe (init)
 import Control.Lens
-import Prettyprinter 
+import Prettyprinter
 
 import Turing
 import Count
 import Tape
 import Data.Bitraversable (Bitraversable)
-import Relude (Bifoldable)
 
 
 data ExpTape s c = ExpTape
@@ -19,17 +18,17 @@ data ExpTape s c = ExpTape
   } deriving (Eq, Ord, Show, Generic)
 instance (NFData s, NFData c) => NFData (ExpTape s c)
 
-instance Bifunctor ExpTape where 
-  first :: (a -> b) -> ExpTape a c -> ExpTape b c 
+instance Bifunctor ExpTape where
+  first :: (a -> b) -> ExpTape a c -> ExpTape b c
   first f (ExpTape ls p rs) = ExpTape (first f <$> ls) (f p) (first f <$> rs)
-  second :: (c -> d) -> ExpTape a c -> ExpTape a d 
+  second :: (c -> d) -> ExpTape a c -> ExpTape a d
   second g (ExpTape ls p rs) = ExpTape (second g <$> ls) p (second g <$> rs)
 
-instance Bifoldable ExpTape where 
-  bifoldMap = bifoldMapDefault 
+instance Bifoldable ExpTape where
+  bifoldMap = bifoldMapDefault
 
 instance Bitraversable ExpTape where
-  bitraverse f g (ExpTape ls p rs) 
+  bitraverse f g (ExpTape ls p rs)
    = ExpTape <$> traverse (bitraverse f g) ls <*> f p <*> traverse (bitraverse f g) rs
 
 --TODO:: this function tells us we should probably be using Seq instead of list
@@ -92,7 +91,7 @@ getNewPoint [] = Left "tape Empty"
 getNewPoint xs@((b, Infinity) : _) = pure (b, xs)
 getNewPoint  ((b, NotInfinity c) : xs) = if c == finiteCount 1
   then pure (b, xs)
-  else case subNatFromCount c 1 of 
+  else case subNatFromCount c 1 of
     Nothing -> Left $ "count didn't have an extra" <> show c
     Just newC -> pure (b, (b, NotInfinity newC) : xs)
 
@@ -114,8 +113,8 @@ expTapeToTape (ExpTape left point right) = Tape newLeft point newRight where
 
 data Signature s = Signature [s] s [s] deriving (Eq, Ord, Show)
 
-tapeSignature :: ExpTape s c -> Signature s 
+tapeSignature :: ExpTape s c -> Signature s
 tapeSignature (ExpTape ls p rs) = Signature (fst <$> ls) p  (fst <$> rs)
 
-signatureComplexity :: Signature s -> Int 
+signatureComplexity :: Signature s -> Int
 signatureComplexity (Signature ls _p rs) = length ls + length rs

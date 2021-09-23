@@ -80,4 +80,14 @@ spec = do
     it "generalizes a subtractive function" $ do 
       generalizeFromCounts ((c 5, c 3) :| [(c 10, c 8), (c 4, c 2)]) 
         `shouldBe` Just (newBoundVar 0 <> finiteCount 2, newBoundVar 0)
-    
+    it "generalizes a multiplicative function" $ do -- 3x - 2
+      generalizeFromCounts ((c 5, c 13) :| [(c 10, c 28), (c 2, c 4)]) 
+        `shouldBe` Just (newBoundVar 0 <> finiteCount 2, nTimes 3 $ newBoundVar 0)
+    it "fails to generalize when it isn't a pattern" $ do -- 3x - 2
+      generalizeFromCounts ((c 5, c 13) :| [(c 10, c 42), (c 2, c 4)]) 
+        `shouldBe` Nothing
+    it "fails to generalize when the third doesn't match the first two " $ do -- 3x - 2
+      generalizeFromCounts ((c 5, c 13) :| [(c 10, c 18), (c 2, c 4)]) 
+        `shouldBe` Nothing
+    --TODO, write basic tests for the 3 cases of generalizeFromInfCounts 
+    --write several tests for guessInductionHypothesis    

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 42f44dac54b80acc763657031b75f49d620b8744884ce30502343f04e2e2af91
+-- hash: 21124a1d080dee9d879386a64d3eb20b62750dd7a17f829504471275da04e027
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -59,6 +59,7 @@ library
     , mtl
     , prettyprinter
     , relude
+    , safe
     , witherable
   default-language: Haskell2010
 
