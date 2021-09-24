@@ -144,27 +144,30 @@ showEval x = traceShow x x
 showEvalN :: Show a => String -> a -> a
 showEvalN t x = trace (t <> "\n" <> show x) x
 
+showTapePhaseList :: [(Phase, ExpTape Bit InfCount)] -> String
+showTapePhaseList tapes = toString $ T.concat $ (\(p, x) -> dispPhase p <> " " <> dispExpTape x <> "\n") <$> tapes
+
 -- TODO: write a function that guesses a good induction hypothesis given a history of the tape 
 -- (first guess: the simplest signature that has occurred 3 times, guess the additive induction if one exists)
-guessInductionHypothesis :: [ExpTape Bit InfCount] -> Maybe (Skip Bit)
-guessInductionHypothesis tapes = trace (toString $ T.concat $ (\x -> dispExpTape x <> "\n") <$> tapes) skipOut where
-    tapeSignatures :: [Signature Bit]
-    tapeSignatures = tapeSignature <$> tapes
-    sigFreqs :: Map (Signature Bit) Int
+guessInductionHypothesis :: [(Phase, ExpTape Bit InfCount)] -> Maybe (Skip Bit)
+guessInductionHypothesis tapesAndPhases = trace (showTapePhaseList tapesAndPhases) skipOut where
+    tapeSignatures :: [(Phase, Signature Bit)]
+    tapeSignatures = tapeSignature <$$> tapesAndPhases
+    sigFreqs :: Map (Phase, Signature Bit) Int
     sigFreqs = M.fromListWith (+) $ (,1) <$> tapeSignatures
-    possibleSigs :: [Signature Bit]
+    possibleSigs :: [(Phase, Signature Bit)]
     possibleSigs = filter (\s -> (sigFreqs ^?! ix s) >= 3) tapeSignatures 
-    simplestSig = minimumBy (compare `on` signatureComplexity) possibleSigs
-    goalTapes :: Maybe (NonEmpty (ExpTape Bit InfCount))
-    goalTapes = let ans = nonEmpty $ filter (\tape -> tapeSignature tape == simplestSig) tapes in 
-        trace (toString $ "goal:\n" <> T.concat (mNEToList ((\x -> dispExpTape x <> "\n") <$$> ans))) ans
+    simplestSig = minimumBy (compare `on` signatureComplexity . snd) possibleSigs
+    goalTapes :: Maybe (NonEmpty (Phase, ExpTape Bit InfCount))
+    goalTapes = let ans = nonEmpty $ filter (\(p, tape) -> (p, tapeSignature tape) == simplestSig) tapesAndPhases in 
+        trace ("goal:\n" <> showTapePhaseList (mNEToList ans)) ans
     --To complete this function, given the goal tapes, for each position, accumulate the counts at that position
     --a list of counts leads to a generalized guess for the overall (more complex) count, eg 1, 2, 3, leads to n, and 2,4,6 leads to 2n
     -- then you need to be able to union counts somehow maybe? or no, I think that's just it
     etToCounts (ExpTape ls _p rs) = (snd <$> ls, snd <$> rs)
     -- appears correct
     countOfGoalTapes :: Maybe (NonEmpty ([InfCount], [InfCount]))
-    countOfGoalTapes = showEvalN "countOfGoalTapes" $ etToCounts <$$> goalTapes
+    countOfGoalTapes = showEvalN "countOfGoalTapes" $ etToCounts . snd <$$> goalTapes
     -- appears correct
     pairOfCountLists :: Maybe ([NonEmpty InfCount], [NonEmpty InfCount])
     pairOfCountLists = showEvalN "pairOfCountLists" $ bisequence (transposeNE <$> (fst <$$> countOfGoalTapes),
@@ -175,18 +178,8 @@ guessInductionHypothesis tapes = trace (toString $ T.concat $ (\x -> dispExpTape
     pairOfCountPairs = showEvalN "pairOfCountPairs" $ bimapBoth (fmap $ fromList . pairUpNe) <$> pairOfCountLists
     allCountsGeneralizedEither :: Maybe ([Either () (Count, Count)], [Either () (Count, Count)])
     allCountsGeneralizedEither = bitraverseBoth (traverse generalizeFromInfCounts) =<< pairOfCountPairs
-    -- mungeGeneralizedCount :: [Either () (Count, Count)] -> [(Count, Count)] 
-    -- mungeGeneralizedCount = \case 
-    --     [] -> [] 
-    --     [x] -> case x of 
-    --         Left () -> [] 
-    --         Right p -> [p] 
-    --     x : rest@(_: _) -> case x of 
-    --         Left () -> error "mungeGeneralizedCount"
-    --         Right p -> p : mungeGeneralizedCount rest 
-    -- allCountsGeneralized = bimapBoth mungeGeneralizedCount <$> allCountsGeneralizedEither
     goalPoints :: Maybe (NonEmpty Bit)
-    goalPoints = point <$$> goalTapes
+    goalPoints = point . snd <$$> goalTapes
     targetPoint :: Maybe Bit
     targetPoint = head <$> goalPoints
     etPointsStacked :: Maybe Bit --really worried I got this one wrong -- 23:50 29Sep21
@@ -204,7 +197,10 @@ guessInductionHypothesis tapes = trace (toString $ T.concat $ (\x -> dispExpTape
     skipOut = do 
         (lPairs, rPairs) <- allCountsGeneralizedEither 
         point <- etPointsStacked 
-        (Signature lSig p rSig) <- tapeSignature . head <$> goalTapes 
+        actualGoalTapes <- goalTapes
+        let targetPhase = fst $ head actualGoalTapes 
+        goalPhase <- boolToMaybe (list1AllEqual $ fst <$> actualGoalTapes) $> targetPhase 
+        let (Signature lSig p rSig) = tapeSignature . snd . head $ actualGoalTapes
         if p /= point then error "oh no skipOut" else Just () 
         let 
             --TODO:: the phase here is a placeholder
@@ -212,7 +208,7 @@ guessInductionHypothesis tapes = trace (toString $ T.concat $ (\x -> dispExpTape
          makeConfig f = do 
              lStuff <- mungePairedStuff f $ zipExact lSig lPairs
              rStuff <- mungePairedStuff f $ zipExact rSig rPairs
-             pure $ Config (Phase (-1)) lStuff p rStuff
+             pure $ Config goalPhase lStuff p rStuff
         startConfig <- makeConfig fst 
         endConfig <- makeConfig snd 
         pure $ Skip startConfig (EndMiddle endConfig) (finiteCount 0) False
@@ -225,7 +221,6 @@ guessInductionHypothesis tapes = trace (toString $ T.concat $ (\x -> dispExpTape
 -- else, see if they are generated by a function of the form x -> m * x + b 
 -- else give up 
 generalizeFromCounts :: NonEmpty (Count, Count) -> Maybe (Count, Count)
--- generalizeFromCounts xs | trace (show xs <> "\n\n") False = undefined 
 generalizeFromCounts xs = allEqualPair <|> additivePair <|> affinePair where
     allEqualPair :: Maybe (Count, Count)
     allEqualPair = guard (list1AllEqual xs) >> pure (head xs)

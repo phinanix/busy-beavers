@@ -61,8 +61,9 @@ gluePreviousTwoSkips state = state & s_book .~ newBook where
       Right gluedSkip -> addSkipToBook gluedSkip (Glued prevSkip skip) book
 
 recordHist :: SimState -> SimState
-recordHist state = state & s_history %~ (:) curTape where
+recordHist state = state & s_history %~ (:) (curPhase, curTape) where
   curTape = state ^. s_tape
+  curPhase = state ^. s_phase 
 
 attemptInductionGuess :: Turing -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
 attemptInductionGuess _machine state = case guessInductionHypothesis hist of 

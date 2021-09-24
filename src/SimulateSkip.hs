@@ -39,7 +39,7 @@ data SimState = SimState
   , _s_book :: SkipBook Bit
   , _s_steps :: Steps --the number of "small" / machine steps we have simulated. 
   , _s_trace :: [Skip Bit] -- a list of the skips used so far in order
-  , _s_history :: [ExpTape Bit InfCount] --a list of the tapes seen so far in order
+  , _s_history :: [(Phase, ExpTape Bit InfCount)] --a list of the tapes seen so far in order
   , _s_counter :: Int --the number of times we have taken a "big step". guaranteed to take on all values between 0 and n
   }
 
