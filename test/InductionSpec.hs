@@ -12,6 +12,11 @@ import TuringExamples
 import SimulateSkip
 import Induction
 import Skip
+import SimulationLoops
+import Results 
+import HaltProof
+import HaltProof (HaltProof(BackwardSearch))
+import TuringExamples (checkerboardSweeper)
 
 weird3Goal :: Skip Bit
 weird3Goal = Skip
@@ -45,12 +50,12 @@ simple_sweeperGoal = Skip
   False
 
 c = finiteCount 
-unsafeL1 = (\case
-            [] -> error "lol"
-            (x : xs) -> x :| xs)
 
 spec :: Spec
 spec = do
+  describe "transposeNE" $ do 
+    it "works on a simple case" $ 
+     transposeNE ([1,2] :| [[3,4],[5,6]]) `shouldBe` [1 :| [3,5], 2 :| [4,6]]
   describe "proveInductively" $ do
     it "proves a simple thing" $
       proveInductively 4 simple_sweeper (initBook simple_sweeper) simple_sweeperGoal (BoundVar 0)
@@ -60,7 +65,7 @@ spec = do
       `shouldBe` Right (Induction (initBook weird3) 4)
     it "fails to pvoe a thing that is false" $
       proveInductively 20 checkerboardSweeper (initBook checkerboardSweeper) checkerboardFalseGoal
-      (BoundVar 0) `shouldBe` Left "failed ind: machine stuck Phase 1 EndSide Phase 0 R [(True,Count 3 (fromList [(SymbolVar 4,Sum {getSum = 1})]) (fromList []))] ExpTape {left = [(True,NotInfinity Count 1 (fromList []) (fromList []))], point = True, right = [(False,NotInfinity Count 0 (fromList [(SymbolVar 4,Sum {getSum = 1})]) (fromList [])),(True,NotInfinity Count 1 (fromList []) (fromList []))]}"
+      (BoundVar 0) `shouldBe` Left "failed ind: machine stuck (Phase 1) EndSide (Phase 0) R [(True,Count 3 (fromList [(SymbolVar 4,Sum {getSum = 1})]) (fromList []))] ExpTape {left = [(True,NotInfinity Count 1 (fromList []) (fromList []))], point = True, right = [(False,NotInfinity Count 0 (fromList [(SymbolVar 4,Sum {getSum = 1})]) (fromList [])),(True,NotInfinity Count 1 (fromList []) (fromList []))]}"
   describe "replaceVarInSkip" $ do
     it "solves a simple case" $ do
       3 `shouldBe` 3
@@ -69,7 +74,7 @@ spec = do
       3 `shouldBe` 3
   describe "generalizeFromCounts" $ do 
     it "generalizes identical ints" $ do
-      generalizeFromCounts (unsafeL1 $ replicate 5 (finiteCount 5, finiteCount 5)) 
+      generalizeFromCounts (fromList $ replicate 5 (finiteCount 5, finiteCount 5)) 
         `shouldBe` Just (finiteCount 5, finiteCount 5)
     {- it "generalizes infinity" $ do 
       generalizeFromCounts (unsafeL1 $ replicate 5 (Infinity, Infinity))
@@ -91,3 +96,21 @@ spec = do
         `shouldBe` Nothing
     --TODO, write basic tests for the 3 cases of generalizeFromInfCounts 
     --write several tests for guessInductionHypothesis    
+  describe "guessInductionHypothesis" $ do
+    it "guesses for a counting machine" $ do 
+       indGuessLoop 1000 weird3 `shouldBe` InductionGuess (Skip 
+        (Config (Phase (-1)) [] False [(True, Count 0 Empty (fromList [(BoundVar 0,Sum 1)]))])
+        (EndMiddle (Config (Phase (-1)) [] False [(True, Count 1 Empty (fromList [(BoundVar 0, Sum 1)]))]))
+        Empty
+        False) --this is of course only one reasonable guess, others would also be fine 
+    it "guesses for a sweeper" $ do 
+      indGuessLoop 1000 simple_sweeper `shouldBe` InductionGuess (Skip 
+        (Config (Phase (-1)) [] False [(True, Count 0 Empty (fromList [(BoundVar 0, Sum 1)]))])
+        (EndMiddle (Config (Phase (-1)) [] False [(True, Count 1 Empty (fromList [(BoundVar 0, Sum 1)]))]))
+        Empty False)
+    it "guesses for a second sweeper" $ do 
+      indGuessLoop 1000 checkerboardSweeper `shouldBe` InductionGuess (Skip 
+        (Config (Phase (-1)) [(True, Count 0 Empty (fromList [(BoundVar 0, Sum 1)]))] False [])
+        (EndMiddle (Config (Phase (-1)) [(True, Count 1 Empty (fromList [(BoundVar 0, Sum 1)]))] False []))
+        Empty False)
+      

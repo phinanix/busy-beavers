@@ -4,6 +4,7 @@ import Relude
 import Control.Lens
 import Data.Map.Monoidal (assocs)
 import qualified Data.Map as M
+import qualified Data.Text as T (concat) 
 
 import Util
 import Count
@@ -11,6 +12,10 @@ import Skip
 import ExpTape
 import Turing
 import SimulateSkip
+    ( SkipBook,
+      SkipOrigin(Induction),
+      PartialStepResult(Stepped, Unknown, Stopped, MachineStuck),
+      skipStep )
 import Data.Bits (Bits(bit))
 import Data.List (minimumBy)
 import Relude.Extra (bimapBoth)
@@ -115,8 +120,9 @@ proveBySimulating limit t book (Skip start goal _ _)
         deInfCount Infinity = Nothing
         deInfCount (NotInfinity c) = Just c
 
+--this is wrong, it needs to be ziplist-y
 transposeNE :: NonEmpty [a] -> [NonEmpty a]
-transposeNE (x :| xs) = (:|) <$> x <*> transpose xs
+transposeNE (x :| xs) = getZipList $ (:|) <$> ZipList x <*> ZipList (transpose xs)
 
 bitraverseBoth :: (Bitraversable p, Applicative f) => (a -> f b) -> p a a -> f (p b b)
 bitraverseBoth f = bitraverse f f
@@ -128,59 +134,87 @@ boolToMaybe :: Bool -> Maybe ()
 boolToMaybe True = Just ()
 boolToMaybe False = Nothing
 
+mNEToList :: Maybe (NonEmpty a) -> [a]
+mNEToList Nothing = []
+mNEToList (Just ne) = toList ne 
+
+showEval :: (Show a) => a -> a 
+showEval x = traceShow x x 
+
+showEvalN :: Show a => String -> a -> a
+showEvalN t x = trace (t <> "\n" <> show x) x
+
 -- TODO: write a function that guesses a good induction hypothesis given a history of the tape 
 -- (first guess: the simplest signature that has occurred 3 times, guess the additive induction if one exists)
 guessInductionHypothesis :: [ExpTape Bit InfCount] -> Maybe (Skip Bit)
-guessInductionHypothesis tapes = skipOut where
+guessInductionHypothesis tapes = trace (toString $ T.concat $ (\x -> dispExpTape x <> "\n") <$> tapes) skipOut where
     tapeSignatures :: [Signature Bit]
     tapeSignatures = tapeSignature <$> tapes
     sigFreqs :: Map (Signature Bit) Int
     sigFreqs = M.fromListWith (+) $ (,1) <$> tapeSignatures
     possibleSigs :: [Signature Bit]
-    possibleSigs = filter (\s -> (sigFreqs ^?! ix s) >= 3) tapeSignatures
+    possibleSigs = filter (\s -> (sigFreqs ^?! ix s) >= 3) tapeSignatures 
     simplestSig = minimumBy (compare `on` signatureComplexity) possibleSigs
     goalTapes :: Maybe (NonEmpty (ExpTape Bit InfCount))
-    goalTapes = nonEmpty $ filter (\tape -> tapeSignature tape == simplestSig) tapes
+    goalTapes = let ans = nonEmpty $ filter (\tape -> tapeSignature tape == simplestSig) tapes in 
+        trace (toString $ "goal:\n" <> T.concat (mNEToList ((\x -> dispExpTape x <> "\n") <$$> ans))) ans
     --To complete this function, given the goal tapes, for each position, accumulate the counts at that position
     --a list of counts leads to a generalized guess for the overall (more complex) count, eg 1, 2, 3, leads to n, and 2,4,6 leads to 2n
     -- then you need to be able to union counts somehow maybe? or no, I think that's just it
     etToCounts (ExpTape ls _p rs) = (snd <$> ls, snd <$> rs)
+    -- appears correct
     countOfGoalTapes :: Maybe (NonEmpty ([InfCount], [InfCount]))
-    countOfGoalTapes = etToCounts <$$> goalTapes
+    countOfGoalTapes = showEvalN "countOfGoalTapes" $ etToCounts <$$> goalTapes
+    -- appears correct
     pairOfCountLists :: Maybe ([NonEmpty InfCount], [NonEmpty InfCount])
-    pairOfCountLists = bisequence (transposeNE <$> (fst <$$> countOfGoalTapes),
+    pairOfCountLists = showEvalN "pairOfCountLists" $ bisequence (transposeNE <$> (fst <$$> countOfGoalTapes),
                                    transposeNE <$> (snd <$$> countOfGoalTapes))
     pairUpNe :: NonEmpty a -> [(a, a)]
-    pairUpNe xs = (,) <$> init xs <*> tail xs
+    pairUpNe xs = getZipList $ (,) <$> ZipList (init xs) <*> ZipList (tail xs)
     pairOfCountPairs :: Maybe ([NonEmpty (InfCount, InfCount)], [NonEmpty (InfCount, InfCount)])
-    pairOfCountPairs =  bimapBoth (fmap $ fromList . pairUpNe) <$> pairOfCountLists
+    pairOfCountPairs = showEvalN "pairOfCountPairs" $ bimapBoth (fmap $ fromList . pairUpNe) <$> pairOfCountLists
     allCountsGeneralizedEither :: Maybe ([Either () (Count, Count)], [Either () (Count, Count)])
     allCountsGeneralizedEither = bitraverseBoth (traverse generalizeFromInfCounts) =<< pairOfCountPairs
-    mungeGeneralizedCount :: [Either () (Count, Count)] -> [(Count, Count)] 
-    mungeGeneralizedCount = \case 
-        [] -> [] 
-        [x] -> case x of 
-            Left () -> [] 
-            Right p -> [p] 
-        x : rest@(_: _) -> case x of 
-            Left () -> error "mungeGeneralizedCount"
-            Right p -> p : mungeGeneralizedCount rest 
-    allCountsGeneralized = bimapBoth mungeGeneralizedCount <$> allCountsGeneralizedEither
+    -- mungeGeneralizedCount :: [Either () (Count, Count)] -> [(Count, Count)] 
+    -- mungeGeneralizedCount = \case 
+    --     [] -> [] 
+    --     [x] -> case x of 
+    --         Left () -> [] 
+    --         Right p -> [p] 
+    --     x : rest@(_: _) -> case x of 
+    --         Left () -> error "mungeGeneralizedCount"
+    --         Right p -> p : mungeGeneralizedCount rest 
+    -- allCountsGeneralized = bimapBoth mungeGeneralizedCount <$> allCountsGeneralizedEither
     goalPoints :: Maybe (NonEmpty Bit)
     goalPoints = point <$$> goalTapes
     targetPoint :: Maybe Bit
     targetPoint = head <$> goalPoints
     etPointsStacked :: Maybe Bit --really worried I got this one wrong -- 23:50 29Sep21
     etPointsStacked = (boolToMaybe . list1AllEqual =<< goalPoints) >> targetPoint
+    mungePairedStuff :: ((Count, Count) -> Count) -> [(Bit, Either () (Count, Count))] -> Maybe [(Bit, Count)]
+    mungePairedStuff f = \case 
+        [] -> Just [] 
+        [(False, eitherUnitPair)] -> case eitherUnitPair of 
+            Left () -> Just [] 
+            Right cPair -> Just [(False, f cPair)]
+        (b, eitherUnitPair) : rest -> case eitherUnitPair of 
+            Left () -> Nothing 
+            Right cPair -> (:) (b, f cPair) <$> mungePairedStuff f rest 
+
     skipOut = do 
-        (lPairs, rPairs) <- allCountsGeneralized 
+        (lPairs, rPairs) <- allCountsGeneralizedEither 
         point <- etPointsStacked 
         (Signature lSig p rSig) <- tapeSignature . head <$> goalTapes 
         if p /= point then error "oh no skipOut" else Just () 
         let 
-         makeConfig f = Config undefined (zipExact lSig (f <$> lPairs)) p (zipExact rSig (f <$> rPairs)) 
-         startConfig = makeConfig fst 
-         endConfig = makeConfig snd 
+            --TODO:: the phase here is a placeholder
+            -- there's an error because lPairs doesn't include the infinity at the end 
+         makeConfig f = do 
+             lStuff <- mungePairedStuff f $ zipExact lSig lPairs
+             rStuff <- mungePairedStuff f $ zipExact rSig rPairs
+             pure $ Config (Phase (-1)) lStuff p rStuff
+        startConfig <- makeConfig fst 
+        endConfig <- makeConfig snd 
         pure $ Skip startConfig (EndMiddle endConfig) (finiteCount 0) False
 
 --takes a list of at least 2 pairs of counts, and returns a pair of counts that generalizes them,
@@ -191,6 +225,7 @@ guessInductionHypothesis tapes = skipOut where
 -- else, see if they are generated by a function of the form x -> m * x + b 
 -- else give up 
 generalizeFromCounts :: NonEmpty (Count, Count) -> Maybe (Count, Count)
+-- generalizeFromCounts xs | trace (show xs <> "\n\n") False = undefined 
 generalizeFromCounts xs = allEqualPair <|> additivePair <|> affinePair where
     allEqualPair :: Maybe (Count, Count)
     allEqualPair = guard (list1AllEqual xs) >> pure (head xs)
@@ -198,7 +233,8 @@ generalizeFromCounts xs = allEqualPair <|> additivePair <|> affinePair where
         Count n Empty Empty -> Just n
         _ -> Nothing
     naturalPairs :: Maybe (NonEmpty (Natural, Natural))
-    naturalPairs = traverse (bitraverse countToMaybeNat countToMaybeNat) xs
+    naturalPairs = let ans = traverse (bitraverse countToMaybeNat countToMaybeNat) xs in 
+        traceShow ans ans 
     subNats :: Natural -> Natural -> Int
     subNats = (-) `on` fromIntegral
     differences = uncurry subNats <$$> naturalPairs
@@ -228,6 +264,7 @@ generalizeFromCounts xs = allEqualPair <|> additivePair <|> affinePair where
         -- does not handle x -> m * (x + a) + b - but probably could somehow?
         pairs@((x1, y1) :| (x2, y2) : _rest) -> do
             m <- if y2 >= y1
+                    --TODO :: this crashes if x1 == x2
                     then (y2 - y1) `maybeDiv` (x2 - x1)
                     else (y1 - y2) `maybeDiv` (x1 - x2)
             let b :: Int = fromIntegral y1 - (fromIntegral m * fromIntegral x1)

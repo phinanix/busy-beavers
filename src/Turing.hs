@@ -12,7 +12,7 @@ import Data.List.NonEmpty ((<|))
 --the Phase a turing machine is in, to not conflict with State
 newtype Phase = Phase { unPhase :: Int} deriving (Eq, Ord, Generic)
 instance Show Phase where 
-  show (Phase i) = "Phase " <> (show i)
+  show (Phase i) = "(Phase " <> show i <> ")"
 
 data Dir = L | R deriving (Eq, Ord, Show, Generic)
 type Bit = Bool
@@ -53,8 +53,8 @@ uniBit :: NonEmpty Bit
 uniBit = False :| [True]
 
 dispBit :: Bit -> Text
-dispBit False = "0"
-dispBit True = "1"
+dispBit False = "F"
+dispBit True = "T"
 
 dispPhase :: Phase -> Text
 dispPhase (Phase i) = show i

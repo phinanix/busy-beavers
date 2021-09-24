@@ -27,12 +27,13 @@ library:
   dependencies:
   - containers
   - lens
+  - monoidal-containers
   - mtl
+  - prettyprinter
   - relude
   - safe
-  - monoidal-containers
+  - text
   - witherable
-  - prettyprinter
 
 executables:
   busy-beavers-exe:

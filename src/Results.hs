@@ -15,6 +15,7 @@ import Skip
 data SimResult a = Halted Steps a
                | Continue Steps Phase a
                | ContinueForever HaltProof
+               | InductionGuess (Skip Bit) 
                deriving (Eq, Ord, Show, Functor)
 
 $(makePrisms ''SimResult)
@@ -27,6 +28,7 @@ dispResult dispTape (Continue steps phase tape) = prettyText $ "step: " <> showI
   <> " tape: " <> dispTape tape
 dispResult _ (ContinueForever proof) = prettyText "the machine will go forever via: "
   <> dispHaltProof proof
+dispResult _ (InductionGuess skip) = prettyText "we guessed this skip:\n" <> pretty skip 
 
 --the results should be
 --  how many machines halted

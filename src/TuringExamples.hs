@@ -54,6 +54,7 @@ simple_sweeper = Turing {states = 3, transitions  = fromList
   ,((Phase 2, True), Step (Phase 0) True L)
   ]}
 
+
 checkerboardSweeper :: Turing 
 checkerboardSweeper = Turing {states = 3, transitions  = fromList 
   [((Phase 0, False), Step (Phase 1) True R)

@@ -115,7 +115,7 @@ simProgram display results = do
             case decimal steps of
               Left _ -> showMachine r
               Right (steps::Int, _) -> do
-                putTextLn $ "simulating machine: " <> show i
+                putTextLn $ "simulating machine: " <> show i <> "\n" <> show machine
                 putTextLn $ showOneMachine machine steps
                 interact r
 
@@ -126,6 +126,26 @@ simProgram display results = do
 --TODO:: make simple induction
 --TODO:: make macro machine simulator
 --TODO:: make database that stores results of machines, so that results can be compared between different runs
+
+--above todos are old 
+--planet — Today at 9:52 PM (3 Oct 2021)
+--next Todos: 
+--see if it can actually prove said inductions 
+--add in logic to detect when an induction means a machine will run forever
+--add in cycle checking
+--that will leave the only size 3 machine that is unproven the checkerboard sweeper, I think
+--
+--next todos, rewritten: 
+-- fix treatement of "phase" by history and induction guesser 
+-- attempt to connect induction guesser to induction prover
+-- when we prove new skips, add logic to detect when that skip proves a machine will run forever
+-- using the history feature, check if we ever cycle and use that as a proof of nonhalting 
+-- 
+-- add the monad that is used to generate fresh bound and symbol variables 
+-- check the backwards search code works ok 
+-- add backwards search to skip-based sim
+-- add end-of-tape heuristic to skip-based sim (I think maybe glueing actually just accomplishes this)
+
 main :: IO ()
 main = do
   let results = Simulate.simulate 140 $ startMachine1 3
