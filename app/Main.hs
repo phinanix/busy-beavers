@@ -136,7 +136,6 @@ simProgram display results = do
 --that will leave the only size 3 machine that is unproven the checkerboard sweeper, I think
 --
 --next todos, rewritten: 
--- fix treatement of "phase" by history and induction guesser 
 -- attempt to connect induction guesser to induction prover
 -- when we prove new skips, add logic to detect when that skip proves a machine will run forever
 -- using the history feature, check if we ever cycle and use that as a proof of nonhalting 

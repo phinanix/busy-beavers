@@ -5,6 +5,7 @@ import Control.Lens
 import Data.Map.Monoidal (assocs)
 import qualified Data.Map as M
 import qualified Data.Text as T (concat) 
+import Prettyprinter
 
 import Util
 import Count
@@ -90,8 +91,8 @@ proveBySimulating limit t book (Skip start goal _ _)
       | otherwise = case skipStep t book p tape of
             Unknown e -> Left $ "hit unknown edge" <> show e
             Stopped {} -> Left "halted while simulating"
-            MachineStuck -> Left $ "machine stuck " <> show p
-                <> " " <> show goal <> " " <> show tape
+            MachineStuck -> Left $ "machine stuck in phase:" <> show p
+                <> "\ngoal:" <> show (pretty goal) <> "\ncur tape:" <> dispExpTape tape
             Stepped Infinity _ _ _ -> Left "hopped to infinity"
             Stepped (NotInfinity hopsTaken) newPhase newTape _
                 -> loop (numSteps + 1) newPhase newTape (curCount <> hopsTaken)
@@ -150,7 +151,7 @@ showTapePhaseList tapes = toString $ T.concat $ (\(p, x) -> dispPhase p <> " " <
 -- TODO: write a function that guesses a good induction hypothesis given a history of the tape 
 -- (first guess: the simplest signature that has occurred 3 times, guess the additive induction if one exists)
 guessInductionHypothesis :: [(Phase, ExpTape Bit InfCount)] -> Maybe (Skip Bit)
-guessInductionHypothesis tapesAndPhases = trace (showTapePhaseList tapesAndPhases) skipOut where
+guessInductionHypothesis tapesAndPhases = skipOut where
     tapeSignatures :: [(Phase, Signature Bit)]
     tapeSignatures = tapeSignature <$$> tapesAndPhases
     sigFreqs :: Map (Phase, Signature Bit) Int

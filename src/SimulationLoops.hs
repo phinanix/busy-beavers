@@ -13,6 +13,7 @@ import Results
 import Glue
 import SimulateSkip 
 import Induction
+import Skip
 
 type SimAction = Turing -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
 
@@ -65,10 +66,20 @@ recordHist state = state & s_history %~ (:) (curPhase, curTape) where
   curTape = state ^. s_tape
   curPhase = state ^. s_phase 
 
+--applies the skip to everything in the list, checks if any of them have just 
+skipAppliedInHist :: Skip Bit -> [(Phase, ExpTape Bit InfCount)] -> Bool 
+skipAppliedInHist skip hist = any (has _Just) $ applySkip skip <$> hist 
+
 attemptInductionGuess :: Turing -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
-attemptInductionGuess _machine state = case guessInductionHypothesis hist of 
-  Just skip -> Left $ InductionGuess skip 
+attemptInductionGuess machine state = case guessInductionHypothesis hist of 
   Nothing -> Right state 
+  --try to prove the skip by induction 
+  Just skip -> trace ("guessed a skip:\n" <> show (pretty skip)) $ 
+    case proveInductively 20 machine (state ^. s_book) skip (BoundVar 0) of 
+      Left fail -> trace (toString fail) $ Right state 
+      Right skipOrigin -> if skipGoesForever skip && skipAppliedInHist skip hist 
+        then Left (ContinueForever (SkippedToInfinity (state ^. s_steps) skip))
+        else Right $ state & s_book %~ addSkipToBook skip skipOrigin 
   where 
     hist = reverse (state ^. s_history)
 

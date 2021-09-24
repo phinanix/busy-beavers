@@ -1,14 +1,7 @@
 module Glue where
-
 import Relude
 import Control.Monad.Error.Class
 import Control.Lens
--- import Control.Unification
--- import Control.Unification.Types (UFailure(..))
--- import Data.Functor.Fixedpoint
--- import Control.Unification
--- import Control.Unification.Types (UFailure(..))
--- import Data.Functor.Fixedpoint
 import Data.Map.Monoidal (deleteFindMin, singleton, assocs, MonoidalMap (MonoidalMap))
 
 import Util
@@ -184,4 +177,5 @@ glueSkips (Skip startConfig middleSkipEnd c b) (Skip middleConfig endSkipEnd c' 
                 (c <> c') 
                 b'
               
-
+skipGoesForever :: forall s. (Eq s, Show s) => Skip s -> Bool 
+skipGoesForever skip = has _Right (glueSkips skip skip) 

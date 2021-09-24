@@ -51,6 +51,7 @@ dispHaltProof (SkippedToInfinity steps skip) = prettyText ("after " <> show step
   <> " steps, the machine applies the following skip which proves nonhalting:\n  ")
   <> pretty skip
 
+
 --runs a backward search from each halting state to see if it can reach a contradiction
 --if we show that all ways to halt don't have paths leading into them from valid tapes
 --then the halt state will never be reached
