@@ -148,8 +148,9 @@ simProgram display results = do
 -- add end-of-tape heuristic to skip-based sim (I think maybe glueing actually just accomplishes this)
 --
 -- more todos
--- -- add deflection to left and right tracking
--- -- use deflection tracking to do the better induction guesser 
+-- add deflection to left and right tracking
+-- use deflection tracking to do the end of tape cycle guesser right
+-- use deflection tracking to do the better induction guesser 
 main :: IO ()
 main = do
   let results = Simulate.simulate 140 $ startMachine1 3

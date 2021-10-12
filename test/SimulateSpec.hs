@@ -35,7 +35,7 @@ simpleSkip = Skip
     [(True, num 3)]
     False
     [(False, num 3), (True, num 5)]))
-  (num 5) False
+  (num 5) False (OneDir L $ num 3)
 
 simpleResult :: ExpTape Bit InfCount
 simpleResult = ExpTape
@@ -53,7 +53,7 @@ exampleSkip = Skip
     [(True, num 3)]
     False
     [(False, num 3), (True, num 5)]))
-  (num 10) False
+  (num 10) False (OneDir L $ num 8)
 
 exampleTape :: ExpTape Bit InfCount
 exampleTape = ExpTape
@@ -76,7 +76,7 @@ varSkip = Skip
     [(False, newBoundVar 0), (True, One <> newBoundVar 0)]
     False []))
   (Count 11 Empty (fromList [(BoundVar 0, Sum 3)]))
-  False
+  False (OneDir L $ Count 1 Empty (fromList [(BoundVar 0, Sum 1)]))
 
 varTape :: ExpTape Bit InfCount
 varTape = ExpTape

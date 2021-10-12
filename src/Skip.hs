@@ -27,11 +27,16 @@ data SkipEnd s = EndSide Phase Dir [(s, Count)] | EndMiddle (Config s)
   deriving (Eq, Ord, Show, Generic, Functor)
 instance (NFData s) => NFData (SkipEnd s)
 
+--Zero and OneDir as they say, BothDirs goes the first count steps left and the second count steps right 
+data Displacement = Zero | OneDir Dir Count | BothDirs Count Count deriving (Eq, Ord, Show, Generic) 
+instance NFData Displacement 
+
 data Skip s = Skip
   { _start :: Config s
   , _end :: SkipEnd s
   , _hops :: Count --number of atomic TM steps
   , _halts :: Bool --true if the skip results in the machine halting
+  , _displacement :: Displacement
   } deriving (Eq, Ord, Show, Generic, Functor)
 instance (NFData s) => NFData (Skip s)
 
@@ -53,8 +58,9 @@ instance Pretty s => Pretty (SkipEnd s) where
   pretty (EndMiddle c) = pretty c
 
 instance Pretty s => Pretty (Skip s) where
-  pretty (Skip s e c halts) = prettyText "in " <> pretty (dispCount c) <> prettyText " steps we turn\n"
-    <> pretty s <> prettyText "\ninto: \n" <> pretty e <> prettyText (if halts then "\n and halt" else "")
+  pretty (Skip s e c halts displace) = prettyText "in " <> pretty (dispCount c) <> prettyText " steps we turn\n"
+    <> pretty s <> prettyText "\ninto: \n" <> pretty e <> prettyText (if halts then "\n and halt" else "") 
+    <> prettyText "\n displacement of: " <> pretty (dispCount c) 
 
 getSkipEndPhase :: SkipEnd s -> Phase
 getSkipEndPhase (EndSide p _ _) = p
@@ -185,7 +191,7 @@ matchConfigTape (Config _p lsC pointC rsC) (ExpTape lsT pointT rsT)
 
 matchSkipTape :: (Eq s) => Skip s -> ExpTape s InfCount 
   -> Equations ([(s, InfCount)], [(s, InfCount)])
-matchSkipTape (Skip config end _hops _halts) tape = do 
+matchSkipTape (Skip config end _hops _halts _displacement) tape = do 
   out@(lRem, rRem) <- matchConfigTape config tape 
   case end of     
     EndMiddle _ -> pure out

@@ -52,8 +52,8 @@ proveInductively limit t book goal indVar = case baseCase of
 
 -- given a skip, replaces all occurences of a particular BoundVar with a particular Count
 replaceVarInSkip :: Skip s -> BoundVar -> Count -> Skip s
-replaceVarInSkip (Skip sConfig eSE hopCount halts) varIn countOut =
-    Skip newConfig newSE (replaceVarInCount hopCount) halts where
+replaceVarInSkip (Skip sConfig eSE hopCount halts displacement) varIn countOut =
+    Skip newConfig newSE (replaceVarInCount hopCount) halts (replaceVarInDisplacement displacement) where
     newConfig = replaceVarInConfig sConfig
     newSE = replaceVarInSE eSE
     replaceVarInConfig (Config p ls c_point rs)
@@ -64,6 +64,10 @@ replaceVarInSkip (Skip sConfig eSE hopCount halts) varIn countOut =
     replaceVarInSE = \case
         EndMiddle config -> EndMiddle $ replaceVarInConfig config
         EndSide p d xs -> EndSide p d $ replaceVarInList xs
+    replaceVarInDisplacement = \case 
+        Zero -> Zero 
+        OneDir d c -> OneDir d $ replaceVarInCount c 
+        BothDirs c c' -> BothDirs (replaceVarInCount c) (replaceVarInCount c')
     replaceVarInList :: [(s, Count)] -> [(s, Count)]
     replaceVarInList = fmap $ fmap replaceVarInCount
     replaceVarInCount :: Count -> Count
@@ -76,7 +80,7 @@ replaceVarInSkip (Skip sConfig eSE hopCount halts) varIn countOut =
 -- input int is limit on number of steps to simulate
 -- output count is the number of steps it actually took 
 proveBySimulating :: Int -> Turing -> SkipBook Bit -> Skip Bit -> Either Text Count
-proveBySimulating limit t book (Skip start goal _ _)
+proveBySimulating limit t book (Skip start goal _ _ _)
     = loop 0
     (start ^. cstate)
     (second NotInfinity $ configToET start ^. _2)
@@ -204,15 +208,14 @@ guessInductionHypothesis tapesAndPhases = skipOut where
         let (Signature lSig p rSig) = tapeSignature . snd . head $ actualGoalTapes
         if p /= point then error "oh no skipOut" else Just () 
         let 
-            --TODO:: the phase here is a placeholder
-            -- there's an error because lPairs doesn't include the infinity at the end 
          makeConfig f = do 
              lStuff <- mungePairedStuff f $ zipExact lSig lPairs
              rStuff <- mungePairedStuff f $ zipExact rSig rPairs
              pure $ Config goalPhase lStuff p rStuff
         startConfig <- makeConfig fst 
         endConfig <- makeConfig snd 
-        pure $ Skip startConfig (EndMiddle endConfig) (finiteCount 0) False
+        --todo - the zeros for steps and displacement are placeholders
+        pure $ Skip startConfig (EndMiddle endConfig) (finiteCount 0) False Zero 
 
 --takes a list of at least 2 pairs of counts, and returns a pair of counts that generalizes them,
 -- if possible, in the sense that it has bound vars which can be subbed to be all the pairs

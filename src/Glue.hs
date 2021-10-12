@@ -1,14 +1,16 @@
 module Glue where
 import Relude
+import Relude.Extra (bimapBoth)
 import Control.Monad.Error.Class
 import Control.Lens
-import Data.Map.Monoidal (deleteFindMin, singleton, assocs, MonoidalMap (MonoidalMap))
+import Data.Map.Monoidal (deleteFindMin, singleton, assocs, MonoidalMap (MonoidalMap), intersectionWith, unionWith)
 
 import Util
 import Count
 import Skip hiding (HeadMatch(..))
 import ExpTape
 import Turing
+
 
 
 {-
@@ -147,19 +149,74 @@ updateSkipEnd map = \case
   EndSide p d xs -> EndSide p d $ updateCount map <$$> xs --the problem is update count turns a count into an infcount but that doesn't work here
   EndMiddle config -> EndMiddle $ updateConfig map config 
 
+updateDisplacement :: Map BoundVar Count -> Displacement -> Displacement  
+updateDisplacement map = \case 
+  Zero -> Zero 
+  OneDir d c -> OneDir d $ updateCount map c 
+  BothDirs c c' -> BothDirs (updateCount map c) (updateCount map c')
+
 updateSkip :: Map BoundVar Count -> Skip s -> Skip s 
-updateSkip map (Skip config end hops halts) = Skip 
+updateSkip map (Skip config end hops halts disp) = Skip 
   (updateConfig map config) 
   (updateSkipEnd map end) 
   (updateCount map hops) 
   halts
+  (updateDisplacement map disp)
+
+simplifyDisplacement :: Displacement -> Displacement 
+simplifyDisplacement d | traceShow d False = undefined
+simplifyDisplacement Zero = Zero 
+simplifyDisplacement (OneDir d c) = OneDir d c 
+simplifyDisplacement (BothDirs c c') = case (c, c') of 
+  (Empty, ans) -> OneDir R ans 
+  (ans, Empty) -> OneDir L ans 
+  -- TODO:: I'm pretty sure this code is redundant, make actually sure
+  -- (Count n as xs, FinCount m) -> if n >= m 
+  --   then OneDir L $ Count (n - m) as xs 
+  --   else BothDirs (Count 0 as xs) (FinCount $ m - n)
+  -- (FinCount n, Count m as xs) -> if m >= n
+  --   then OneDir R $ Count (m - n) as xs 
+  --   else BothDirs (FinCount $ m - n) (Count 0 as xs)
+  (Count n as xs, Count m bs ys) -> let 
+    (n', m') = subMin n m 
+    (as', bs') = removeCommon' as bs 
+    (xs', ys') = removeCommon' xs ys 
+    in simplifyDisplacement $ BothDirs (Count n' as' xs') (Count m' bs' ys')
+  where 
+    subMin :: Natural -> Natural -> (Natural, Natural)
+    subMin x y = (x - theMin, y - theMin) where 
+      theMin = min x y 
+    removeCommon' xs ys = bimapBoth (fmap Sum) $ removeCommon (getSum <$> xs) (getSum <$> ys) 
+    --takes two maps and returns both, with the keys they both had subtracted out 
+    removeCommon :: (Ord k) => MMap k Natural -> MMap k Natural -> (MMap k Natural, MMap k Natural)
+    removeCommon xs ys = (unionWith (-) xs commonElts, unionWith (-) ys commonElts) where
+      commonElts = intersectionWith min xs ys 
+  
+
+glueDisplacements :: Displacement -> Displacement -> Displacement 
+glueDisplacements Zero d = d 
+glueDisplacements d Zero = d 
+glueDisplacements (OneDir d c) (OneDir d' c') = if d == d' then OneDir d (c <> c') else case (c, c') of 
+  (FinCount n, FinCount n') -> if n >= n' 
+    then OneDir d $ FinCount $ n - n'
+    else OneDir d' $ FinCount $ n' - n
+  (_, _) -> case (d, d') of 
+    (L, R) -> BothDirs c c'
+    (R, L) -> BothDirs c' c 
+    _ -> error "unreachable"
+glueDisplacements (OneDir d c) (BothDirs lC rC) = case d of 
+  L -> BothDirs (lC <> c) rC 
+  R -> BothDirs lC (rC <> c) 
+glueDisplacements both@(BothDirs _ _) one@(OneDir _ _) = glueDisplacements one both 
+glueDisplacements (BothDirs lC rC) (BothDirs lC' rC') = BothDirs (lC <> lC') (rC <> rC')
+
 
 --takes a first and a second skip and returns, if it is possible, a skip that
 --results from applying one then the next. Tries to keep universals as general as
 --possible but this is not guaranteed to find the most general universal quantifiers
 glueSkips :: forall s. (Eq s, Show s) => Skip s -> Skip s -> Either Text (Skip s)
-glueSkips (Skip startConfig middleSkipEnd c b) (Skip middleConfig endSkipEnd c' b') 
- = uncurry updateSkip <$> munge (runEquations skipWithEquations) where
+glueSkips (Skip startConfig middleSkipEnd c b d) (Skip middleConfig endSkipEnd c' b' d') 
+ = uncurry updateSkip <$> munge (runEquations skipWithEquations) & _Right . displacement %~ simplifyDisplacement where
   munge :: Either Text (Map BoundVar InfCount, a) -> Either Text (Map BoundVar Count, a)
   munge = second $ first $ fmap unsafeDeInf
   unsafeDeInf :: InfCount -> Count 
@@ -176,6 +233,7 @@ glueSkips (Skip startConfig middleSkipEnd c b) (Skip middleConfig endSkipEnd c' 
                 (applyTailsSkipEnd endTails endSkipEnd) 
                 (c <> c') 
                 b'
+                (glueDisplacements d d') 
               
 skipGoesForever :: forall s. (Eq s, Show s) => Skip s -> Bool 
 skipGoesForever skip = has _Right (glueSkips skip skip) 

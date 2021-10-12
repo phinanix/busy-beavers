@@ -64,6 +64,9 @@ instance NFData Count
 pattern One :: Count
 pattern One = Count 1 Empty Empty
 
+pattern FinCount :: Natural -> Count
+pattern FinCount n = Count n Empty Empty 
+
 instance Show Count where
   show (Count num symbols bound) = "Count " <> show num <> " (fromList " <> show (assocs symbols)
     <> ") (fromList " <> show (assocs bound) <> ")"

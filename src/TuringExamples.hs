@@ -64,3 +64,11 @@ checkerboardSweeper = Turing {states = 3, transitions  = fromList
   ,((Phase 2, False), Halt)
   ,((Phase 2, True), Step (Phase 0) True L)
   ]}
+
+goesLeftForever :: Turing 
+goesLeftForever = Turing {states = 2, transitions = fromList 
+  [((Phase 0, False), Step (Phase 1) True L)
+--  ,((Phase 0, True), Step (Phase 0) False L)
+  ,((Phase 1, False), Step (Phase 0) True L)
+  ,((Phase 1, True), Halt)
+  ]}

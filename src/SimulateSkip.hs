@@ -84,14 +84,14 @@ instance (Ord s, Pretty s) => Pretty (SkipBook s) where
 --returns nothing if the skip is inapplicable, else returns a new tape
 applySkip :: forall s. (Eq s) => Skip s -> (Phase, ExpTape s InfCount)
   -> Maybe (SkipResult s InfCount)
-applySkip skip@(Skip s _ _ _) (p, tape)
+applySkip skip@(Skip s _ _ _ _) (p, tape)
   = guard (s^.cstate == p) >> either (const Nothing) Just
       (packageResult skip =<< runEquations (matchSkipTape skip tape))
 
 packageResult :: forall s. (Eq s) => Skip s
   -> (Map BoundVar InfCount, ([(s, InfCount)], [(s, InfCount)]))
   -> Either Text (SkipResult s InfCount)
-packageResult (Skip _ e hopCount _) (boundVs, (newLs, newRs)) = Skipped
+packageResult (Skip _ e hopCount _ _) (boundVs, (newLs, newRs)) = Skipped
   (updateCount boundVs hopCount)
   (getSkipEndPhase e)
   <$> getFinalET e (newLs, newRs)
@@ -141,6 +141,7 @@ oneStepSkip (p, b) q c d = Skip
   (EndSide q d [(c, finiteCount 1)])
   (finiteCount 1)
   False
+  (OneDir d $ finiteCount 1)
 
 --the skip that results from an atomic transition which transitions a phase to itself
 --writing the given bit and dir
@@ -152,12 +153,14 @@ infiniteSkip (p, b) c L = Skip
   (EndSide p L [(c, One <> newBoundVar 0)])
   (One <> newBoundVar 0)
   False
+  (OneDir L $ One <> newBoundVar 0)
 infiniteSkip (p, b) c R = Skip
   -- (Config p [] (b, Side (newBoundVar 0) L) [])
   (Config p [] b [(b, newBoundVar 0)])
   (EndSide p R [(c, One <> newBoundVar 0)])
   (One <> newBoundVar 0)
   False
+  (OneDir R $ One <> newBoundVar 0)
 
 initTransSkip :: Edge -> Trans -> Set (Skip Bit)
 --we need to modify this skip so that it's halt question is true
@@ -188,8 +191,8 @@ skipFarthest :: (Eq s, Eq c)
   -> (Skip s, SkipResult s c)
   -> Ordering
 skipFarthest a b | a == b = EQ
-skipFarthest (Skip _ _ _ True, _)   _ = LT
-skipFarthest _   (Skip _ _ _ True, _) = GT
+skipFarthest (Skip _ _ _ True _, _)   _ = LT
+skipFarthest _   (Skip _ _ _ True _, _) = GT
 skipFarthest (_, Skipped c _ _) (_, Skipped c' _ _) = compare c c'
 
 --simulates one step of a TM using a skip-book

@@ -143,7 +143,7 @@ attemptInductionGuess machine state = case guessInductionHypothesis hist of
     hist = reverse (state ^. s_history)
 
 attemptEndOfTapeGlueProof :: SimOneAction 
-attemptEndOfTapeGlueProof machine state = rightAddedState where 
+attemptEndOfTapeGlueProof _machine state = rightAddedState where
   hist = state ^. s_history 
     --we're going to need to look at the history, find all the places the machine was at a specific 
   --end of the tape, then attempt to glue between those 
