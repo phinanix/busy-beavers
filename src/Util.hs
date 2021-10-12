@@ -37,3 +37,8 @@ unsafeFromRight (Left _) = error "unsafe"
 atE :: (AsEmpty (IxValue m), At m) => Index m -> Lens' m (IxValue m)
 --the second iso is of type Iso' (Maybe (IxValue m)) (IxValue m)
 atE i = at i . iso (fromMaybe Empty) Just
+
+--taken from https://stackoverflow.com/questions/4597820/does-haskell-have-list-slices-i-e-python
+-- TODO: Use Vector package?
+slice :: Int -> Int -> [a] -> [a]
+slice from to xs = take (to - from + 1) (drop from xs)

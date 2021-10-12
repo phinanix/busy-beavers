@@ -136,15 +136,20 @@ simProgram display results = do
 --that will leave the only size 3 machine that is unproven the checkerboard sweeper, I think
 --
 --next todos, rewritten: 
+-- figure out how to make induction guesser guess things of the right length in/out
 -- attempt to connect induction guesser to induction prover
 -- when we prove new skips, add logic to detect when that skip proves a machine will run forever
--- using the history feature, check if we ever cycle and use that as a proof of nonhalting 
+-- -- make the simulateMultipleMachinesOuterLoop function
+-- -- using the history feature, check if we ever cycle and use that as a proof of nonhalting 
 -- 
 -- add the monad that is used to generate fresh bound and symbol variables 
 -- check the backwards search code works ok 
 -- add backwards search to skip-based sim
 -- add end-of-tape heuristic to skip-based sim (I think maybe glueing actually just accomplishes this)
-
+--
+-- more todos
+-- -- add deflection to left and right tracking
+-- -- use deflection tracking to do the better induction guesser 
 main :: IO ()
 main = do
   let results = Simulate.simulate 140 $ startMachine1 3

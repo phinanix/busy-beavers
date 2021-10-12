@@ -179,3 +179,6 @@ glueSkips (Skip startConfig middleSkipEnd c b) (Skip middleConfig endSkipEnd c' 
               
 skipGoesForever :: forall s. (Eq s, Show s) => Skip s -> Bool 
 skipGoesForever skip = has _Right (glueSkips skip skip) 
+
+glueMany :: (Eq s, Show s) => NonEmpty (Skip s) -> Either Text (Skip s)
+glueMany (h :| tail) = foldlM glueSkips h tail 
