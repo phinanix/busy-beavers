@@ -3,6 +3,7 @@ import Relude
 import Relude.Extra (bimapBoth)
 import Control.Monad.Error.Class
 import Control.Lens
+import qualified Data.Map.Strict as M (assocs)
 import Data.Map.Monoidal (deleteFindMin, singleton, assocs, MonoidalMap (MonoidalMap), intersectionWith, unionWith)
 
 import Util
@@ -141,6 +142,17 @@ updateCount m (Count n as xs) = Count n as Empty
       Just c -> c 
       Nothing -> boundVarCount x 1
 
+updateCountToInf :: Map BoundVar InfCount -> Count -> InfCount
+updateCountToInf m (Count n as (MonoidalMap xs))
+  = NotInfinity (Count n as Empty) <> foldMap (updateVar m) (M.assocs xs) where
+  updateVar :: Map BoundVar InfCount -> (BoundVar, Sum Natural) -> InfCount
+  updateVar m (x, Sum n) = n `nTimes` getVar m x
+  getVar :: Map BoundVar InfCount -> BoundVar -> InfCount
+  getVar m x = case m^.at x of
+    Just c -> c
+    Nothing -> error $ show m <> "\n" <> show x
+      <> " a bound var wasn't mapped"
+
 updateConfig :: Map BoundVar Count -> Config s -> Config s 
 updateConfig map (Config p ls point rs) = Config p (updateCount map <$$> ls) point (updateCount map <$$> rs) 
 
@@ -149,11 +161,11 @@ updateSkipEnd map = \case
   EndSide p d xs -> EndSide p d $ updateCount map <$$> xs --the problem is update count turns a count into an infcount but that doesn't work here
   EndMiddle config -> EndMiddle $ updateConfig map config 
 
-updateDisplacement :: Map BoundVar Count -> Displacement -> Displacement  
-updateDisplacement map = \case 
-  Zero -> Zero 
-  OneDir d c -> OneDir d $ updateCount map c 
-  BothDirs c c' -> BothDirs (updateCount map c) (updateCount map c')
+-- updateDisplacement :: Map BoundVar Count -> Displacement Count -> Displacement Count
+-- updateDisplacement map = \case 
+--   Zero -> Zero 
+--   OneDir d c -> OneDir d $ updateCount map c 
+--   BothDirs c c' -> BothDirs (updateCount map c) (updateCount map c')
 
 updateSkip :: Map BoundVar Count -> Skip s -> Skip s 
 updateSkip map (Skip config end hops halts disp) = Skip 
@@ -161,9 +173,18 @@ updateSkip map (Skip config end hops halts disp) = Skip
   (updateSkipEnd map end) 
   (updateCount map hops) 
   halts
-  (updateDisplacement map disp)
+  (updateCount map <$> disp)
 
-simplifyDisplacement :: Displacement -> Displacement 
+simplifyInfDisplacement :: Displacement InfCount -> Displacement InfCount 
+simplifyInfDisplacement = \case 
+  BothDirs Infinity Infinity -> error "double infinity ??"
+  --commented out because these feel weird and I kind of want to not commit to them 
+  -- BothDirs Infinity _c -> OneDir L Infinity 
+  -- BothDirs _c Infinity -> OneDir R Infinity 
+  BothDirs (NotInfinity c) (NotInfinity d) -> NotInfinity <$> simplifyDisplacement (BothDirs c d)
+  other -> other
+
+simplifyDisplacement :: Displacement Count -> Displacement Count
 simplifyDisplacement d | traceShow d False = undefined
 simplifyDisplacement Zero = Zero 
 simplifyDisplacement (OneDir d c) = OneDir d c 
@@ -193,7 +214,7 @@ simplifyDisplacement (BothDirs c c') = case (c, c') of
       commonElts = intersectionWith min xs ys 
   
 
-glueDisplacements :: Displacement -> Displacement -> Displacement 
+glueDisplacements :: Displacement Count -> Displacement Count -> Displacement Count
 glueDisplacements Zero d = d 
 glueDisplacements d Zero = d 
 glueDisplacements (OneDir d c) (OneDir d' c') = if d == d' then OneDir d (c <> c') else case (c, c') of 

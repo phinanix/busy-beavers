@@ -1,6 +1,6 @@
 module SimulateSkip where
 
-import Relude hiding (mapMaybe, filter)
+import Relude hiding (mapMaybe, filter, (??))
 import Control.Lens
 import Data.Map.Monoidal (MonoidalMap(..))
 import Data.List (maximumBy, foldl1)
@@ -17,11 +17,12 @@ import Count
 import HaltProof
 import Results
 import Glue
+import Simulate (initSimState)
 
 
 data PartialStepResult a = Unknown Edge
-                         | Stopped InfCount a (Skip Bit)
-                         | Stepped InfCount Phase a (Skip Bit)
+                         | Stopped InfCount a (Skip Bit) (Displacement InfCount)
+                         | Stepped InfCount Phase a (Skip Bit) (Displacement InfCount)
                          | MachineStuck
 
 data SkipOrigin s = Initial --from an atomic transition of the machine 
@@ -42,12 +43,15 @@ data SimState = SimState
   -- a list of the skips used so far in order
   -- since it is the skips used in order, the index 0 one takes us from step 0 to step 1
   --the slice that takes you from step 5 to step 13 is index 5 to index 12 inclusive
-  , _s_trace :: [Skip Bit] 
+  , _s_trace :: [Skip Bit]
    --a list of the (phase, tape)s seen so far in order
   , _s_history :: [(Phase, ExpTape Bit InfCount)]
     --a map of the (phase, tape)s seen so far to the step count at which they were seen 
   , _s_history_set :: Map (Phase, ExpTape Bit InfCount) Int
   , _s_counter :: Int --the number of times we have taken a "big step". guaranteed to take on all values between 0 and n
+  --the total amount of leftward (negative) or rightward (positive) displacement we have done, starting from 0
+  , _s_displacement :: Int
+  , _s_disp_history :: [Int] 
   } deriving (Eq, Ord, Show)
 
 instance (Pretty s) => Pretty (SkipOrigin s) where
@@ -61,6 +65,7 @@ data SkipResult s c = Skipped
   { _hopsTaken :: InfCount
   , _newPhase :: Phase
   , _newTape :: ExpTape s c
+  , _resultingDisp :: Displacement InfCount
   } deriving (Eq, Ord, Show, Generic)
 
 $(makeLenses ''SkipResult)
@@ -70,10 +75,10 @@ initExpTape :: s -> ExpTape s InfCount
 initExpTape s = ExpTape [(s, Infinity)] s [(s, Infinity)]
 
 dispSkipResult :: SkipResult Bit InfCount -> Text
-dispSkipResult (Skipped c p tape)
+dispSkipResult (Skipped c p tape disp)
   = "skipped to phase: " <> dispPhase p
   <> " and tape " <> dispExpTape tape
-  <> " in " <> dispInfCount c <> " hops"
+  <> " in " <> dispInfCount c <> " hops\ndisplacement was:" <> show disp
 
 instance (Ord s, Pretty s) => Pretty (SkipBook s) where
   pretty book = let skipPile = unions book in
@@ -91,10 +96,11 @@ applySkip skip@(Skip s _ _ _ _) (p, tape)
 packageResult :: forall s. (Eq s) => Skip s
   -> (Map BoundVar InfCount, ([(s, InfCount)], [(s, InfCount)]))
   -> Either Text (SkipResult s InfCount)
-packageResult (Skip _ e hopCount _ _) (boundVs, (newLs, newRs)) = Skipped
-  (updateCount boundVs hopCount)
+packageResult (Skip _ e hopCount _ displacement) (boundVs, (newLs, newRs)) = (Skipped
+  (updateCountToInf boundVs hopCount)
   (getSkipEndPhase e)
-  <$> getFinalET e (newLs, newRs)
+  <$> getFinalET e (newLs, newRs)) ??
+  (simplifyInfDisplacement $ updateCountToInf boundVs <$> displacement)
   where
     getFinalET :: SkipEnd s -> ([(s, InfCount)], [(s, InfCount)]) -> Either Text (ExpTape s InfCount)
     getFinalET (EndMiddle c) (remLs, remRs) = pure $ ExpTape
@@ -119,17 +125,7 @@ packageResult (Skip _ e hopCount _ _) (boundVs, (newLs, newRs)) = Skipped
     finalizeList = invariantifyList . updateList boundVs . fmap (fmap NotInfinity)
     updateInfCount :: Map BoundVar InfCount -> InfCount -> InfCount
     updateInfCount _m Infinity = Infinity
-    updateInfCount m (NotInfinity c) = updateCount m c
-    updateCount :: Map BoundVar InfCount -> Count -> InfCount
-    updateCount m (Count n as (MonoidalMap xs))
-      = NotInfinity (Count n as Empty) <> foldMap (updateVar m) (assocs xs) where
-      updateVar :: Map BoundVar InfCount -> (BoundVar, Sum Natural) -> InfCount
-      updateVar m (x, Sum n) = n `nTimes` getVar m x
-      getVar :: Map BoundVar InfCount -> BoundVar -> InfCount
-      getVar m x = case m^.at x of
-        Just c -> c
-        Nothing -> error $ show m <> "\n" <> show x
-          <> " a bound var wasn't mapped"
+    updateInfCount m (NotInfinity c) = updateCountToInf m c
 --we want to be able to apply a skip of counts to an ExpTape _ Count but also a
 --skip of counts to an ExpTape _ Nat
 
@@ -193,7 +189,7 @@ skipFarthest :: (Eq s, Eq c)
 skipFarthest a b | a == b = EQ
 skipFarthest (Skip _ _ _ True _, _)   _ = LT
 skipFarthest _   (Skip _ _ _ True _, _) = GT
-skipFarthest (_, Skipped c _ _) (_, Skipped c' _ _) = compare c c'
+skipFarthest (_, res1) (_, res2) = compare (res1 ^. hopsTaken) (res2 ^. hopsTaken)
 
 --simulates one step of a TM using a skip-book
 --right now you can't generalize this Bit to an s because you want to be able to case
@@ -215,100 +211,104 @@ skipStep (Turing _ trans) book p tape@(ExpTape _ls bit _rs)
       case appliedSkips of
         [] -> MachineStuck --TODO :: can we generate this message somewhere better?
         _ -> let
-          (bestSkip, Skipped hops newP newT) = maximumBy skipFarthest appliedSkips
+          (bestSkip, Skipped hops newP newT newD) = maximumBy skipFarthest appliedSkips
           in --trace (toString $ (mconcat $ dispSkip . fst <$> appliedSkips) <> "\n") $
-          if bestSkip ^. halts then Stopped hops newT bestSkip
-            else Stepped hops newP newT bestSkip
+          if bestSkip ^. halts then Stopped hops newT bestSkip newD
+            else Stepped hops newP newT bestSkip newD
 type SkipTape = ExpTape Bit InfCount
 
 initSkipState :: Turing -> SimState
-initSkipState t = SimState (Phase 0) (initExpTape False) (initBook t) 0 [] [] Empty 0
+initSkipState t = SimState (Phase 0) (initExpTape False) (initBook t) 0 [] [] Empty 0 0 [0] 
 
 simulateOneMachine :: Int -> Turing -> SimState
   -> ([Skip Bit], Either Edge (SimResult SkipTape))
 simulateOneMachine limit t = \case
-  SimState p tape _book steps@((>= limit) -> True) trace _hist _ _counter -> (trace, Right $ Continue steps p tape)
-  SimState p tape book steps trace hist histSet counter -> case skipStep t book p tape of
+  --SimState p tape _book steps@((>= limit) -> True) trace _hist _ _counter -> (trace, Right $ Continue steps p tape)
+  state | state ^. s_steps >= limit -> (state ^. s_trace, Right $ Continue (state ^. s_steps) (state ^. s_phase) (state ^. s_tape) (state ^. s_displacement))
+  SimState p tape book steps trace hist histSet counter disp dispHist -> case skipStep t book p tape of
     MachineStuck -> error "machinestuck"
     Unknown e -> (trace, Left e)
-    Stopped c newTape skip -> (skip : trace, Right $ Halted (steps + infCountToInt c) newTape)
-    Stepped c newP newTape skip -> case c of
+    Stopped c newTape skip newDisp -> (skip : trace, Right $ Halted (steps + infCountToInt c) newTape (disp + dispToInt newDisp))
+    Stepped c newP newTape skip newDisp -> case c of
       Infinity -> (skip : trace, Right $ ContinueForever (SkippedToInfinity steps skip))
-      c -> simulateOneMachine limit t $ SimState newP newTape book (steps + infCountToInt c) (skip : trace) hist histSet counter 
+      c -> simulateOneMachine limit t $ SimState newP newTape book (steps + infCountToInt c) (skip : trace)
+        hist histSet counter (disp + dispToInt newDisp) (disp : dispHist)
 
---
+simulateOneTotalMachine :: Int -> Turing -> ([Skip Bit], SimResult (ExpTape Bit InfCount))
+simulateOneTotalMachine limit machine = (^?! _Right) <$> simulateOneMachine limit machine (initSkipState machine)
+
 updateBook :: Edge -> Turing -> SkipBook Bit -> SkipBook Bit
 updateBook edge (Turing _ trans) book =
   let newSkips = initTransSkip edge (trans ^?! ix edge) in
     foldr addInitialSkipToBook book newSkips
 
 --TODO: known bug: we currently output a number higher than we should for step count
-simulateWithSkips :: Int -> Turing -> Results SkipTape
-simulateWithSkips limit startMachine
-  = loop (startMachine, initSkipState startMachine) [] Empty where
-  loop :: (Turing, SimState) -> [(Turing, SimState)]
-    -> Results (ExpTape Bit InfCount) -> Results (ExpTape Bit InfCount)
-  loop (t, s@(SimState p tape book steps trace hist histSet counter)) todoList !rs = case simulateOneMachine limit t s of
-    (_trace, Right result) -> recurse todoList $ addResult t result rs
-    (_trace, Left e) -> recurse ((newState <$> branchOnEdge e t) <> todoList) rs where
-      --we need to add the new skips to the TM's book
-      newState :: Turing -> (Turing, SimState)
-      newState t = (t, SimState p tape (updateBook e t book) steps trace hist histSet counter)
-      -- updateBook :: Turing -> SkipBook Bit -> SkipBook Bit
-      -- updateBook (Turing _ trans) book =
-      --   let newSkips = initTransSkip e (trans ^?! ix e) in
-      --     foldr addInitialSkipToBook book newSkips
-  recurse [] result = result
-  recurse (x : xs) result = loop x xs result
+-- simulateWithSkips :: Int -> Turing -> Results SkipTape
+-- simulateWithSkips limit startMachine
+--   = loop (startMachine, initSkipState startMachine) [] Empty where
+--   loop :: (Turing, SimState) -> [(Turing, SimState)]
+--     -> Results (ExpTape Bit InfCount) -> Results (ExpTape Bit InfCount)
+--   loop (t, s@(SimState p tape book steps trace hist histSet counter)) todoList !rs = case simulateOneMachine limit t s of
+--     (_trace, Right result) -> recurse todoList $ addResult t result rs
+--     (_trace, Left e) -> recurse ((newState <$> branchOnEdge e t) <> todoList) rs where
+--       --we need to add the new skips to the TM's book
+--       newState :: Turing -> (Turing, SimState)
+--       newState t = (t, SimState p tape (updateBook e t book) steps trace hist histSet counter)
+--       -- updateBook :: Turing -> SkipBook Bit -> SkipBook Bit
+--       -- updateBook (Turing _ trans) book =
+--       --   let newSkips = initTransSkip e (trans ^?! ix e) in
+--       --     foldr addInitialSkipToBook book newSkips
+--   recurse [] result = result
+--   recurse (x : xs) result = loop x xs result
 
-simulateOneTotalMachine :: Int -> Turing -> ([Skip Bit], SimResult (ExpTape Bit InfCount))
-simulateOneTotalMachine limit machine
-  = loop machine $ SimState (Phase 0) (initExpTape False) (initBook machine) 0 [] [] Empty 0 where
-  loop :: Turing -> SimState -> ([Skip Bit], SimResult (ExpTape Bit InfCount))
-  loop _t (SimState p tape _book steps@((>= limit) -> True) trace _hist _histSet _counter) = (trace, Continue steps p tape)
-  loop t (SimState p tape book steps trace hist histSet counter) = case skipStep t book p tape of
-    MachineStuck -> error "machinestuck"
-    Unknown _e -> (trace, Continue steps p tape)
-    Stopped c newTape _ -> (trace, Halted (steps + infCountToInt c) newTape)
-    Stepped c newP newTape skip -> if c == Infinity
-      then (skip : trace, ContinueForever $ SkippedToInfinity steps skip)
-      else loop t $ SimState newP newTape book (steps + infCountToInt c) (skip : trace) hist histSet counter
+-- simulateOneTotalMachine :: Int -> Turing -> ([Skip Bit], SimResult (ExpTape Bit InfCount))
+-- simulateOneTotalMachine limit machine
+--   = loop machine $ (initSKipState machine) where
+--   loop :: Turing -> SimState -> ([Skip Bit], SimResult (ExpTape Bit InfCount))
+--   loop _t (SimState p tape _book steps@((>= limit) -> True) trace _hist _histSet _counter) = (trace, Continue steps p tape)
+--   loop t (SimState p tape book steps trace hist histSet counter) = case skipStep t book p tape of
+--     MachineStuck -> error "machinestuck"
+--     Unknown _e -> (trace, Continue steps p tape)
+--     Stopped c newTape _ -> (trace, Halted (steps + infCountToInt c) newTape)
+--     Stepped c newP newTape skip -> if c == Infinity
+--       then (skip : trace, ContinueForever $ SkippedToInfinity steps skip)
+--       else loop t $ SimState newP newTape book (steps + infCountToInt c) (skip : trace) hist histSet counter
 
 
 
-simulateOneMachineByGluing :: Int -> Turing -> SimState
-  -> ([Skip Bit], SkipBook Bit, Either Edge (SimResult SkipTape))
-simulateOneMachineByGluing limit t = \case
-  SimState p tape book steps@((>= limit) -> True) trace _hist _histSet _counter -> (trace, book, Right $ Continue steps p tape)
-  SimState p tape book steps trace hist histSet counter -> case skipStep t book p tape of
-    MachineStuck -> error "machinestuck"
-    Unknown e -> (trace, book, Left e)
-    Stopped c newTape skip -> (skip : trace, book, Right $ Halted (steps + infCountToInt c) newTape)
-    Stepped c newP newTape skip -> case c of
-      Infinity -> (skip : trace, book, Right $ ContinueForever (SkippedToInfinity steps skip))
-      c -> simulateOneMachineByGluing limit t
-              $ SimState newP newTape newBook (steps + infCountToInt c) (skip : trace) hist histSet counter where
-        newBook = case trace of
-          [] -> book
-          prevSkip : _rest -> case glueSkips prevSkip skip of
-            Left err -> error $ "used two skips in a row but couldn't glue:\n"
-              <> "reason: " <> err <> "\n" <> show (pretty prevSkip)
-              <> "\nsecond skip\n" <> show (pretty skip)
-            Right gluedSkip -> addSkipToBook gluedSkip (Glued prevSkip skip) book
+-- simulateOneMachineByGluing :: Int -> Turing -> SimState
+--   -> ([Skip Bit], SkipBook Bit, Either Edge (SimResult SkipTape))
+-- simulateOneMachineByGluing limit t = \case
+--   SimState p tape book steps@((>= limit) -> True) trace _hist _histSet _counter -> (trace, book, Right $ Continue steps p tape)
+--   SimState p tape book steps trace hist histSet counter -> case skipStep t book p tape of
+--     MachineStuck -> error "machinestuck"
+--     Unknown e -> (trace, book, Left e)
+--     Stopped c newTape skip -> (skip : trace, book, Right $ Halted (steps + infCountToInt c) newTape)
+--     Stepped c newP newTape skip -> case c of
+--       Infinity -> (skip : trace, book, Right $ ContinueForever (SkippedToInfinity steps skip))
+--       c -> simulateOneMachineByGluing limit t
+--               $ SimState newP newTape newBook (steps + infCountToInt c) (skip : trace) hist histSet counter where
+--         newBook = case trace of
+--           [] -> book
+--           prevSkip : _rest -> case glueSkips prevSkip skip of
+--             Left err -> error $ "used two skips in a row but couldn't glue:\n"
+--               <> "reason: " <> err <> "\n" <> show (pretty prevSkip)
+--               <> "\nsecond skip\n" <> show (pretty skip)
+--             Right gluedSkip -> addSkipToBook gluedSkip (Glued prevSkip skip) book
 
-simulateByGluing :: Int -> Turing -> Results (ExpTape Bit InfCount)
-simulateByGluing limit startMachine
- = loop (startMachine, initSkipState startMachine) [] Empty  where
-  loop :: (Turing, SimState) -> [(Turing, SimState)] -> Results SkipTape -> Results SkipTape
-  loop (t, s@(SimState p tape book steps trace hist histSet counter)) todoList rs = case simulateOneMachineByGluing limit t s of
-    (_trace, _book, Right result) -> recurse todoList $ addResult t result rs
-    (_trace, _book, Left e) -> recurse ((newState <$> branchOnEdge e t) <> todoList) rs where
-      --we need to add the new skips to the TM's book
-      newState :: Turing -> (Turing, SimState)
-      newState t = (t, SimState p tape (updateBook t book) steps trace hist histSet counter)
-      updateBook :: Turing -> SkipBook Bit -> SkipBook Bit
-      updateBook (Turing _ trans) book =
-        let newSkips = initTransSkip e (trans ^?! ix e) in
-          foldr addInitialSkipToBook book newSkips
-  recurse [] result = result
-  recurse (x : xs) result = loop x xs result
+-- simulateByGluing :: Int -> Turing -> Results (ExpTape Bit InfCount)
+-- simulateByGluing limit startMachine
+--  = loop (startMachine, initSkipState startMachine) [] Empty  where
+--   loop :: (Turing, SimState) -> [(Turing, SimState)] -> Results SkipTape -> Results SkipTape
+--   loop (t, s@(SimState p tape book steps trace hist histSet counter)) todoList rs = case simulateOneMachineByGluing limit t s of
+--     (_trace, _book, Right result) -> recurse todoList $ addResult t result rs
+--     (_trace, _book, Left e) -> recurse ((newState <$> branchOnEdge e t) <> todoList) rs where
+--       --we need to add the new skips to the TM's book
+--       newState :: Turing -> (Turing, SimState)
+--       newState t = (t, SimState p tape (updateBook t book) steps trace hist histSet counter)
+--       updateBook :: Turing -> SkipBook Bit -> SkipBook Bit
+--       updateBook (Turing _ trans) book =
+--         let newSkips = initTransSkip e (trans ^?! ix e) in
+--           foldr addInitialSkipToBook book newSkips
+--   recurse [] result = result
+--   recurse (x : xs) result = loop x xs result

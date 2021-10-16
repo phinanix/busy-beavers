@@ -26,14 +26,14 @@ simulateBasicAndSkip limit t = (normalRes, skipRes) where
         (_, Left e) -> error $ show e <> " was not a known edge simulateBasicAndSkip 2"
         (_, Right res) -> res
 
-simulateBasicAndGlue :: Int -> Turing -> (SimResult Tape, SimResult SkipTape)
-simulateBasicAndGlue limit t = (normalRes, skipRes) where 
-  normalRes = case Simulate.simulateOneMachine limit t initSimState of 
-          Left e -> error $ show e <> " was not a known edge simulateBasicAndGlue"
-          Right res -> res 
-  skipRes = case SimulateSkip.simulateOneMachineByGluing limit t (initSkipState t) of 
-    (_, _, Left e) -> error $ show e <> " was not a known edge simulateBasicAndGlue 2"
-    (_, _, Right res) -> res 
+-- simulateBasicAndGlue :: Int -> Turing -> (SimResult Tape, SimResult SkipTape)
+-- simulateBasicAndGlue limit t = (normalRes, skipRes) where 
+--   normalRes = case Simulate.simulateOneMachine limit t initSimState of 
+--           Left e -> error $ show e <> " was not a known edge simulateBasicAndGlue"
+--           Right res -> res 
+--   skipRes = case SimulateSkip.simulateOneMachineByGluing limit t (initSkipState t) of 
+--     (_, _, Left e) -> error $ show e <> " was not a known edge simulateBasicAndGlue 2"
+--     (_, _, Right res) -> res 
 
 twoThingsSimulatesSame :: SimResult Tape -> SimResult SkipTape -> Expectation 
 twoThingsSimulatesSame normalRes skipRes = if normalSteps == skipSteps 
@@ -56,9 +56,10 @@ spec :: Spec
 spec = do
   -- the goal of this test is to make sure that simulating the machine with skips outputs the same thing 
   -- as simulating a machine without skips
-  describe "simulateWithSkips" $ do 
-    it "produces the same results as normal simulation" $ 
-      simulatesSameForAll simulateBasicAndSkip 40 bb3
-  describe "simulateByGluing" $ do 
-    it "produces the same results as normal simulation" $ 
-      simulatesSameForAll simulateBasicAndGlue 40 bb3
+  -- describe "simulateWithSkips" $ do 
+  --   it "produces the same results as normal simulation" $ 
+  --     simulatesSameForAll simulateBasicAndSkip 40 bb3
+  -- describe "simulateByGluing" $ do 
+  --   it "produces the same results as normal simulation" $ 
+  --     simulatesSameForAll simulateBasicAndGlue 40 bb3
+  pure ()

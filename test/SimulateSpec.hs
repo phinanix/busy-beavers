@@ -92,7 +92,7 @@ varResult = ExpTape
 
 getContinueSteps :: SimResult a -> Maybe Steps
 getContinueSteps = \case
-  Continue steps _ _ -> Just steps
+  Continue steps _ _ _ -> Just steps
   _ -> Nothing
 
 spec :: Spec
@@ -109,13 +109,13 @@ spec = do
     --     `shouldBe` Just (Lremains (False, inum 8))
     it "applies a simple skip" $
       applySkip simpleSkip (Phase 0, simpleTape)
-      `shouldBe` Just (Skipped (NotInfinity $ num 5) (Phase 1) simpleResult)
+      `shouldBe` Just (Skipped (NotInfinity $ num 5) (Phase 1) simpleResult (OneDir L (NotInfinity $ num 3)))
     -- it "matches the point of the more complex skip" $ do
     --   getEquations (matchPoints (exampleSkip^.start.c_point) (point exampleTape))
     --     `shouldBe` Just (Lremains (True, inum 6))
     it "applies a more complex skip" $
       applySkip exampleSkip (Phase 0, exampleTape)
-      `shouldBe` Just (Skipped (NotInfinity $ num 10) (Phase 1) exampleResult)
+      `shouldBe` Just (Skipped (NotInfinity $ num 10) (Phase 1) exampleResult (OneDir L (NotInfinity $ num 8)))
 
   describe "simulateOneMachine" $ do
     it "stops after the specified number of tests" $

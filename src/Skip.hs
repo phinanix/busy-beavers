@@ -28,15 +28,23 @@ data SkipEnd s = EndSide Phase Dir [(s, Count)] | EndMiddle (Config s)
 instance (NFData s) => NFData (SkipEnd s)
 
 --Zero and OneDir as they say, BothDirs goes the first count steps left and the second count steps right 
-data Displacement = Zero | OneDir Dir Count | BothDirs Count Count deriving (Eq, Ord, Show, Generic) 
-instance NFData Displacement 
+data Displacement c = Zero | OneDir Dir c | BothDirs c c deriving (Eq, Ord, Show, Generic, Functor) 
+instance (NFData c) => NFData (Displacement c)
+
+dispToInt :: Displacement InfCount -> Int 
+dispToInt = \case 
+  Zero -> 0
+  OneDir L (NotInfinity (FinCount n)) -> -1 * fromIntegral n
+  OneDir R (NotInfinity (FinCount n)) -> fromIntegral n
+  BothDirs (NotInfinity (FinCount n)) (NotInfinity (FinCount m)) -> fromIntegral m - fromIntegral n
+  other -> error $ "couldn't convert " <> show other <> " to an int"
 
 data Skip s = Skip
   { _start :: Config s
   , _end :: SkipEnd s
   , _hops :: Count --number of atomic TM steps
   , _halts :: Bool --true if the skip results in the machine halting
-  , _displacement :: Displacement
+  , _displacement :: Displacement Count 
   } deriving (Eq, Ord, Show, Generic, Functor)
 instance (NFData s) => NFData (Skip s)
 

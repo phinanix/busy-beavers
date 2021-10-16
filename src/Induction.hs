@@ -97,8 +97,8 @@ proveBySimulating limit t book (Skip start goal _ _ _)
             Stopped {} -> Left "halted while simulating"
             MachineStuck -> Left $ "machine stuck in phase:" <> show p
                 <> "\ngoal:" <> show (pretty goal) <> "\ncur tape:" <> dispExpTape tape
-            Stepped Infinity _ _ _ -> Left "hopped to infinity"
-            Stepped (NotInfinity hopsTaken) newPhase newTape _
+            Stepped Infinity _ _ _ _ -> Left "hopped to infinity"
+            Stepped (NotInfinity hopsTaken) newPhase newTape _ _
                 -> loop (numSteps + 1) newPhase newTape (curCount <> hopsTaken)
     indMatch :: Phase -> ExpTape Bit InfCount -> SkipEnd Bit -> Bool
     indMatch cur_p et se = case bitraverse pure deInfCount et of

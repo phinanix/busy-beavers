@@ -12,8 +12,8 @@ import HaltProof
 import Skip
 
 -- the type var here is the type of tape 
-data SimResult a = Halted Steps a
-               | Continue Steps Phase a
+data SimResult a = Halted Steps a Int --these two ints are the total displacement
+               | Continue Steps Phase a Int 
                | ContinueForever HaltProof
                | InductionGuess (Skip Bit) 
                deriving (Eq, Ord, Show, Functor)
@@ -21,9 +21,10 @@ data SimResult a = Halted Steps a
 $(makePrisms ''SimResult)
 
 dispResult :: (a -> Text) -> SimResult a -> Doc ann
-dispResult dispTape (Halted steps tape) = prettyText $ "After " <> show steps
-  <> " steps, halted with tape: \n" <> dispTape tape
-dispResult dispTape (Continue steps phase tape) = prettyText $ "step: " <> showInt3Wide steps
+dispResult dispTape (Halted steps tape disp) = prettyText $ "After " <> show steps 
+  <> " steps, and " <> show disp <> " disp halted with tape: \n" <> dispTape tape
+dispResult dispTape (Continue steps phase tape disp) = prettyText $ "step: " <> showInt3Wide steps
+  <> " disp: " <> show disp 
   <> " state: " <> show phase
   <> " tape: " <> dispTape tape
 dispResult _ (ContinueForever proof) = prettyText "the machine will go forever via: "
@@ -75,7 +76,7 @@ keepNum :: Int
 keepNum = 3
 
 addResult :: (Tapeable a) => Turing -> SimResult a -> Results a -> Results a
-addResult turing (Halted steps tape) r =
+addResult turing (Halted steps tape _disp) r =
   addHalter $ addLongest $ addOnesiest (ones tape) r where
     addLongest r = case r ^. longestRun of
       Nothing -> r & longestRun ?~ (steps, turing, tape)
@@ -96,7 +97,7 @@ addResult turing (ContinueForever proof) r =
     special BackwardSearch = --if r ^. backwardSearches > keepNum then id else
       backwardExamples %~ ((:) turing)
     special _ = id
-addResult turing (Continue steps phase tape) r =
+addResult turing (Continue steps phase tape _disp) r =
   let r' = r & unproven +~ 1 in
   if r' ^. unproven > keepNum then r'
     else r' & unprovenExamples %~ ((:) (turing, steps, phase, tape))

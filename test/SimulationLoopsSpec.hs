@@ -11,9 +11,9 @@ import Count
 import ExpTape 
 import Results 
 import SimulationLoops 
+
 import HaltProof
 import TuringExamples
-import HaltProof (HaltProof(OffToInfinityN))
 
 loopForEndOfTapeGlue :: Int -> Turing -> SimResult (ExpTape Bit InfCount)
 loopForEndOfTapeGlue limit = simulateOneMachineOuterLoop $ 
@@ -27,7 +27,8 @@ test = NotInfinity (c 2)
 spec :: Spec 
 spec = do 
   describe "attemptEndOfTapeGlueProof" $ do 
-    it "proves a simple goes forever machine" $ do 
+    xit "proves a simple goes forever machine" $ do 
       loopForEndOfTapeGlue 100 goesLeftForever `shouldBe` ContinueForever (OffToInfinityN 1 L)
     it "does not prove a machine that doesn't halt in this way" $ do 
-      loopForEndOfTapeGlue 100 weird3 `shouldBe`  Continue 101 (Phase 2) (ExpTape [(False,NotInfinity (c 2)),(True,NotInfinity (c 1)),(False,Infinity)] False [(True,NotInfinity (c 2)),(False,Infinity)])
+      loopForEndOfTapeGlue 100 weird3 `shouldBe`  
+        Continue 101 (Phase 2) (ExpTape [(False,NotInfinity (c 2)),(True,NotInfinity (c 1)),(False,Infinity)] False [(True,NotInfinity (c 2)),(False,Infinity)]) (-3)

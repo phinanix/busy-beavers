@@ -74,13 +74,13 @@ getSteps (SimState steps _ _) = (steps `div` 2, steps)
 simulateOneMachine :: Int -> Turing -> SimState Tape -> Either Edge (SimResult Tape)
 simulateOneMachine limit t = \case
   s@(collision -> True) -> Right $ ContinueForever $ uncurry Cycle $ getSteps s
-  SimState stepCount@((>= limit) -> True) _ (TMState p finalTape) -> Right $ Continue stepCount p finalTape
+  SimState stepCount@((>= limit) -> True) _ (TMState p finalTape) -> Right $ Continue stepCount p finalTape 0
   s@(SimState stepsTaken slow fast) -> case proveForever t s of
     Just hp -> Right $ ContinueForever hp
     Nothing -> let newStepsTaken = stepsTaken + 1 in
       case simStep t fast of
         Unknown e -> Left e
-        Stopped _ tape -> Right $ Halted newStepsTaken tape
+        Stopped _ tape -> Right $ Halted newStepsTaken tape 0
         Stepped _ newFast -> let
           newSlow = if even newStepsTaken  then forceAdvance t slow else slow
           newState = SimState newStepsTaken newSlow newFast
