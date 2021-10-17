@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 893460ec4b0d6f18e7ad557a9e68c3822393ecf995d84ca87aa8b597410c3e63
+-- hash: 3820864c1f927df1a96de81f1141f6e9e8cefa9f694e0ce4433dd11ae8ca641e
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -53,8 +53,10 @@ library
   default-extensions: ApplicativeDo BangPatterns ConstraintKinds DataKinds DefaultSignatures DeriveFoldable DeriveFunctor DeriveGeneric DeriveLift DeriveTraversable DerivingStrategies EmptyCase ExistentialQuantification FlexibleContexts FlexibleInstances FunctionalDependencies GADTs GeneralizedNewtypeDeriving InstanceSigs KindSignatures LambdaCase MultiParamTypeClasses MultiWayIf NamedFieldPuns NoImplicitPrelude OverloadedStrings PartialTypeSignatures PatternSynonyms PolyKinds QuasiQuotes RankNTypes ScopedTypeVariables StrictData StandaloneDeriving TemplateHaskell TupleSections TypeApplications TypeOperators ViewPatterns
   ghc-options: -Wall -Wno-name-shadowing -Wno-unused-imports -Wcompat -Wredundant-constraints -Wincomplete-record-updates -Wincomplete-uni-patterns
   build-depends:
-      base
+      QuickCheck
+    , base
     , containers
+    , hspec
     , lens
     , monoidal-containers
     , mtl

@@ -4,6 +4,7 @@ import Relude hiding (mapMaybe, filter, (??))
 import Control.Lens
 import Data.Map.Monoidal (MonoidalMap(..))
 import Data.List (maximumBy, foldl1)
+import qualified Data.List.NonEmpty as NE ((<|))
 import Data.Map.Strict (assocs, keysSet, unions)
 import Witherable
 import Prettyprinter
@@ -51,7 +52,7 @@ data SimState = SimState
   , _s_counter :: Int --the number of times we have taken a "big step". guaranteed to take on all values between 0 and n
   --the total amount of leftward (negative) or rightward (positive) displacement we have done, starting from 0
   , _s_displacement :: Int
-  , _s_disp_history :: [Int] 
+  , _s_disp_history :: [Int]
   } deriving (Eq, Ord, Show)
 
 instance (Pretty s) => Pretty (SkipOrigin s) where
@@ -218,7 +219,7 @@ skipStep (Turing _ trans) book p tape@(ExpTape _ls bit _rs)
 type SkipTape = ExpTape Bit InfCount
 
 initSkipState :: Turing -> SimState
-initSkipState t = SimState (Phase 0) (initExpTape False) (initBook t) 0 [] [] Empty 0 0 [0] 
+initSkipState t = SimState (Phase 0) (initExpTape False) (initBook t) 0 [] [(Phase 0, initExpTape False)] Empty 0 0 (pure 0) 
 
 simulateOneMachine :: Int -> Turing -> SimState
   -> ([Skip Bit], Either Edge (SimResult SkipTape))

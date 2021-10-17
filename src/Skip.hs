@@ -68,7 +68,7 @@ instance Pretty s => Pretty (SkipEnd s) where
 instance Pretty s => Pretty (Skip s) where
   pretty (Skip s e c halts displace) = prettyText "in " <> pretty (dispCount c) <> prettyText " steps we turn\n"
     <> pretty s <> prettyText "\ninto: \n" <> pretty e <> prettyText (if halts then "\n and halt" else "") 
-    <> prettyText "\n displacement of: " <> pretty (dispCount c) 
+    <> prettyText "\n displacement of: " <> show displace
 
 getSkipEndPhase :: SkipEnd s -> Phase
 getSkipEndPhase (EndSide p _ _) = p

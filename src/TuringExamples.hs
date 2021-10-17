@@ -1,8 +1,8 @@
-module TuringExamples where 
+module TuringExamples where
 
-import Relude ( IsList(fromList), Bool(True, False) ) 
+import Relude ( IsList(fromList), Bool(True, False) )
 
-import Turing 
+import Turing
 
 --woah, this is a counting machine !!!
 weird3 :: Turing
@@ -45,8 +45,8 @@ bb3 = Turing {states = 3, transitions = fromList
   ,((Phase 2, True ), Step (Phase 0) True  L)
   ]}
 
-simple_sweeper :: Turing 
-simple_sweeper = Turing {states = 3, transitions  = fromList 
+simple_sweeper :: Turing
+simple_sweeper = Turing {states = 3, transitions  = fromList
   [((Phase 0, False), Step (Phase 1) True R)
   ,((Phase 1, False), Step (Phase 2) False L)
   ,((Phase 1, True), Step (Phase 1) False R)
@@ -55,8 +55,8 @@ simple_sweeper = Turing {states = 3, transitions  = fromList
   ]}
 
 
-checkerboardSweeper :: Turing 
-checkerboardSweeper = Turing {states = 3, transitions  = fromList 
+checkerboardSweeper :: Turing
+checkerboardSweeper = Turing {states = 3, transitions  = fromList
   [((Phase 0, False), Step (Phase 1) True R)
   ,((Phase 0, True), Step (Phase 2) False L)
   ,((Phase 1, False), Step (Phase 2) False L)
@@ -65,10 +65,22 @@ checkerboardSweeper = Turing {states = 3, transitions  = fromList
   ,((Phase 2, True), Step (Phase 0) True L)
   ]}
 
-goesLeftForever :: Turing 
-goesLeftForever = Turing {states = 2, transitions = fromList 
+goesLeftForever :: Turing
+goesLeftForever = Turing {states = 2, transitions = fromList
   [((Phase 0, False), Step (Phase 1) True L)
 --  ,((Phase 0, True), Step (Phase 0) False L)
   ,((Phase 1, False), Step (Phase 0) True L)
   ,((Phase 1, True), Halt)
+  ]}
+
+-- a four state binary counter which uses TF and TT as its digits 
+binaryCounterTFTT :: Turing
+binaryCounterTFTT = Turing {states = 4, transitions = fromList
+  [((Phase 0,False),Step (Phase 1) True R)
+  ,((Phase 0,True),Step (Phase 0) True R)
+  ,((Phase 1,False),Step (Phase 2) False L)
+  ,((Phase 1,True),Step (Phase 0) False R)
+  ,((Phase 2,True),Step (Phase 3) False L)
+  ,((Phase 3,False),Step (Phase 0) True L)
+  ,((Phase 3,True),Step (Phase 2) True L)
   ]}

@@ -11,7 +11,7 @@ import Data.List.NonEmpty ((<|))
 
 --the Phase a turing machine is in, to not conflict with State
 newtype Phase = Phase { unPhase :: Int} deriving (Eq, Ord, Generic)
-instance Show Phase where 
+instance Show Phase where
   show (Phase i) = "(Phase " <> show i <> ")"
 
 data Dir = L | R deriving (Eq, Ord, Show, Generic)
@@ -163,10 +163,10 @@ branchOnEdge e@(Phase newPhase, _) (Turing n m) = --if elem bb3test out then (tr
 --not valid for n=1, where the machine must halt immediately, or run forever.
 startMachine0 :: Int -> Turing
 startMachine0 1 = uni1Machine
-startMachine0 n = Turing n $ one ((Phase 0, False), (Step (Phase 1) False R))
+startMachine0 n = Turing n $ one ((Phase 0, False), Step (Phase 1) False R)
 startMachine1 :: Int -> Turing
 startMachine1 1 = uni1Machine
-startMachine1 n = Turing n $ one ((Phase 0, False), (Step (Phase 1) True R))
+startMachine1 n = Turing n $ one ((Phase 0, False), Step (Phase 1) True R)
 --for n=1 if you don't halt right away, you are doomed to loop forever
 uni1Machine :: Turing
 uni1Machine = Turing 1 $ one ((Phase 0, False), Halt)

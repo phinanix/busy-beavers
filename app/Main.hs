@@ -146,19 +146,19 @@ simProgram display results = do
 -- add the monad that is used to generate fresh bound and symbol variables 
 -- check the backwards search code works ok 
 -- add backwards search to skip-based sim
--- add end-of-tape heuristic to skip-based sim (I think maybe glueing actually just accomplishes this)
+-- -- add end-of-tape heuristic to skip-based sim (I think maybe glueing actually just accomplishes this)
 --
 -- more todos
--- add deflection to left and right tracking (added to skips, now just need to add to simstate / applyskip)
--- use deflection tracking to do the end of tape cycle guesser right
+-- -- add deflection to left and right tracking (added to skips, now just need to add to simstate / applyskip)
+-- -- use deflection tracking to do the end of tape cycle guesser right
 -- use deflection tracking to do the better induction guesser 
 main :: IO ()
 main = do
   -- let results = Simulate.simulate 140 $ startMachine1 3
   -- simProgram dispTape results
   
-  let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] =  simulateManyBasicLoop 100 $ startMachine1 3 
-  putText $ dispResults dispExpTape $ foldr (uncurry addResult) Empty resultList 
+  let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] =  simulateManyBasicLoop 140 $ startMachine1 4
+  simProgram dispExpTape $ foldr (uncurry addResult) Empty resultList 
 
   -- let skipResults = simulateWithSkips 1000 $ startMachine1 5
   -- simProgram dispExpTape skipResults

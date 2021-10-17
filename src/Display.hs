@@ -15,13 +15,17 @@ import qualified Simple.Display as Simple (dispResult)
 import qualified Simple.Tape as Simple
 import Data.Map (restrictKeys)
 import SimulateSkip
+import Count
+import Numeric (showFFloat)
 
 showOneMachine :: Turing -> Steps -> Text
 showOneMachine t n =
-  dispTuring t <> "\n" <> foldMap 
-  (\steps -> Simple.dispResult (Simple.simulate steps Simple.dispStartState t) <> "\n") 
+  dispTuring t <> "\n" <> foldMap
+  (\steps -> Simple.dispResult (Simple.simulate steps Simple.dispStartState t) <> "\n")
   [0.. n]
 
+dispPhaseET :: (Phase, ExpTape Bit InfCount) -> Text
+dispPhaseET (ph, et) = "(" <> dispPhase  ph <> ", " <> dispExpTape et <> ")\n"
 
 displaySkipSimStep :: Turing -> Steps -> Doc ann
 displaySkipSimStep t steps = dispResult dispExpTape $ SimulateSkip.simulateOneTotalMachine steps t ^. _2
@@ -31,12 +35,12 @@ displaySkipSimulation t limit =
   prettyText (dispTuring t <> "\n") <> foldMap (\i -> displaySkipSimStep t i <> "\n") [0 .. limit]
 
 displaySkipStepAndSkip :: Turing -> Steps -> Doc ann
-displaySkipStepAndSkip t limit = case SimulateSkip.simulateOneTotalMachine limit t of 
+displaySkipStepAndSkip t limit = case SimulateSkip.simulateOneTotalMachine limit t of
   (lastSkip : _, res) -> dispResult dispExpTape res <> "\nresulted from the skip:" <> show (pretty lastSkip)
   ([], res) -> error ("there were no skips for some reason, res:\n" <> show res)
 
-displaySkipSimulationWithSkips :: Turing -> Steps -> Doc ann 
-displaySkipSimulationWithSkips t limit = 
+displaySkipSimulationWithSkips :: Turing -> Steps -> Doc ann
+displaySkipSimulationWithSkips t limit =
   prettyText (dispTuring t <> "\n") <> foldMap (\i -> displaySkipStepAndSkip t i <> "\n") [1.. limit]
 
 -- temporarily removed due to maintainence or something
@@ -47,7 +51,7 @@ displaySkipSimulationWithSkips t limit =
 --       show e <> " was not a defined edge"
 --   (lastSkip : _, book, Right res) -> dispResult dispExpTape res <> "\nresulted from the skip:" <> show (pretty lastSkip) 
 --     <> "\n" <> if displayBook then pretty book else ""
-  
+
 -- displayGlueSimulationAndBook :: Turing -> Steps -> Doc ann 
 -- displayGlueSimulationAndBook t limit = prettyText (dispTuring t <> "\n") 
 --   <> foldMap (\i -> displayGlueStepAndSkip t i False <> "\n") [1.. limit-1]
@@ -56,6 +60,10 @@ displaySkipSimulationWithSkips t limit =
 
 totalMachines :: Results a -> Int
 totalMachines r = r ^. haltCount + r ^. provenForever + r ^. unproven
+
+dispUnprovenFraction :: Results a -> Text
+dispUnprovenFraction r = fromString $
+  (showFFloat (Just 2) $ fromIntegral (100 * r ^. unproven) / fromIntegral (r^. provenForever))  ""
 
 dispResults :: (a -> Text) -> Results a -> Text
 dispResults dispTape r = "checked: " <> show (totalMachines r) <> " machines.\n"
@@ -74,7 +82,8 @@ dispResults dispTape r = "checked: " <> show (totalMachines r) <> " machines.\n"
   -- <> "including:\n" <> (mconcat $ dispTuring <$> r ^. backwardExamples)
   <> show (r ^. skipInfinity) <> " by a skip to infinity\n"
   <> "\n"
-  <> show (r ^. unproven) <> " machines were not proven to halt, including:\n"
+  <> show (r ^. unproven) <> " machines were not proven to halt ("
+  <> dispUnprovenFraction r <> "%), including:\n"
   <> (mconcat $ dispUnproven <$> r ^. unprovenExamples)
   where
     --dispUnproven :: (Turing, Steps, Phase, a) -> Text

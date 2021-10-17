@@ -34,7 +34,9 @@ library:
   - safe
   - text
   - witherable
-
+  - QuickCheck
+  - hspec
+  
 executables:
   busy-beavers-exe:
     main:                Main.hs
@@ -49,6 +51,7 @@ executables:
     - lens
     - prettyprinter
     - text
+
 
 
 tests:

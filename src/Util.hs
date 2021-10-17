@@ -3,6 +3,7 @@ module Util where
 import Relude
 import Data.Map.Monoidal
 import Control.Lens
+import Safe.Exact (takeExact)
 
 type MMap = MonoidalMap
 
@@ -12,7 +13,7 @@ showInt3Wide i@((\i -> i < 100) -> True) = " " <> show i
 showInt3Wide i = show i
 
 bind :: Monad m => (a -> m b) -> m a -> m b
-bind = flip (>>=)
+bind = (=<<)
 
 mfailGuard :: (MonadFail m) => Bool -> String -> m ()
 mfailGuard True = const $ pure ()
@@ -41,4 +42,4 @@ atE i = at i . iso (fromMaybe Empty) Just
 --taken from https://stackoverflow.com/questions/4597820/does-haskell-have-list-slices-i-e-python
 -- TODO: Use Vector package?
 slice :: Int -> Int -> [a] -> [a]
-slice from to xs = take (to - from + 1) (drop from xs)
+slice from to xs = takeExact (to - from + 1) (drop from xs)

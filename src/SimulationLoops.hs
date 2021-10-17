@@ -1,8 +1,10 @@
 module SimulationLoops where 
 
-import Relude 
+import Relude hiding (inits) 
+import qualified Relude.Unsafe as Unsafe
 import Control.Lens
-import Data.List (maximumBy, foldl1)
+import Data.List (maximumBy, foldl1, maximum, minimum)
+import Data.List.NonEmpty (inits)
 import Prettyprinter
 
 import Turing
@@ -15,6 +17,10 @@ import SimulateSkip
 import Induction
 import Skip
 import Util 
+import Control.Exception (assert)
+import Safe.Exact
+import Relude.Unsafe ((!!))
+import Display
 
 
 type SimOneAction = Turing -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
@@ -80,8 +86,11 @@ liftModifyState f _t = Right . f
 liftModifyStateMulti :: (SimState -> SimState) -> SimMultiAction 
 liftModifyStateMulti = liftOneToMulti . liftModifyState 
 
+runIfCond :: (SimState -> Bool) -> SimOneAction -> SimOneAction
+runIfCond cond act machine state = if cond state then act machine state else pure state 
+
 runAtCount :: Int -> SimOneAction -> SimOneAction 
-runAtCount n act m state = if state ^. s_counter == n then act m state else pure state 
+runAtCount n = runIfCond (\state -> state ^. s_counter == n)
 
 addSkipToStateOrInf :: Skip Bit -> SkipOrigin Bit -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState 
 addSkipToStateOrInf skip origin state = if skipGoesForever skip && skipAppliedInHist skip (state ^. s_history)
@@ -164,33 +173,65 @@ A thing I need to be very careful about is the interaction between EndOfTape pro
 If we skip over part of the evaluation that involves the maximum inward displacement, then we could assume we had a 
 successful proof when we actually don't, and this is hard to catch. 
 -}
-attemptEndOfTapeGlueProof :: SimOneAction 
-attemptEndOfTapeGlueProof _machine state = rightAddedState where
-  hist = state ^. s_history 
-    --we're going to need to look at the history, find all the places the machine was at a specific 
-  --end of the tape, then attempt to glue between those 
+atLeftOfTape :: ExpTape Bool InfCount -> Bool
+atLeftOfTape (ExpTape ls _p _rs) = ls == [(False, Infinity)]
 
-  makeSkipFromTimes :: [Bool] -> Either Text (Skip Bit, SkipOrigin Bit)
-  makeSkipFromTimes times = do 
-    (last, sndLast) <- case reverse $ filter snd $ zip [0, 1 .. ] times of
-      [] -> Left "never at left side"
-      [_] -> Left "at left side only once"
-      (last, _) : (sndLast, _) : _rest -> pure (last, sndLast) 
+atRightOfTape :: ExpTape Bool InfCount -> Bool
+atRightOfTape (ExpTape _ls _p rs) = rs == [(False, Infinity)]
 
-    let skipRange = case nonEmpty $ slice sndLast last $ state ^. s_trace of
-          Nothing -> error $ "first slice equalled last? wacked:" <> show last 
-          Just ne -> ne 
-    (,GlueStepRange sndLast last) <$> glueMany skipRange 
+{-
+How this function works: 
+1. only called when the machine is at the left side of the tape. 
+2. finds the previous time the machine was at the left side of the tape. 
+3. finds the maximum rightward displacement over that interval. 
+4. if the leftmost bits of the tape are the same then and now, we have a proof!
+5. (maybe future): check the condition again by brute force simulation
+-}
+attemptEndOfTapeProof :: SimOneAction 
+attemptEndOfTapeProof _machine state = assert (atLeftOfTape $ state ^. s_tape) $
+    maybe (Right state) (Left . ContinueForever) maybeProof 
+ where 
+  samePhase = (== state ^. s_phase)
+  samePoint (ExpTape _ls oldPoint _rs) = oldPoint == point (state ^. s_tape)
+  isCandidate (phase, tape) = samePhase phase && atLeftOfTape tape && samePoint tape 
+  dispList = Unsafe.tail $ state ^. s_disp_history 
+  maximumInwardList = fmap maximum $ tail $ inits dispList 
+  bitsToCheck = uncurry (-) <$> zipExact maximumInwardList dispList
+  candidates = filter (isCandidate . view _2) $ zipExact bitsToCheck $ Unsafe.tail $ state ^. s_history  
+  -- int is from bitsToCheck
+  checkProof :: (Int, (Phase, ExpTape Bit InfCount)) -> Maybe HaltProof 
+  checkProof (numBitsToCheck, (_ph, oldTape)) = let 
+    getBits tapeHalf = takeExact numBitsToCheck $ tapeHalfToBitList tapeHalf <> repeat False
+    in 
+    if getBits (right oldTape) == getBits (right $ state ^. s_tape) 
+      then Just $ OffToInfinityN (state ^. s_steps) L
+      else Nothing 
+  maybeProof :: Maybe HaltProof
+  maybeProof = viaNonEmpty head $ mapMaybe checkProof candidates
+  
 
-  maybeLeftSkip :: Either Text (Skip Bit, SkipOrigin Bit) 
-  maybeLeftSkip = makeSkipFromTimes $ wasAtLeft . snd <$> hist
-  maybeRightSkip = makeSkipFromTimes $ wasAtRight . snd <$> hist
-  wasAtLeft (ExpTape ls _p _rs) = ls == [(False, Infinity)]
-  wasAtRight (ExpTape _ls _p rs) = rs == [(False, Infinity)]
-  addFailSkipToState skip state = either (const $ Right state) (flip (uncurry addSkipToStateOrInf) state) skip
-  leftAddedState :: Either (SimResult (ExpTape Bit InfCount)) SimState
-  leftAddedState = addFailSkipToState maybeLeftSkip state 
-  rightAddedState = addFailSkipToState maybeRightSkip =<< leftAddedState 
+attemptOtherEndOfTapeProof :: SimOneAction 
+attemptOtherEndOfTapeProof _machine state = assert (atRightOfTape $ state ^. s_tape) $
+    maybe (Right state) (Left . ContinueForever) maybeProof 
+ where 
+  samePhase = (== state ^. s_phase)
+  samePoint (ExpTape _ls oldPoint _rs) = oldPoint == point (state ^. s_tape)
+  isCandidate (phase, tape) = samePhase phase && atRightOfTape tape && samePoint tape 
+  dispList = Unsafe.tail $ state ^. s_disp_history 
+  minimumInwardList = fmap minimum $ tail $ inits dispList 
+  bitsToCheck = uncurry (-) <$> zipExact dispList minimumInwardList
+  candidates = filter (isCandidate . view _2) $ zipExact bitsToCheck $ Unsafe.tail $ state ^. s_history  
+  -- int is from bitsToCheck
+  checkProof :: (Int, (Phase, ExpTape Bit InfCount)) -> Maybe HaltProof 
+  checkProof (numBitsToCheck, (_ph, oldTape)) = let 
+    getBits tapeHalf = takeExact numBitsToCheck $ tapeHalfToBitList tapeHalf <> repeat False
+    in 
+    if getBits (left oldTape) == getBits (left $ state ^. s_tape) 
+      then Just $ OffToInfinityN (state ^. s_steps) R
+      else Nothing 
+  maybeProof :: Maybe HaltProof
+  maybeProof = viaNonEmpty head $ mapMaybe checkProof candidates
+  
   
 loopSimulateSkip :: Int -> Turing -> SimResult (ExpTape Bit InfCount)
 loopSimulateSkip limit = simulateOneMachineOuterLoop $ pure $ simulateStepTotalLoop limit
@@ -200,4 +241,12 @@ indGuessLoop limit = simulateOneMachineOuterLoop $
   simulateStepTotalLoop limit :| [liftModifyState recordHist, runAtCount 100 attemptInductionGuess]
 
 simulateManyBasicLoop :: Int -> Turing -> [_]
-simulateManyBasicLoop limit = simulateManyMachinesOuterLoop $ simulateStepPartial limit :| [liftOneToMulti checkSeenBefore]
+simulateManyBasicLoop limit = simulateManyMachinesOuterLoop $ simulateStepPartial limit 
+  :| (liftOneToMulti <$> [checkSeenBefore, liftModifyState recordHist, liftModifyState recordDispHist, 
+  runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof,
+  runIfCond (atRightOfTape . view s_tape) attemptOtherEndOfTapeProof
+  ])
+
+loopForEndOfTapeGlue :: Int -> Turing -> SimResult (ExpTape Bit InfCount)
+loopForEndOfTapeGlue limit = simulateOneMachineOuterLoop $ 
+    simulateStepTotalLoop limit :| [liftModifyState recordHist, liftModifyState recordDispHist, runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof]
