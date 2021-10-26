@@ -43,20 +43,17 @@ instance Monad MultiResult where
     UnknownEdge e -> UnknownEdge e 
     Result r -> Result r 
 
-simulateOneMachineOuterLoop :: NonEmpty SimOneAction -> Turing -> SimResult (ExpTape Bit InfCount)
-simulateOneMachineOuterLoop updateFuncs startMachine = case updatesList of
-  Right _ -> error "oh no"
-  Left res -> res
-  where
-  bigUpdateFunc :: SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
-  bigUpdateFunc = foldl1 (>=>) ((&) startMachine <$> updateFuncs)
-  iterateM :: (Monad m) => (a -> m a) -> a -> m [a]
-  iterateM k init = do
-    res <- k init
-    (:) res <$> iterateM k res
-  updatesList :: Either (SimResult (ExpTape Bit InfCount)) [SimState]
-  updatesList = iterateM bigUpdateFunc $ initSkipState startMachine
+concatActions :: NonEmpty SimOneAction -> SimOneAction 
+concatActions actions machine = foldl1 (>=>) ((&) machine <$> actions)
 
+simulateOneMachineOuterLoop :: NonEmpty SimOneAction -> Turing -> (SimResult (ExpTape Bit InfCount), [SimState])
+simulateOneMachineOuterLoop updateFuncs startMachine 
+  = iterateEither (concatActions updateFuncs startMachine) (initSkipState startMachine) where
+    iterateEither :: (a -> Either r a) -> a -> (r, [a])
+    iterateEither k init = case k init of 
+      Left r -> (r, [init])
+      Right next -> (:) init <$> iterateEither k next 
+    
 simulateManyMachinesOuterLoop :: NonEmpty SimMultiAction -> Turing -> [(Turing, SimResult (ExpTape Bit InfCount))]
 simulateManyMachinesOuterLoop updateFuncs startMachine = loop (startMachine, startState) [] [] where 
   startState :: SimState 
@@ -233,10 +230,10 @@ attemptOtherEndOfTapeProof _machine state = assert (atRightOfTape $ state ^. s_t
   maybeProof = viaNonEmpty head $ mapMaybe checkProof candidates
   
   
-loopSimulateSkip :: Int -> Turing -> SimResult (ExpTape Bit InfCount)
+loopSimulateSkip :: Int -> Turing -> (SimResult (ExpTape Bit InfCount), [SimState])
 loopSimulateSkip limit = simulateOneMachineOuterLoop $ pure $ simulateStepTotalLoop limit
 
-indGuessLoop ::  Int -> Turing -> SimResult (ExpTape Bit InfCount)
+indGuessLoop ::  Int -> Turing -> (SimResult (ExpTape Bit InfCount), [SimState])
 indGuessLoop limit = simulateOneMachineOuterLoop $ 
   simulateStepTotalLoop limit :| [liftModifyState recordHist, runAtCount 100 attemptInductionGuess]
 
@@ -247,6 +244,6 @@ simulateManyBasicLoop limit = simulateManyMachinesOuterLoop $ simulateStepPartia
   runIfCond (atRightOfTape . view s_tape) attemptOtherEndOfTapeProof
   ])
 
-loopForEndOfTapeGlue :: Int -> Turing -> SimResult (ExpTape Bit InfCount)
+loopForEndOfTapeGlue :: Int -> Turing -> (SimResult (ExpTape Bit InfCount), [SimState])
 loopForEndOfTapeGlue limit = simulateOneMachineOuterLoop $ 
     simulateStepTotalLoop limit :| [liftModifyState recordHist, liftModifyState recordDispHist, runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof]

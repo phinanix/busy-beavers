@@ -157,7 +157,7 @@ main = do
   -- let results = Simulate.simulate 140 $ startMachine1 3
   -- simProgram dispTape results
   
-  let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] =  simulateManyBasicLoop 140 $ startMachine1 4
+  let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] =  simulateManyBasicLoop 40 $ startMachine1 3
   simProgram dispExpTape $ foldr (uncurry addResult) Empty resultList 
 
   -- let skipResults = simulateWithSkips 1000 $ startMachine1 5
