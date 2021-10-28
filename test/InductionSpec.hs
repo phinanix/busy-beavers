@@ -52,6 +52,12 @@ simple_sweeperGoal = Skip
   False
   Zero --obviously this is fake for now 
 
+makeIndGuess :: Int -> Turing -> Maybe (Skip Bit)
+makeIndGuess stepCount turing = guessInductionHypothesis histToUse where
+  actionList = simulateStepTotalLoop (stepCount + 1) :| [liftModifyState recordHist]
+  (_, stateList) = simulateOneMachineOuterLoop actionList turing 
+  histToUse = reverse $ stateList ^. ix stepCount . s_history
+
 c = finiteCount 
 
 spec :: Spec
@@ -100,20 +106,20 @@ spec = do
     --TODO, write basic tests for the 3 cases of generalizeFromInfCounts 
     --write several tests for guessInductionHypothesis    
   describe "guessInductionHypothesis" $ do
-    xit "guesses for a counting machine" $ do 
-       indGuessLoop 1000 weird3 `shouldBe` InductionGuess (Skip 
+    it "guesses for a counting machine" $ do 
+       makeIndGuess 1000 weird3 `shouldBe` Just (Skip 
         (Config (Phase 2) [] False [(True, Count 0 Empty (fromList [(BoundVar 0,Sum 1)]))])
         (EndMiddle (Config (Phase 2) [] False [(True, Count 1 Empty (fromList [(BoundVar 0, Sum 1)]))]))
         Empty
         False (OneDir L Empty)) --this is of course only one reasonable guess, others would also be fine 
-    xit "guesses for a sweeper" $ do 
-      indGuessLoop 1000 simple_sweeper `shouldBe` InductionGuess (Skip 
+    it "guesses for a sweeper" $ do 
+      makeIndGuess 1000 simple_sweeper `shouldBe` Just (Skip 
         (Config (Phase 0) [] False [(True, Count 0 Empty (fromList [(BoundVar 0, Sum 1)]))])
         (EndMiddle (Config (Phase 0) [] False [(True, Count 1 Empty (fromList [(BoundVar 0, Sum 1)]))]))
         Empty False (OneDir L Empty))
-    xit "guesses for a second sweeper" $ do 
-      indGuessLoop 1000 checkerboardSweeper `shouldBe` InductionGuess (Skip 
+    it "guesses for a second sweeper" $ do 
+      makeIndGuess 1000 checkerboardSweeper `shouldBe` Just (Skip 
         (Config (Phase 1) [(True, Count 0 Empty (fromList [(BoundVar 0, Sum 1)]))] False [])
         (EndMiddle (Config (Phase 1) [(True, Count 2 Empty (fromList [(BoundVar 0, Sum 1)]))] False []))
-        Empty False (OneDir L Empty))
+        Empty False Zero)
       

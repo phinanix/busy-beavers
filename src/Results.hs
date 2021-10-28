@@ -11,11 +11,11 @@ import Tape
 import HaltProof
 import Skip
 
+
 -- the type var here is the type of tape 
 data SimResult a = Halted Steps a Int --these two ints are the total displacement
                | Continue Steps Phase a Int 
                | ContinueForever HaltProof
---               | InductionGuess (Skip Bit) 
                deriving (Eq, Ord, Show, Functor)
 
 $(makePrisms ''SimResult)
