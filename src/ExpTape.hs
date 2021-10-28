@@ -9,7 +9,9 @@ import Turing
 import Count
 import Tape
 import Data.Bitraversable (Bitraversable)
-
+import Control.Exception (assert)
+import Util
+import Relude.Extra (bimapBoth)
 
 data ExpTape s c = ExpTape
   { left :: [(s, c)]
@@ -116,5 +118,30 @@ data Signature s = Signature [s] s [s] deriving (Eq, Ord, Show)
 tapeSignature :: ExpTape s c -> Signature s
 tapeSignature (ExpTape ls p rs) = Signature (fst <$> ls) p  (fst <$> rs)
 
+getCounts :: ExpTape s c -> ([c], [c])
+getCounts (ExpTape ls _p rs) = bimapBoth (fmap snd) (ls, rs)
+
 signatureComplexity :: Signature s -> Int
 signatureComplexity (Signature ls _p rs) = length ls + length rs
+
+getNThings :: [(s, InfCount)] -> Natural -> [s]
+getNThings _ 0 = [] 
+getNThings xs n = case getNewPoint xs of 
+  Left msg -> error $ "getNThings failed: " <> msg 
+  Right (s, rest) -> (s :) $ getNThings rest (n - 1)
+
+runLengthEncode :: (Eq s) => [s] -> [(s, Count)]
+runLengthEncode xs = invariantifyList $ (, One) <$> xs 
+
+-- assumes n is positive
+getNFromRLE :: (Eq s) => [(s, InfCount)] -> Natural -> [(s, Count)] 
+getNFromRLE xs n = runLengthEncode$ getNThings xs n
+
+--given an exptape and a <=0 integer representing distance to go left (0 being take 
+--nothing beyond the point) and a >=0 integer representing distance to go right (similarly) 
+--return the corresponding new ExpTape
+sliceExpTape :: (Eq s) => ExpTape s InfCount -> Int -> Int -> ExpTape s Count 
+sliceExpTape (ExpTape ls p rs) lDist rDist = assert (lDist <= 0 && rDist >= 0) $ 
+  ExpTape ls' p rs' where 
+    ls' = getNFromRLE ls (fromIntegral (-lDist))
+    rs' = getNFromRLE rs (fromIntegral rDist)

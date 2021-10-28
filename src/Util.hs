@@ -3,7 +3,7 @@ module Util where
 import Relude
 import Data.Map.Monoidal
 import Control.Lens
-import Safe.Exact (takeExact)
+import Safe.Exact (takeExact, dropExact)
 
 type MMap = MonoidalMap
 
@@ -41,5 +41,10 @@ atE i = at i . iso (fromMaybe Empty) Just
 
 --taken from https://stackoverflow.com/questions/4597820/does-haskell-have-list-slices-i-e-python
 -- TODO: Use Vector package?
+--inclusive of the endpoints 
 slice :: Int -> Int -> [a] -> [a]
-slice from to xs = takeExact (to - from + 1) (drop from xs)
+slice from to xs = takeExact (to - from + 1) (dropExact from xs)
+
+allEqual :: (Eq s) => [s] -> Bool 
+allEqual [] = True 
+allEqual (x : xs) = all (== x) xs 

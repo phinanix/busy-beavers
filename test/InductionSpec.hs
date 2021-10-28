@@ -52,12 +52,6 @@ simple_sweeperGoal = Skip
   False
   Zero --obviously this is fake for now 
 
-makeIndGuess :: Int -> Turing -> Maybe (Skip Bit)
-makeIndGuess stepCount turing = guessInductionHypothesis histToUse where
-  actionList = simulateStepTotalLoop (stepCount + 1) :| [liftModifyState recordHist]
-  (_, stateList) = simulateOneMachineOuterLoop actionList turing 
-  histToUse = reverse $ stateList ^. ix stepCount . s_history
-
 c = finiteCount 
 
 spec :: Spec
@@ -107,19 +101,31 @@ spec = do
     --write several tests for guessInductionHypothesis    
   describe "guessInductionHypothesis" $ do
     it "guesses for a counting machine" $ do 
+      -- at step 176, F (T, 5) F >F<
+      -- at step 366, (T, 6)   F >F<
+      --both phase 0
        makeIndGuess 1000 weird3 `shouldBe` Just (Skip 
-        (Config (Phase 2) [] False [(True, Count 0 Empty (fromList [(BoundVar 0,Sum 1)]))])
-        (EndMiddle (Config (Phase 2) [] False [(True, Count 1 Empty (fromList [(BoundVar 0, Sum 1)]))]))
+        (Config (Phase 0) [(False, c 1), (True, Count 0 Empty (fromList [(BoundVar 0,Sum 1)])), (False, c 1)] False [])
+        (EndMiddle (Config (Phase 0) [(True, Count 1 Empty (fromList [(BoundVar 0,Sum 1)])), (False, c 1)] False []))
         Empty
-        False (OneDir L Empty)) --this is of course only one reasonable guess, others would also be fine 
+        False Zero) --this is of course only one reasonable guess, others would also be fine 
     it "guesses for a sweeper" $ do 
+      -- at step 15, F >F< (T, 3)
+      -- at step 24, >F< (T, 4)
+      --both phase 0
       makeIndGuess 1000 simple_sweeper `shouldBe` Just (Skip 
-        (Config (Phase 0) [] False [(True, Count 0 Empty (fromList [(BoundVar 0, Sum 1)]))])
+        (Config (Phase 0) [(False, c 1)] False [(True, Count 0 Empty (fromList [(BoundVar 0, Sum 1)]))])
         (EndMiddle (Config (Phase 0) [] False [(True, Count 1 Empty (fromList [(BoundVar 0, Sum 1)]))]))
-        Empty False (OneDir L Empty))
+        Empty False Zero)
     it "guesses for a second sweeper" $ do 
+      -- at step 6, F (T, 3) >F< F
+      -- at step 15, (T, 5) >F<
+      -- both phase 1 
       makeIndGuess 1000 checkerboardSweeper `shouldBe` Just (Skip 
-        (Config (Phase 1) [(True, Count 0 Empty (fromList [(BoundVar 0, Sum 1)]))] False [])
-        (EndMiddle (Config (Phase 1) [(True, Count 2 Empty (fromList [(BoundVar 0, Sum 1)]))] False []))
+        (Config (Phase 1) 
+            [(False, c 1), (True, Count 0 Empty (fromList [(BoundVar 0, Sum 1)]))] False [(False, c 1)])
+        (EndMiddle (Config (Phase 1) 
+            
+             [(True, Count 2 Empty (fromList [(BoundVar 0, Sum 1)]))] False []))
         Empty False Zero)
       
