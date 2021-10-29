@@ -48,7 +48,8 @@ proveInductively limit t book goal indVar = case baseCase of
     baseGoal :: Skip Bit
     baseGoal = replaceVarInSkip goal indVar $ finiteCount 1
     indCase :: Either Text Count
-    indCase = proveBySimulating limit t book indGoal
+    --this doesn't actually add the inductive hypothesis to the book!
+    indCase = trace "\n\nstarting ind\n\n\n\n" proveBySimulating limit t book indGoal
     indGoal :: Skip Bit
     indGoal = replaceVarInSkip goal indVar $ symbolVarCount newSymbolVar 1
     newSymbolVar :: SymbolVar --TODO: this is obviously incredibly unsafe
@@ -85,7 +86,7 @@ replaceVarInSkip (Skip sConfig eSE hopCount halts displacement) varIn countOut =
 -- output count is the number of steps it actually took 
 proveBySimulating :: Int -> Turing -> SkipBook Bit -> Skip Bit -> Either Text Count
 proveBySimulating limit t book (Skip start goal _ _ _)
-    = loop 0
+    = traceShow (pretty start) $ loop 0
     (start ^. cstate)
     (second NotInfinity $ configToET start ^. _2)
     (finiteCount 0)
@@ -94,12 +95,14 @@ proveBySimulating limit t book (Skip start goal _ _ _)
     -- we've succeeded, stepping fails for some reason, or we continue 
     loop :: Int -> Phase -> ExpTape Bit InfCount -> Count -> Either Text Count
     loop numSteps p tape curCount
+      | trace (toString $ "p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined 
       |indMatch p tape goal = pure curCount
       | numSteps > limit = Left "exceeded limit while simulating"
       | otherwise = case skipStep t book p tape of
             Unknown e -> Left $ "hit unknown edge" <> show e
             Stopped {} -> Left "halted while simulating"
-            MachineStuck -> Left $ "machine stuck in phase:" <> show p
+            MachineStuck -> Left $ "machine stuck on step: " <> show numSteps 
+                <> " in phase:" <> show p
                 <> "\ngoal:" <> show (pretty goal) <> "\ncur tape:" <> dispExpTape tape
             Stepped Infinity _ _ _ _ -> Left "hopped to infinity"
             Stepped (NotInfinity hopsTaken) newPhase newTape _ _
@@ -195,8 +198,8 @@ getSlicePair hist disps start end = (startSlice, endSlice) where
     endSlice = sliceExpTape (hist ^?! ix end . _2) (leftAbsDisp - endDisp) (rightAbsDisp - endDisp)
 
 --says whether by dropping one or both the left or the right bits of the start sig, we can reach the end sig
-commonSig :: Signature Bit -> Signature Bit -> Maybe (Bool, Bool)
-commonSig start end = asum $ check <$> tf <*> tf where
+calcCommonSig :: Signature Bit -> Signature Bit -> Maybe (Bool, Bool)
+calcCommonSig start end = asum $ check <$> tf <*> tf where
     tf = [False, True]
     check dl dr = let
       lFunc = if dl then dropLeft else id
@@ -213,10 +216,10 @@ addZeros (dl, dr) (ls, rs) = (lFunc ls, rFunc rs) where
     lFunc = if dl then appendZero else id
     rFunc = if dr then appendZero else id
 
-guessInductionHypothesis2 :: [(Phase, ExpTape Bit InfCount)] ->[Int] -> Maybe (Skip Bit)
-guessInductionHypothesis2 hist disps = do
+guessInductionHypothesis :: [(Phase, ExpTape Bit InfCount)] -> [Int] -> Maybe (Skip Bit)
+guessInductionHypothesis hist disps = do
   let
-    criticalConfig = guessCriticalConfiguration hist
+    criticalConfig@(criticalPhase, _criticalSignature) = guessCriticalConfiguration hist
     configIndicesAndConfigs = obtainConfigIndices hist criticalConfig
     configIndices = fst <$> configIndicesAndConfigs
     indexPairs = zipExact (U.init configIndices) (U.tail configIndices)
@@ -228,7 +231,8 @@ guessInductionHypothesis2 hist disps = do
   --and then to generalize those pairs of counts accross all the transitions
   --to do this, we have to find a "common signature" for the start and end - we have allowed them to be 
   --different for the moment
-  toDrop <- uncurry commonSig =<< viaNonEmpty head allSigs
+  (startSig, endSig) <- viaNonEmpty head allSigs
+  toDrop <- calcCommonSig startSig endSig
   let
     countListPairPairs :: [(([Count], [Count]), ([Count], [Count]))]
     countListPairPairs = bimapBoth getCounts <$> slicePairs
@@ -245,70 +249,28 @@ guessInductionHypothesis2 hist disps = do
     transposePairs :: [([a], [b])] -> ([[a]], [[b]])
     transposePairs pairs = bimap transpose transpose (fst <$> pairs, snd <$> pairs)
   thingsToGeneralizeList <- bitraverseBoth (traverse nonEmpty) $ transposePairs countPairListList 
+  --the pair here is over left and right, then the list is over the "signature dimension", and the internal
+  --pair is over start -> finish
   allThingsGeneralized <- bitraverseBoth (traverse generalizeFromCounts) thingsToGeneralizeList
+  --we want to pull the pair from start -> finish out to the front, then have the left right pair, then have the 
+  --"signature dimension"
+  let startCounts = bimapBoth (fmap fst) allThingsGeneralized
+      endCounts =  bimapBoth (fmap snd) allThingsGeneralized
+      startConfig = combineIntoConfig criticalPhase startCounts startSig 
+      endConfig = combineIntoConfig criticalPhase endCounts endSig 
+  pure $ Skip startConfig (EndMiddle endConfig) Empty False Zero
   --finishing from here is just munging - we have the common signature (almost), we have the common count 
   --pairlists, we just need to assemble them all into the skip of our dreams
-
-  Nothing
-
--- TODO: write a function that guesses a good induction hypothesis given a history of the tape 
--- (first guess: the simplest signature that has occurred 3 times, guess the additive induction if one exists)
-guessInductionHypothesis :: [(Phase, ExpTape Bit InfCount)] -> Maybe (Skip Bit)
-guessInductionHypothesis tapesAndPhases = skipOut where
-    simplestSig = guessCriticalConfiguration tapesAndPhases
-    goalTapes :: Maybe (NonEmpty (Phase, ExpTape Bit InfCount))
-    goalTapes = let ans = nonEmpty $ filter (\(p, tape) -> (p, tapeSignature tape) == simplestSig) tapesAndPhases in
-        trace ("goal:\n" <> showTapePhaseList (mNEToList ans)) ans
-    --To complete this function, given the goal tapes, for each position, accumulate the counts at that position
-    --a list of counts leads to a generalized guess for the overall (more complex) count, eg 1, 2, 3, leads to n, and 2,4,6 leads to 2n
-    -- then you need to be able to union counts somehow maybe? or no, I think that's just it
-    etToCounts (ExpTape ls _p rs) = (snd <$> ls, snd <$> rs)
-    -- appears correct
-    countOfGoalTapes :: Maybe (NonEmpty ([InfCount], [InfCount]))
-    countOfGoalTapes = showEvalN "countOfGoalTapes" $ etToCounts . snd <$$> goalTapes
-    -- appears correct
-    pairOfCountLists :: Maybe ([NonEmpty InfCount], [NonEmpty InfCount])
-    pairOfCountLists = showEvalN "pairOfCountLists" $ bisequence (transposeNE <$> (fst <$$> countOfGoalTapes),
-                                   transposeNE <$> (snd <$$> countOfGoalTapes))
-    pairUpNe :: NonEmpty a -> [(a, a)]
-    pairUpNe xs = zipExact (init xs) (tail xs)
-    pairOfCountPairs :: Maybe ([NonEmpty (InfCount, InfCount)], [NonEmpty (InfCount, InfCount)])
-    pairOfCountPairs = showEvalN "pairOfCountPairs" $ bimapBoth (fmap $ fromList . pairUpNe) <$> pairOfCountLists
-    allCountsGeneralizedEither :: Maybe ([Either () (Count, Count)], [Either () (Count, Count)])
-    allCountsGeneralizedEither = bitraverseBoth (traverse generalizeFromInfCounts) =<< pairOfCountPairs
-    goalPoints :: Maybe (NonEmpty Bit)
-    goalPoints = point . snd <$$> goalTapes
-    targetPoint :: Maybe Bit
-    targetPoint = head <$> goalPoints
-    etPointsStacked :: Maybe Bit --really worried I got this one wrong -- 23:50 29Sep21
-    etPointsStacked = (boolToMaybe . list1AllEqual =<< goalPoints) >> targetPoint
-    mungePairedStuff :: ((Count, Count) -> Count) -> [(Bit, Either () (Count, Count))] -> Maybe [(Bit, Count)]
-    mungePairedStuff f = \case
-        [] -> Just []
-        [(False, eitherUnitPair)] -> case eitherUnitPair of
-            Left () -> Just []
-            Right cPair -> Just [(False, f cPair)]
-        (b, eitherUnitPair) : rest -> case eitherUnitPair of
-            Left () -> Nothing
-            Right cPair -> (:) (b, f cPair) <$> mungePairedStuff f rest
-
-    skipOut = do
-        (lPairs, rPairs) <- allCountsGeneralizedEither
-        point <- etPointsStacked
-        actualGoalTapes <- goalTapes
-        let targetPhase = fst $ head actualGoalTapes
-        goalPhase <- boolToMaybe (list1AllEqual $ fst <$> actualGoalTapes) $> targetPhase
-        let (Signature lSig p rSig) = tapeSignature . snd . head $ actualGoalTapes
-        if p /= point then error "oh no skipOut" else Just ()
-        let
-         makeConfig f = do
-             lStuff <- mungePairedStuff f $ zipExact lSig lPairs
-             rStuff <- mungePairedStuff f $ zipExact rSig rPairs
-             pure $ Config goalPhase lStuff p rStuff
-        startConfig <- makeConfig fst
-        endConfig <- makeConfig snd
-        --todo - the zeros for steps and displacement are placeholders
-        pure $ Skip startConfig (EndMiddle endConfig) (finiteCount 0) False Zero
+  where
+  combineIntoConfig :: Phase -> ([Count], [Count]) -> Signature Bit -> Config Bit
+  combineIntoConfig phase (leftCounts, rightCounts) (Signature leftBits p rightBits) = 
+    Config phase (zipExact leftBits (deleteZerosAtEnd leftCounts)) p 
+        (zipExact rightBits (deleteZerosAtEnd rightCounts))
+  deleteZerosAtEnd :: [Count] -> [Count] 
+  deleteZerosAtEnd = \case 
+    [] -> []
+    xs@(Empty : _rest) -> assert (allEqual xs) [] 
+    notEmpty : rest -> notEmpty : deleteZerosAtEnd rest 
 
 --takes a list of at least 2 pairs of counts, and returns a pair of counts that generalizes them,
 -- if possible, in the sense that it has bound vars which can be subbed to be all the pairs

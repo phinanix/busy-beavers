@@ -155,7 +155,7 @@ skipAppliedInHist :: Skip Bit -> [(Phase, ExpTape Bit InfCount)] -> Bool
 skipAppliedInHist skip hist = any (has _Just) $ applySkip skip <$> hist
 
 attemptInductionGuess :: Turing -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
-attemptInductionGuess machine state = case guessInductionHypothesis hist of
+attemptInductionGuess machine state = case guessInductionHypothesis hist dispHist of
   Nothing -> Right state
   --try to prove the skip by induction 
   Just skip -> trace ("guessed a skip:\n" <> show (pretty skip)) $
@@ -167,6 +167,7 @@ attemptInductionGuess machine state = case guessInductionHypothesis hist of
         -- else Right $ state & s_book %~ addSkipToBook skip skipOrigin 
   where
     hist = reverse (state ^. s_history)
+    dispHist = reverse (state ^. s_disp_history)
 
 {-
 A thing I need to be very careful about is the interaction between EndOfTape proof and the skipping parts of evaluation
@@ -253,11 +254,13 @@ loopForEndOfTapeGlue limit = simulateOneMachineOuterLoop $
 
 simulateForTime :: Int -> Turing -> OneLoopRes
 simulateForTime time = simulateOneMachineOuterLoop actionList where
-  actionList = simulateStepTotalLoop (time + 1) :| [liftModifyState recordHist]
+  actionList = simulateStepTotalLoop (time + 1) :| [liftModifyState recordHist, liftModifyState recordDispHist]
 
 getStateAfterTime :: Int -> Turing -> SimState
 getStateAfterTime time turing = last $ simulateForTime time turing ^. _2
 
 makeIndGuess :: Int -> Turing -> Maybe (Skip Bit)
-makeIndGuess stepCount turing = guessInductionHypothesis histToUse where
-  histToUse = reverse $ getStateAfterTime stepCount turing ^. s_history
+makeIndGuess stepCount turing = guessInductionHypothesis histToUse dispHist where
+  guessingState = getStateAfterTime stepCount turing
+  histToUse = reverse $ guessingState ^. s_history 
+  dispHist = reverse $ guessingState ^. s_disp_history

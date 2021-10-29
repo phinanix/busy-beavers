@@ -313,3 +313,13 @@ updateBook edge (Turing _ trans) book =
 --           foldr addInitialSkipToBook book newSkips
 --   recurse [] result = result
 --   recurse (x : xs) result = loop x xs result
+weird3Goal :: Skip Bit
+weird3Goal = Skip
+    -- 0 F (T, n) >T< F goes to 
+    -- 0 (T, n+1) >T< F
+    (Config (Phase 0) [(True, newBoundVar 0), (False, finiteCount 1)] True [(False, finiteCount 1)])
+    (EndMiddle $ Config (Phase 0)
+        [(True, finiteCount 1 <> newBoundVar 0)] True [(False, finiteCount 1)])
+    (finiteCount 0) --obviously this is fake for now 
+    False
+    Zero --obviously this is fake for now 

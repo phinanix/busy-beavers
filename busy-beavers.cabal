@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3820864c1f927df1a96de81f1141f6e9e8cefa9f694e0ce4433dd11ae8ca641e
+-- hash: 61596ca871241c57ccf7d1d79f3f4e9682a2c03d5202fc54dfac6d65c7dcb896
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -107,6 +107,7 @@ test-suite busy-beavers-test
     , hspec
     , lens
     , monoidal-containers
+    , prettyprinter
     , quickcheck-instances
     , relude
   default-language: Haskell2010

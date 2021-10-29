@@ -48,3 +48,6 @@ slice from to xs = takeExact (to - from + 1) (dropExact from xs)
 allEqual :: (Eq s) => [s] -> Bool 
 allEqual [] = True 
 allEqual (x : xs) = all (== x) xs 
+
+showOnEval :: Show b => b -> b
+showOnEval x = traceShow x x 
