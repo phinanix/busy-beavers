@@ -95,13 +95,13 @@ proveBySimulating limit t book (Skip start goal _ _ _)
     -- we've succeeded, stepping fails for some reason, or we continue 
     loop :: Int -> Phase -> ExpTape Bit InfCount -> Count -> Either Text Count
     loop numSteps p tape curCount
-      | trace (toString $ "p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined 
+      | trace (toString $ "p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
       |indMatch p tape goal = pure curCount
       | numSteps > limit = Left "exceeded limit while simulating"
       | otherwise = case skipStep t book p tape of
             Unknown e -> Left $ "hit unknown edge" <> show e
             Stopped {} -> Left "halted while simulating"
-            MachineStuck -> Left $ "machine stuck on step: " <> show numSteps 
+            MachineStuck -> Left $ "machine stuck on step: " <> show numSteps
                 <> " in phase:" <> show p
                 <> "\ngoal:" <> show (pretty goal) <> "\ncur tape:" <> dispExpTape tape
             Stepped Infinity _ _ _ _ -> Left "hopped to infinity"
@@ -159,16 +159,22 @@ showEvalN t x = trace (t <> "\n" <> show x) x
 showTapePhaseList :: [(Phase, ExpTape Bit InfCount)] -> String
 showTapePhaseList tapes = toString $ T.concat $ (\(p, x) -> dispPhase p <> " " <> dispExpTape x <> "\n") <$> tapes
 
---given a history, guesses a "critical configuration" 
--- a simple tape appearance the machine repeatedly returns to
-guessCriticalConfiguration :: [(Phase, ExpTape Bit InfCount)] -> (Phase, Signature Bit)
-guessCriticalConfiguration hist = minimumBy (compare `on` signatureComplexity . snd) possibleSigs where
+possibleSignatures :: [(Phase, ExpTape Bit InfCount)] -> [(Phase, Signature Bit)]
+possibleSignatures hist = filter (\s -> sigFreqs ^?! ix s >= 3) tapeSignatures where
     tapeSignatures :: [(Phase, Signature Bit)]
     tapeSignatures = tapeSignature <$$> hist
     sigFreqs :: Map (Phase, Signature Bit) Int
     sigFreqs = M.fromListWith (+) $ (,1) <$> tapeSignatures
-    possibleSigs :: [(Phase, Signature Bit)]
-    possibleSigs = filter (\s -> sigFreqs ^?! ix s >= 3) tapeSignatures
+
+simplestNSigs :: Natural -> [(Phase, ExpTape Bit InfCount)] -> [(Phase, Signature Bit)]
+simplestNSigs n hist = take (fromIntegral n) $
+    sortBy (compare `on` signatureComplexity . snd) $
+    possibleSignatures hist
+
+--given a history, guesses a "critical configuration" 
+-- a simple tape appearance the machine repeatedly returns to
+guessCriticalConfiguration :: [(Phase, ExpTape Bit InfCount)] -> (Phase, Signature Bit)
+guessCriticalConfiguration = minimumBy (compare `on` signatureComplexity . snd) . possibleSignatures
 
 -- given a particular config, return the list of times that config occurred, plus the integer position in the original list
 obtainConfigIndices :: [(Phase, ExpTape Bit InfCount)] -> (Phase, Signature Bit)
@@ -216,6 +222,10 @@ addZeros (dl, dr) (ls, rs) = (lFunc ls, rFunc rs) where
     lFunc = if dl then appendZero else id
     rFunc = if dr then appendZero else id
 
+generalizeFromExamples :: [(ExpTape Bit Count, ExpTape Bit Count)] -> Maybe (Skip Bit)
+generalizeFromExamples slicePairs = do 
+    undefined 
+
 guessInductionHypothesis :: [(Phase, ExpTape Bit InfCount)] -> [Int] -> Maybe (Skip Bit)
 guessInductionHypothesis hist disps = do
   let
@@ -237,18 +247,18 @@ guessInductionHypothesis hist disps = do
     countListPairPairs :: [(([Count], [Count]), ([Count], [Count]))]
     countListPairPairs = bimapBoth getCounts <$> slicePairs
     --fmap over the list, then use second to only add zeros to the end signatures
-    augCountPairPairs = fmap (second (addZeros toDrop)) countListPairPairs 
+    augCountPairPairs = fmap (second (addZeros toDrop)) countListPairPairs
     doubleZipExact :: (([a], [x]), ([b], [y])) -> ([(a, b)], [(x, y)])
     doubleZipExact ((as, xs), (bs, ys)) = (zipExact as bs, zipExact xs ys)
     countPairListList :: [([(Count, Count)], [(Count, Count)])]
-    countPairListList = doubleZipExact <$> augCountPairPairs 
+    countPairListList = doubleZipExact <$> augCountPairPairs
     -- the previous list's first index is over different times the critical config occured 
     -- pair index is over left or right, and then third index is over the signature length
     -- we want the outer index to be the pair, then the signature legnth index, then the 
     -- occurence index that was originally first
     transposePairs :: [([a], [b])] -> ([[a]], [[b]])
     transposePairs pairs = bimap transpose transpose (fst <$> pairs, snd <$> pairs)
-  thingsToGeneralizeList <- bitraverseBoth (traverse nonEmpty) $ transposePairs countPairListList 
+  thingsToGeneralizeList <- bitraverseBoth (traverse nonEmpty) $ transposePairs countPairListList
   --the pair here is over left and right, then the list is over the "signature dimension", and the internal
   --pair is over start -> finish
   allThingsGeneralized <- bitraverseBoth (traverse generalizeFromCounts) thingsToGeneralizeList
@@ -256,21 +266,32 @@ guessInductionHypothesis hist disps = do
   --"signature dimension"
   let startCounts = bimapBoth (fmap fst) allThingsGeneralized
       endCounts =  bimapBoth (fmap snd) allThingsGeneralized
-      startConfig = combineIntoConfig criticalPhase startCounts startSig 
-      endConfig = combineIntoConfig criticalPhase endCounts endSig 
+      startConfig = combineIntoConfig criticalPhase startCounts startSig
+      endConfig = combineIntoConfig criticalPhase endCounts endSig
   pure $ Skip startConfig (EndMiddle endConfig) Empty False Zero
   --finishing from here is just munging - we have the common signature (almost), we have the common count 
   --pairlists, we just need to assemble them all into the skip of our dreams
   where
   combineIntoConfig :: Phase -> ([Count], [Count]) -> Signature Bit -> Config Bit
-  combineIntoConfig phase (leftCounts, rightCounts) (Signature leftBits p rightBits) = 
-    Config phase (zipExact leftBits (deleteZerosAtEnd leftCounts)) p 
+  combineIntoConfig phase (leftCounts, rightCounts) (Signature leftBits p rightBits) =
+    Config phase (zipExact leftBits (deleteZerosAtEnd leftCounts)) p
         (zipExact rightBits (deleteZerosAtEnd rightCounts))
-  deleteZerosAtEnd :: [Count] -> [Count] 
-  deleteZerosAtEnd = \case 
+  deleteZerosAtEnd :: [Count] -> [Count]
+  deleteZerosAtEnd = \case
     [] -> []
-    xs@(Empty : _rest) -> assert (allEqual xs) [] 
-    notEmpty : rest -> notEmpty : deleteZerosAtEnd rest 
+    xs@(Empty : _rest) -> assert (allEqual xs) []
+    notEmpty : rest -> notEmpty : deleteZerosAtEnd rest
+
+
+timesSimplestNOccured :: Natural -> [(Phase, ExpTape Bit InfCount)] -> [Int]
+timesSimplestNOccured n hist = sort $ fst <$> (obtainConfigIndices hist =<< simplestN) where
+    simplestN = simplestNSigs n hist
+
+simplestNExamples :: Natural -> [(Phase, ExpTape Bit InfCount)] -> [Int] -> [(ExpTape Bit Count, ExpTape Bit Count)]
+simplestNExamples n hist disps = uncurry (getSlicePair hist disps) <$> increasingIndPairs where 
+    inds = timesSimplestNOccured n hist 
+    increasingIndPairs :: [(Int, Int)]
+    increasingIndPairs = filter (uncurry (<)) $ (,) <$> inds <*> inds 
 
 --takes a list of at least 2 pairs of counts, and returns a pair of counts that generalizes them,
 -- if possible, in the sense that it has bound vars which can be subbed to be all the pairs
