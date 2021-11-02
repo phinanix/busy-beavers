@@ -5,6 +5,7 @@ import Control.Lens
 import Data.Map.Monoidal (assocs)
 import qualified Data.Map as M
 import qualified Data.Text as T (concat)
+import qualified Data.Set as S
 import Prettyprinter
 
 import Util
@@ -18,7 +19,7 @@ import SimulateSkip
       PartialStepResult(Stepped, Unknown, Stopped, MachineStuck),
       skipStep )
 import Data.Bits (Bits(bit))
-import Data.List (minimumBy)
+import Data.List (minimumBy, findIndex)
 import Relude.Extra (bimapBoth)
 import Relude.Foldable (Bitraversable)
 import Safe.Exact
@@ -132,7 +133,6 @@ proveBySimulating limit t book (Skip start goal _ _ _)
         deInfCount Infinity = Nothing
         deInfCount (NotInfinity c) = Just c
 
---this is wrong, it needs to be ziplist-y
 transposeNE :: NonEmpty [a] -> [NonEmpty a]
 transposeNE (x :| xs) = getZipList $ (:|) <$> ZipList x <*> ZipList (transpose xs)
 
@@ -190,18 +190,26 @@ maximumDisplacement ds start end = let d_len = length ds in
   (minimum portion, maximum portion) where
     portion = slice start end ds
 
---given a tape history, a history of (relative) displacement, and a start and end point
---obtain a slice of tape corresponding to everything the machine read / output at the start 
---and end points respectively
-getSlicePair :: [(Phase, ExpTape Bit InfCount)] -> [Int] -> Int -> Int -> (ExpTape Bit Count, ExpTape Bit Count)
-getSlicePair hist disps start end = (startSlice, endSlice) where
+getSlicePair'' :: ExpTape Bit Count -> ExpTape Bit Count -> [Int] -> Int -> Int -> (ExpTape Bit Count, ExpTape Bit Count)
+getSlicePair'' sT eT = getSlicePair' (second NotInfinity sT) (second NotInfinity eT)
+
+getSlicePair' :: ExpTape Bit InfCount -> ExpTape Bit InfCount -> [Int] -> Int -> Int -> (ExpTape Bit Count, ExpTape Bit Count)
+getSlicePair' startTape endTape disps start end = (startSlice, endSlice) where
     startDisp = disps !! start
     endDisp = disps !! end
     (leftAbsDisp, rightAbsDisp) = maximumDisplacement disps start end
     --to get the left and right displacements relative to a particular position (ie the start or end)
     -- you have to subtract off that position, so it becomes zero, and the other ones become relative
-    startSlice = sliceExpTape (hist ^?! ix start . _2) (leftAbsDisp - startDisp) (rightAbsDisp - startDisp)
-    endSlice = sliceExpTape (hist ^?! ix end . _2) (leftAbsDisp - endDisp) (rightAbsDisp - endDisp)
+    startSlice = sliceExpTape startTape (leftAbsDisp - startDisp) (rightAbsDisp - startDisp)
+    endSlice = sliceExpTape endTape (leftAbsDisp - endDisp) (rightAbsDisp - endDisp)
+
+--given a tape history, a history of (relative) displacement, and a start and end point
+--obtain a slice of tape corresponding to everything the machine read / output at the start 
+--and end points respectively
+getSlicePair :: [(Phase, ExpTape Bit InfCount)] -> [Int] -> Int -> Int -> (ExpTape Bit Count, ExpTape Bit Count)
+getSlicePair hist disps start end = getSlicePair' startTape endTape disps start end where
+    startTape = hist ^?! ix start . _2
+    endTape = hist ^?! ix end . _2
 
 --says whether by dropping one or both the left or the right bits of the start sig, we can reach the end sig
 calcCommonSig :: Signature Bit -> Signature Bit -> Maybe (Bool, Bool)
@@ -222,9 +230,10 @@ addZeros (dl, dr) (ls, rs) = (lFunc ls, rFunc rs) where
     lFunc = if dl then appendZero else id
     rFunc = if dr then appendZero else id
 
+--I have no idea how to write this function
 generalizeFromExamples :: [(ExpTape Bit Count, ExpTape Bit Count)] -> Maybe (Skip Bit)
-generalizeFromExamples slicePairs = do 
-    undefined 
+generalizeFromExamples slicePairs =
+    undefined
 
 guessInductionHypothesis :: [(Phase, ExpTape Bit InfCount)] -> [Int] -> Maybe (Skip Bit)
 guessInductionHypothesis hist disps = do
@@ -288,11 +297,65 @@ timesSimplestNOccured n hist = sort $ fst <$> (obtainConfigIndices hist =<< simp
     simplestN = simplestNSigs n hist
 
 simplestNExamples :: Natural -> [(Phase, ExpTape Bit InfCount)] -> [Int] -> [(ExpTape Bit Count, ExpTape Bit Count)]
-simplestNExamples n hist disps = uncurry (getSlicePair hist disps) <$> increasingIndPairs where 
-    inds = timesSimplestNOccured n hist 
+simplestNExamples n hist disps = uncurry (getSlicePair hist disps) <$> increasingIndPairs where
+    inds = timesSimplestNOccured n hist
     increasingIndPairs :: [(Int, Int)]
-    increasingIndPairs = filter (uncurry (<)) $ (,) <$> inds <*> inds 
+    increasingIndPairs = filter (uncurry (<)) $ (,) <$> inds <*> inds
 
+{-takes in a machine, a tape configuration, and a symbolvar present in that tape configuration 
+to generalize over. attempts to generate a skip with that config as a starting point
+algorithm: instatiate the variable at several values, simulate forward a bunch of steps
+take all signatures that occurred in each simulation, and try to generalize accross them, 
+starting with the simplest first (eg, if 010 occurred many times, try to guess the function that
+generates the coefficients of 0 1 and 0 from the instantiated symbolvar) 
+-}
+guessWhatHappensNext :: Turing -> Config Bit -> SymbolVar -> Maybe (Skip Bit)
+guessWhatHappensNext machine config varToGeneralize
+ = asum (generalizeOneSig <$> sortOn (signatureComplexity . view _2) (toList sigsWhichOccurred)) where
+    numsToSimulateAt = [4.. 8]
+    -- the int we simulated at, the simulation history, the displacement history
+    simsAtNums :: [([(Phase, ExpTape Bit Count)], [Int])]
+    simsAtNums = undefined <$> numsToSimulateAt
+    --occurred in all simulations 
+    sigsWhichOccurred :: Set (Phase, Signature Bit)
+    sigsWhichOccurred = foldr S.intersection Empty
+        $ fromList . fmap (fmap tapeSignature) . view _1 <$> simsAtNums
+    generalizeOneSig :: (Phase, Signature Bit) -> Maybe (Skip Bit)
+    generalizeOneSig psb = undefined where
+        munge :: [(Phase, ExpTape Bit Count)] -> (Int, (Phase, ExpTape Bit Count))
+        munge hist = case findIndex (\(p, t) -> (p, tapeSignature t) == psb) hist of
+            Nothing -> error "there was nothing with a signature we checked is in everything"
+            Just i -> (i, hist !! i)
+        finalIndexAndConfig :: [(Int, (Phase, ExpTape Bit Count))]
+        finalIndexAndConfig = munge . view _1 <$> simsAtNums
+        finalPhases = view (_2 . _1) <$> finalIndexAndConfig
+        finalPhase :: Maybe Phase
+        finalPhase = guard (allEqual finalPhases) $> U.head finalPhases
+        slicedPairs :: [(ExpTape Bit Count, ExpTape Bit Count)]
+        slicedPairs = getZipList $ liftA2
+            (\(i, (_p, t)) disps -> getSlicePair'' (view _2 $ configToET config) t disps 0 i)
+            (ZipList finalIndexAndConfig)
+            (ZipList $ view _2 <$> simsAtNums)
+        countLists :: [(([Count], [Count]), ([Count], [Count]))]
+        countLists = fmap (bimapBoth getCounts) slicedPairs
+        --genrealizes against the numsToSimulateAt from above 
+        generalizeCL :: [Count] -> Maybe Count
+        generalizeCL cl = snd <$> (generalizeFromCounts =<< nonEmpty (zipExact (FinCount <$> numsToSimulateAt) cl))
+        getAtF f = traverse generalizeCL $ transpose (f <$> countLists)
+        --we want to push the outer list all the way to the inside 
+        transposedCountLists :: Maybe (([Count], [Count]), ([Count], [Count]))
+        transposedCountLists = (\x y z w -> ((x, y),(z,w))) <$> getAtF (fst . fst) <*> getAtF (snd . fst) <*> getAtF (fst.snd) <*> getAtF (snd.snd)
+        res = do 
+            ((s_cls, s_crs), (e_cls, e_crs)) <- transposedCountLists 
+            e_ph <- finalPhase 
+            let (s_ph, ExpTape _ s_p _) = configToET config 
+                end_points = point . view (_2 . _2) <$> finalIndexAndConfig
+            guard $ allEqual end_points
+            let end_point = U.head end_points
+            pure $ Skip 
+                (Config s_ph s_ls s_p s_rs)
+            
+            undefined 
 --takes a list of at least 2 pairs of counts, and returns a pair of counts that generalizes them,
 -- if possible, in the sense that it has bound vars which can be subbed to be all the pairs
 --algorithm: if each pair is equal, return said pair

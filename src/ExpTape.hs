@@ -133,7 +133,6 @@ getNThings xs n = case getNewPoint xs of
 runLengthEncode :: (Eq s) => [s] -> [(s, Count)]
 runLengthEncode xs = invariantifyList $ (, One) <$> xs 
 
--- assumes n is positive
 getNFromRLE :: (Eq s) => [(s, InfCount)] -> Natural -> [(s, Count)] 
 getNFromRLE xs n = runLengthEncode$ getNThings xs n
 
