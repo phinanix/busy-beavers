@@ -4,9 +4,20 @@ import Relude
 import Control.Lens
 import Data.Map.Monoidal (assocs)
 import qualified Data.Map as M
-import qualified Data.Text as T (concat)
+import qualified Data.Text as T (concat, intercalate)
 import qualified Data.Set as S
 import Prettyprinter
+
+import Data.Bits (Bits(bit))
+import Data.List (minimumBy, findIndex)
+import Relude.Extra (bimapBoth)
+import Relude.Foldable (Bitraversable)
+import qualified Relude.Unsafe as Unsafe
+import Safe.Exact
+import Control.Exception (assert)
+import Data.Foldable
+import Relude.Unsafe ((!!))
+import qualified Relude.Unsafe as U
 
 import Util
 import Count
@@ -14,19 +25,17 @@ import Skip
 import ExpTape
 import Turing
 import SimulateSkip
-    ( SkipBook,
-      SkipOrigin(Induction),
+    ( s_disp_history,
+      s_history,
+      skipStateFromPhTape,
+      skipStep,
       PartialStepResult(Stepped, Unknown, Stopped, MachineStuck),
-      skipStep )
-import Data.Bits (Bits(bit))
-import Data.List (minimumBy, findIndex)
-import Relude.Extra (bimapBoth)
-import Relude.Foldable (Bitraversable)
-import Safe.Exact
-import Control.Exception (assert)
-import Data.Foldable
-import Relude.Unsafe ((!!))
-import qualified Relude.Unsafe as U
+      SkipBook,
+      SkipOrigin(Induction) )
+import SimulationLoops
+import Display
+import Safe.Partial
+import Safe.Partial (Partial)
 
 --goal: make a thing that takes a skip that might apply to a certain machine, 
 --attempts to simulate forward to prove that skip using induction
@@ -96,7 +105,7 @@ proveBySimulating limit t book (Skip start goal _ _ _)
     -- we've succeeded, stepping fails for some reason, or we continue 
     loop :: Int -> Phase -> ExpTape Bit InfCount -> Count -> Either Text Count
     loop numSteps p tape curCount
-      | trace (toString $ "p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
+      | trace (toString $ "p:" <> dispPhase p <> " tape is: " <> dispExpTapeIC tape) False = undefined
       |indMatch p tape goal = pure curCount
       | numSteps > limit = Left "exceeded limit while simulating"
       | otherwise = case skipStep t book p tape of
@@ -104,7 +113,7 @@ proveBySimulating limit t book (Skip start goal _ _ _)
             Stopped {} -> Left "halted while simulating"
             MachineStuck -> Left $ "machine stuck on step: " <> show numSteps
                 <> " in phase:" <> show p
-                <> "\ngoal:" <> show (pretty goal) <> "\ncur tape:" <> dispExpTape tape
+                <> "\ngoal:" <> show (pretty goal) <> "\ncur tape:" <> dispExpTapeIC tape
             Stepped Infinity _ _ _ _ -> Left "hopped to infinity"
             Stepped (NotInfinity hopsTaken) newPhase newTape _ _
                 -> loop (numSteps + 1) newPhase newTape (curCount <> hopsTaken)
@@ -157,7 +166,7 @@ showEvalN :: Show a => String -> a -> a
 showEvalN t x = trace (t <> "\n" <> show x) x
 
 showTapePhaseList :: [(Phase, ExpTape Bit InfCount)] -> String
-showTapePhaseList tapes = toString $ T.concat $ (\(p, x) -> dispPhase p <> " " <> dispExpTape x <> "\n") <$> tapes
+showTapePhaseList tapes = toString $ T.concat $ (\(p, x) -> dispPhase p <> " " <> dispExpTapeIC x <> "\n") <$> tapes
 
 possibleSignatures :: [(Phase, ExpTape Bit InfCount)] -> [(Phase, Signature Bit)]
 possibleSignatures hist = filter (\s -> sigFreqs ^?! ix s >= 3) tapeSignatures where
@@ -190,10 +199,18 @@ maximumDisplacement ds start end = let d_len = length ds in
   (minimum portion, maximum portion) where
     portion = slice start end ds
 
-getSlicePair'' :: ExpTape Bit Count -> ExpTape Bit Count -> [Int] -> Int -> Int -> (ExpTape Bit Count, ExpTape Bit Count)
+getSlicePair'' :: Partial
+  => ExpTape Bit Count
+  -> ExpTape Bit Count
+  -> [Int] -> Int -> Int
+  -> (ExpTape Bit Count, ExpTape Bit Count)
 getSlicePair'' sT eT = getSlicePair' (second NotInfinity sT) (second NotInfinity eT)
 
-getSlicePair' :: ExpTape Bit InfCount -> ExpTape Bit InfCount -> [Int] -> Int -> Int -> (ExpTape Bit Count, ExpTape Bit Count)
+getSlicePair' :: Partial 
+  => ExpTape Bit InfCount
+  -> ExpTape Bit InfCount
+  -> [Int] -> Int -> Int
+    -> (ExpTape Bit Count, ExpTape Bit Count)
 getSlicePair' startTape endTape disps start end = (startSlice, endSlice) where
     startDisp = disps !! start
     endDisp = disps !! end
@@ -302,6 +319,27 @@ simplestNExamples n hist disps = uncurry (getSlicePair hist disps) <$> increasin
     increasingIndPairs :: [(Int, Int)]
     increasingIndPairs = filter (uncurry (<)) $ (,) <$> inds <*> inds
 
+zipSigToET :: Signature b -> ([c], [c]) -> ExpTape b c
+zipSigToET (Signature b_ls p b_rs) (c_ls, c_rs) = ExpTape (zipExact b_ls c_ls) p (zipExact b_rs c_rs)
+
+--gets the simulation history and the displacement history
+--normally these are output backwards which is of course crazy so we fix them here 
+simForStepNumFromConfig :: Int -> Turing -> Config Bit -> ([(Phase, ExpTape Bit Count)], [Int])
+simForStepNumFromConfig limit machine startConfig
+    = (reverse $ second deInfCount <$$> finalState ^. s_history, reverse $ finalState ^. s_disp_history)
+    where
+    (startPh, startTape) = second (second NotInfinity) $ configToET startConfig
+    actionList = simulateStepTotalLoop limit :| [liftModifyState recordHist, liftModifyState recordDispHist]
+    res = simulateOneMachineOuterLoop actionList machine (skipStateFromPhTape machine startPh startTape)
+    finalState = last $ snd res
+
+replaceSymbolVarInConfig :: Config s -> SymbolVar -> Count -> Config s
+replaceSymbolVarInConfig (Config ph ls p rs) sv ans
+    = Config ph (replaceSymbolVarInCount <$$> ls) p (replaceSymbolVarInCount <$$> rs) where
+        replaceSymbolVarInCount :: Count -> Count
+        replaceSymbolVarInCount (Count n as xs) = Count n Empty xs <> foldMap updateVar (assocs as) where
+            updateVar (v, Sum n) = if v == sv then n `nTimes` ans else symbolVarCount v n
+
 {-takes in a machine, a tape configuration, and a symbolvar present in that tape configuration 
 to generalize over. attempts to generate a skip with that config as a starting point
 algorithm: instatiate the variable at several values, simulate forward a bunch of steps
@@ -312,50 +350,82 @@ generates the coefficients of 0 1 and 0 from the instantiated symbolvar)
 guessWhatHappensNext :: Turing -> Config Bit -> SymbolVar -> Maybe (Skip Bit)
 guessWhatHappensNext machine config varToGeneralize
  = asum (generalizeOneSig <$> sortOn (signatureComplexity . view _2) (toList sigsWhichOccurred)) where
-    numsToSimulateAt = [4.. 8]
-    -- the int we simulated at, the simulation history, the displacement history
-    simsAtNums :: [([(Phase, ExpTape Bit Count)], [Int])]
-    simsAtNums = undefined <$> numsToSimulateAt
+    numsToSimulateAt :: NonEmpty Natural
+    numsToSimulateAt = 4 :| [5.. 5]
+    pairsToSimulateAt :: NonEmpty (Int, Natural)
+    pairsToSimulateAt = (\x -> (fromIntegral $ 1200, x)) <$> numsToSimulateAt
+    -- the simulation history and the displacement history
+    simsAtNums :: NonEmpty ([(Phase, ExpTape Bit Count)], [Int])
+    simsAtNums = let 
+      ans = (\(x,y) -> simForStepNumFromConfig x machine
+        $ replaceSymbolVarInConfig config varToGeneralize
+        $ FinCount y) <$> pairsToSimulateAt
+      msg = toString $ T.intercalate "startsim:\n" $ (\x -> "length: " <> show (length x) <> "\n" <> displayHist x) . 
+        fmap (fmap (second NotInfinity)) . fst <$> toList ans
+      in
+      trace msg ans
     --occurred in all simulations 
     sigsWhichOccurred :: Set (Phase, Signature Bit)
-    sigsWhichOccurred = foldr S.intersection Empty
-        $ fromList . fmap (fmap tapeSignature) . view _1 <$> simsAtNums
+    sigsWhichOccurred = let
+        (sig1 :| restSignatures) = fromList . fmap (fmap tapeSignature) . view _1 <$> simsAtNums
+        ans = foldr S.intersection sig1 restSignatures
+        msg = toString $ T.intercalate "\n" $ show <$> toList ans
+      in trace msg ans
+    --generalizes an ending signature if possible
     generalizeOneSig :: (Phase, Signature Bit) -> Maybe (Skip Bit)
-    generalizeOneSig psb = undefined where
+    generalizeOneSig psb@(_p, sigToGeneralize) = trace ("generalizing\n" <> show sigToGeneralize)
+      res where
         munge :: [(Phase, ExpTape Bit Count)] -> (Int, (Phase, ExpTape Bit Count))
         munge hist = case findIndex (\(p, t) -> (p, tapeSignature t) == psb) hist of
             Nothing -> error "there was nothing with a signature we checked is in everything"
             Just i -> (i, hist !! i)
+        --for each hisory, the time at which the signature occured, and the simstate at that point
+        -- note that the final index here is in the backwards history, ie index 0 means occurred last, not first
+        --hopefully this is just fine?
+        --it also means that we select the last thing which everyone had in common, rather than eg the first, which seems
+        --probably best?
         finalIndexAndConfig :: [(Int, (Phase, ExpTape Bit Count))]
-        finalIndexAndConfig = munge . view _1 <$> simsAtNums
+        finalIndexAndConfig = let
+             ans = munge . view _1 <$> toList simsAtNums
+             msg = "final indices and configs\n" <> toString (T.intercalate "\n" $ show . pretty <$> ans)
+            in 
+                trace msg ans 
         finalPhases = view (_2 . _1) <$> finalIndexAndConfig
         finalPhase :: Maybe Phase
         finalPhase = guard (allEqual finalPhases) $> U.head finalPhases
         slicedPairs :: [(ExpTape Bit Count, ExpTape Bit Count)]
         slicedPairs = getZipList $ liftA2
+        --the problem is that we're trying to slice out of the original config, but that obviously doesn't work
+        --because the original config has symbolic variables in it
+        --instead we need to slice out of the configs created up on line 361 in simsAtNums that have actual numbers 
+        --in them, or frankly at history 0 would probably also be pretty damn reasonable
             (\(i, (_p, t)) disps -> getSlicePair'' (view _2 $ configToET config) t disps 0 i)
             (ZipList finalIndexAndConfig)
-            (ZipList $ view _2 <$> simsAtNums)
+            (ZipList $ view _2 <$> toList simsAtNums)
         countLists :: [(([Count], [Count]), ([Count], [Count]))]
         countLists = fmap (bimapBoth getCounts) slicedPairs
         --genrealizes against the numsToSimulateAt from above 
         generalizeCL :: [Count] -> Maybe Count
-        generalizeCL cl = snd <$> (generalizeFromCounts =<< nonEmpty (zipExact (FinCount <$> numsToSimulateAt) cl))
+        generalizeCL cl = snd <$> (generalizeFromCounts =<< nonEmpty (zipExact (FinCount <$> toList numsToSimulateAt) cl))
         getAtF f = traverse generalizeCL $ transpose (f <$> countLists)
         --we want to push the outer list all the way to the inside 
         transposedCountLists :: Maybe (([Count], [Count]), ([Count], [Count]))
         transposedCountLists = (\x y z w -> ((x, y),(z,w))) <$> getAtF (fst . fst) <*> getAtF (snd . fst) <*> getAtF (fst.snd) <*> getAtF (snd.snd)
-        res = do 
-            ((s_cls, s_crs), (e_cls, e_crs)) <- transposedCountLists 
-            e_ph <- finalPhase 
-            let (s_ph, ExpTape _ s_p _) = configToET config 
+        res = do
+            ((s_cls, s_crs), (e_cls, e_crs)) <- transposedCountLists
+            e_ph <- finalPhase
+            let (s_ph, ExpTape s_ls s_p s_rs) = configToET config
                 end_points = point . view (_2 . _2) <$> finalIndexAndConfig
             guard $ allEqual end_points
             let end_point = U.head end_points
-            pure $ Skip 
+            pure $ Skip
                 (Config s_ph s_ls s_p s_rs)
-            
-            undefined 
+                -- we have the e_cls and the e_crs, and we have psb which is the final phase 
+                --and signature we're trying to generalize across, so we just need to write 
+                -- Signature Bit -> ([Count], [Count]) -> ExpTape Bit Count with zipExact
+                (EndMiddle $ etToConfig e_ph $ zipSigToET sigToGeneralize (e_cls, e_crs))
+                Empty False Zero --TODO
+
 --takes a list of at least 2 pairs of counts, and returns a pair of counts that generalizes them,
 -- if possible, in the sense that it has bound vars which can be subbed to be all the pairs
 --algorithm: if each pair is equal, return said pair

@@ -3,6 +3,8 @@ module TuringExamples where
 import Relude ( IsList(fromList), Bool(True, False) )
 
 import Turing
+import Count
+import Skip
 
 --woah, this is a counting machine !!!
 weird3 :: Turing
@@ -14,6 +16,14 @@ weird3 = Turing {states = 3, transitions = fromList
   ,((Phase 2,False),Step (Phase 0) True R)
   ,((Phase 2,True ),Step (Phase 2) True L)
   ]}
+
+counterIndHyp :: Config Bit 
+-- 2 (F, n) >T< T F 
+-- eg @ step 100
+-- the thing we hope it goes to is
+-- 0 (T, n) >T< T F 
+-- eg @ step 170
+counterIndHyp = Config (Phase 2) [(False, symbolVarCount (SymbolVar 0) 1)] True [(True, One), (False, One)]
 
 almostweird3 :: Turing
 almostweird3 = Turing {states = 3, transitions = fromList

@@ -23,6 +23,9 @@ mfailGuard False = fail
 (<$$>) = fmap . fmap
 infixl 4 <$$>
 
+(<**>) :: (Applicative f, Applicative g) => f (g (a -> b)) -> f (g a) -> f (g b)
+(<**>) = liftA2 (liftA2 ($))
+
 (<%>) :: (Traversable t, Applicative f) => (a -> f b) -> t a -> f (t b)
 (<%>) = traverse
 infixl 5 <%>

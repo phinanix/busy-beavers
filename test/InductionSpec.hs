@@ -2,6 +2,7 @@ module InductionSpec where
 
 import Relude
 import Control.Lens
+import Prettyprinter ( Pretty(pretty) )
 
 import Test.Hspec
 import Test.QuickCheck
@@ -15,7 +16,7 @@ import Skip
 import SimulationLoops
 import Results
 import HaltProof
-import Prettyprinter ( Pretty(pretty) )
+import MoreSimulationLoops
 
 
 checkerboardFalseGoal :: Skip Bit

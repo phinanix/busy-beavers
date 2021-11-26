@@ -7,6 +7,7 @@ import qualified Text.Show
 import Control.Lens hiding ((<|))
 import Control.Lens.Extras
 import Data.List.NonEmpty ((<|))
+import Prettyprinter
 
 
 --the Phase a turing machine is in, to not conflict with State
@@ -58,6 +59,9 @@ dispBit True = "T"
 
 dispPhase :: Phase -> Text
 dispPhase (Phase i) = show i
+
+instance Pretty Phase where 
+  pretty = pretty . dispPhase 
 
 dispEdge :: Edge -> Text
 dispEdge (p, b) = dispPhase p <> " " <> show b

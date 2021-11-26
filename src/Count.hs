@@ -135,6 +135,11 @@ infCountToInt Infinity = error "infinity isn't an int"
 infCountToInt (NotInfinity (Count m Empty Empty)) = fromIntegral m
 infCountToInt (NotInfinity c) = error $ "tried to int-ify: " <> dispCount c
 
+deInfCount :: InfCount -> Count 
+deInfCount = \case 
+  Infinity -> error "deinfcount"
+  NotInfinity c -> c
+
 --the linear count, plus a series of counts put through the quadratic function
 --f(x) = x(x+1) / 2, all summed
 data QuadCount = QuadCount

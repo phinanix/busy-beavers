@@ -5,6 +5,7 @@ import qualified Relude.Unsafe as Unsafe
 import Control.Lens
 import Data.List (maximumBy, foldl1, maximum, minimum)
 import Data.List.NonEmpty (inits)
+import Safe.Exact
 import Prettyprinter
 import qualified Data.List.NonEmpty as NE ((<|))
 
@@ -15,11 +16,9 @@ import HaltProof
 import Results
 import Glue
 import SimulateSkip
-import Induction
 import Skip
 import Util
 import Control.Exception (assert)
-import Safe.Exact
 import Relude.Unsafe ((!!))
 import Display
 
@@ -49,13 +48,18 @@ concatActions actions machine = foldl1 (>=>) ((&) machine <$> actions)
 
 type OneLoopRes = (SimResult (ExpTape Bit InfCount), NonEmpty SimState)
 
-simulateOneMachineOuterLoop :: NonEmpty SimOneAction -> Turing -> OneLoopRes 
+simulateOneMachineOuterLoop :: NonEmpty SimOneAction -> Turing -> SimState -> OneLoopRes 
 simulateOneMachineOuterLoop updateFuncs startMachine
-  = iterateEither (concatActions updateFuncs startMachine) (initSkipState startMachine) where
+  = iterateEither (concatActions updateFuncs startMachine) 
+  where
     iterateEither :: (a -> Either r a) -> a -> (r, NonEmpty a)
     iterateEither k init = case k init of
       Left r -> (r, one init)
       Right next -> (NE.<|) init <$> iterateEither k next
+
+simOneFromStartLoop :: NonEmpty SimOneAction -> Turing -> OneLoopRes 
+simOneFromStartLoop updateFuncs startMachine 
+  = simulateOneMachineOuterLoop updateFuncs startMachine (initSkipState startMachine) 
 
 simulateManyMachinesOuterLoop :: NonEmpty SimMultiAction -> Turing -> [(Turing, SimResult (ExpTape Bit InfCount))]
 simulateManyMachinesOuterLoop updateFuncs startMachine = loop (startMachine, startState) [] [] where
@@ -103,7 +107,7 @@ simulateStepTotalLoop limit machine (SimState ph tape book steps trace hist hist
   then Left $ Continue steps ph tape curDisp
   else case skipStep machine book ph tape of
   Unknown e -> error $ "edge undefined" <> show e
-  MachineStuck -> error "machinestuck "
+  MachineStuck -> Left MachineStuckRes
   Stopped c newTape _skipUsed newDisp -> Left $ Halted (steps + infCountToInt c) newTape (curDisp + dispToInt newDisp)
   Stepped c newPh newTape skipUsed newDisp -> case c of
     Infinity -> Left $ ContinueForever (SkippedToInfinity steps skipUsed)
@@ -153,21 +157,6 @@ checkSeenBefore _machine state = case state ^. s_history_set . at histEnt of
 --applies the skip to everything in the list, checks if any of them have just 
 skipAppliedInHist :: Skip Bit -> [(Phase, ExpTape Bit InfCount)] -> Bool
 skipAppliedInHist skip hist = any (has _Just) $ applySkip skip <$> hist
-
-attemptInductionGuess :: Turing -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
-attemptInductionGuess machine state = case guessInductionHypothesis hist dispHist of
-  Nothing -> Right state
-  --try to prove the skip by induction 
-  Just skip -> trace ("guessed a skip:\n" <> show (pretty skip)) $
-    case proveInductively 20 machine (state ^. s_book) skip (BoundVar 0) of
-      Left fail -> trace (toString fail) $ Right state
-      Right skipOrigin -> addSkipToStateOrInf skip skipOrigin state
-        -- if skipGoesForever skip && skipAppliedInHist skip hist 
-        -- then Left (ContinueForever (SkippedToInfinity (state ^. s_steps) skip))
-        -- else Right $ state & s_book %~ addSkipToBook skip skipOrigin 
-  where
-    hist = reverse (state ^. s_history)
-    dispHist = reverse (state ^. s_disp_history)
 
 {-
 A thing I need to be very careful about is the interaction between EndOfTape proof and the skipping parts of evaluation
@@ -235,11 +224,7 @@ attemptOtherEndOfTapeProof _machine state = assert (atRightOfTape $ state ^. s_t
 
 
 loopSimulateSkip :: Int -> Turing -> OneLoopRes
-loopSimulateSkip limit = simulateOneMachineOuterLoop $ pure $ simulateStepTotalLoop limit
-
-indGuessLoop ::  Int -> Turing -> OneLoopRes
-indGuessLoop limit = simulateOneMachineOuterLoop $
-  simulateStepTotalLoop limit :| [liftModifyState recordHist, runAtCount 100 attemptInductionGuess]
+loopSimulateSkip limit = simOneFromStartLoop $ pure $ simulateStepTotalLoop limit
 
 simulateManyBasicLoop :: Int -> Turing -> [_]
 simulateManyBasicLoop limit = simulateManyMachinesOuterLoop $ simulateStepPartial limit
@@ -249,18 +234,12 @@ simulateManyBasicLoop limit = simulateManyMachinesOuterLoop $ simulateStepPartia
   ])
 
 loopForEndOfTapeGlue :: Int -> Turing -> OneLoopRes
-loopForEndOfTapeGlue limit = simulateOneMachineOuterLoop $
+loopForEndOfTapeGlue limit = simOneFromStartLoop $
     simulateStepTotalLoop limit :| [liftModifyState recordHist, liftModifyState recordDispHist, runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof]
 
 simulateForTime :: Int -> Turing -> OneLoopRes
-simulateForTime time = simulateOneMachineOuterLoop actionList where
+simulateForTime time = simOneFromStartLoop actionList where
   actionList = simulateStepTotalLoop (time + 1) :| [liftModifyState recordHist, liftModifyState recordDispHist]
 
 getStateAfterTime :: Int -> Turing -> SimState
 getStateAfterTime time turing = last $ simulateForTime time turing ^. _2
-
-makeIndGuess :: Int -> Turing -> Maybe (Skip Bit)
-makeIndGuess stepCount turing = guessInductionHypothesis histToUse dispHist where
-  guessingState = getStateAfterTime stepCount turing
-  histToUse = reverse $ guessingState ^. s_history 
-  dispHist = reverse $ guessingState ^. s_disp_history

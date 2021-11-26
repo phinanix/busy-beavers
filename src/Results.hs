@@ -16,6 +16,7 @@ import Skip
 data SimResult a = Halted Steps a Int --these two ints are the total displacement
                | Continue Steps Phase a Int 
                | ContinueForever HaltProof
+               | MachineStuckRes
                deriving (Eq, Ord, Show, Functor)
 
 $(makePrisms ''SimResult)

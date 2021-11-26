@@ -12,6 +12,7 @@ import Data.Bitraversable (Bitraversable)
 import Control.Exception (assert)
 import Util
 import Relude.Extra (bimapBoth)
+import Safe.Partial
 
 data ExpTape s c = ExpTape
   { left :: [(s, c)]
@@ -76,11 +77,23 @@ dispBitICount (b, c) = "(" <> dispBit b <> ", " <> dispInfCount c <> ") "
 dispPoint :: (Pretty s) => s -> Text
 dispPoint bit = "|>" <> show (pretty bit) <> "<|"
 
-dispExpTape :: ExpTape Bit InfCount -> Text
-dispExpTape (ExpTape ls point rs)
-  = mconcat (dispBitICount <$> reverse ls)
-  <> dispPoint point
-  <> mconcat (dispBitICount <$> rs)
+dispETPoint :: Bit -> Text 
+dispETPoint bit = "|>" <> dispBit bit <> "<|  "
+
+dispExpTape :: ((Bit,c) -> Text) -> ExpTape Bit c -> Text
+dispExpTape dispPair (ExpTape ls point rs)
+  = mconcat (dispPair <$> reverse ls)
+  <> dispETPoint point
+  <> mconcat (dispPair <$> rs)
+
+dispExpTapeIC :: ExpTape Bit InfCount -> Text
+dispExpTapeIC = dispExpTape dispBitICount
+
+instance Pretty (ExpTape Bit InfCount) where 
+  pretty = pretty . dispExpTape dispBitICount
+
+instance Pretty (ExpTape Bit Count) where 
+  pretty = pretty . dispExpTape dispBitCount 
 
 instance Tapeable (ExpTape Bit InfCount) where
   ones (ExpTape ls point rs) = countPoint point + countList ls + countList rs where
@@ -124,7 +137,7 @@ getCounts (ExpTape ls _p rs) = bimapBoth (fmap snd) (ls, rs)
 signatureComplexity :: Signature s -> Int
 signatureComplexity (Signature ls _p rs) = length ls + length rs
 
-getNThings :: [(s, InfCount)] -> Natural -> [s]
+getNThings :: Partial => [(s, InfCount)] -> Natural -> [s]
 getNThings _ 0 = [] 
 getNThings xs n = case getNewPoint xs of 
   Left msg -> error $ "getNThings failed: " <> msg 
@@ -133,13 +146,13 @@ getNThings xs n = case getNewPoint xs of
 runLengthEncode :: (Eq s) => [s] -> [(s, Count)]
 runLengthEncode xs = invariantifyList $ (, One) <$> xs 
 
-getNFromRLE :: (Eq s) => [(s, InfCount)] -> Natural -> [(s, Count)] 
-getNFromRLE xs n = runLengthEncode$ getNThings xs n
+getNFromRLE :: (Eq s, Partial) => [(s, InfCount)] -> Natural -> [(s, Count)] 
+getNFromRLE xs n = runLengthEncode $ getNThings xs n
 
 --given an exptape and a <=0 integer representing distance to go left (0 being take 
 --nothing beyond the point) and a >=0 integer representing distance to go right (similarly) 
 --return the corresponding new ExpTape
-sliceExpTape :: (Eq s) => ExpTape s InfCount -> Int -> Int -> ExpTape s Count 
+sliceExpTape :: (Eq s, Partial) => ExpTape s InfCount -> Int -> Int -> ExpTape s Count 
 sliceExpTape (ExpTape ls p rs) lDist rDist = assert (lDist <= 0 && rDist >= 0) $ 
   ExpTape ls' p rs' where 
     ls' = getNFromRLE ls (fromIntegral (-lDist))

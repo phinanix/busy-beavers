@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 61596ca871241c57ccf7d1d79f3f4e9682a2c03d5202fc54dfac6d65c7dcb896
+-- hash: 342492579055a7e4aafec534602b8230aa07f9db915378cafd3acf037c6742a7
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -34,6 +34,7 @@ library
       Glue
       HaltProof
       Induction
+      MoreSimulationLoops
       Results
       Simple.Display
       Simple.Simulate

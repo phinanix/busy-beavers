@@ -78,7 +78,7 @@ initExpTape s = ExpTape [(s, Infinity)] s [(s, Infinity)]
 dispSkipResult :: SkipResult Bit InfCount -> Text
 dispSkipResult (Skipped c p tape disp)
   = "skipped to phase: " <> dispPhase p
-  <> " and tape " <> dispExpTape tape
+  <> " and tape " <> dispExpTapeIC tape
   <> " in " <> dispInfCount c <> " hops\ndisplacement was:" <> show disp
 
 instance (Ord s, Pretty s) => Pretty (SkipBook s) where
@@ -218,8 +218,11 @@ skipStep (Turing _ trans) book p tape@(ExpTape _ls bit _rs)
             else Stepped hops newP newT bestSkip newD
 type SkipTape = ExpTape Bit InfCount
 
+skipStateFromPhTape :: Turing -> Phase -> ExpTape Bit InfCount  -> SimState 
+skipStateFromPhTape t ph tape = SimState ph tape (initBook t) 0 [] [(ph, tape)] Empty 0 0 (pure 0) 
+
 initSkipState :: Turing -> SimState
-initSkipState t = SimState (Phase 0) (initExpTape False) (initBook t) 0 [] [(Phase 0, initExpTape False)] Empty 0 0 (pure 0) 
+initSkipState t = skipStateFromPhTape t (Phase 0) (initExpTape False)
 
 simulateOneMachine :: Int -> Turing -> SimState
   -> ([Skip Bit], Either Edge (SimResult SkipTape))

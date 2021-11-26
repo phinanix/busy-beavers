@@ -78,8 +78,8 @@ getSkipEndPhase (EndMiddle (Config p _ _ _)) = p
 configToET :: Config s -> (Phase, ExpTape s Count)
 configToET (Config p ls point rs) = (p, ExpTape ls point rs)
 
--- etToConfig :: (Phase, ExpTape s Count) -> Config s
--- etToConfig (p, ExpTape ls point rs) = Config p ls point rs 
+etToConfig :: Phase -> ExpTape s Count -> Config s
+etToConfig p (ExpTape ls point rs) = Config p ls point rs 
 
 -- glomPointConfig :: (Eq s) => Config s -> Config s
 -- glomPointConfig = etToConfig . fmap glomPointRight . fmap glomPointLeft . configToET
