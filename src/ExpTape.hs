@@ -131,6 +131,12 @@ data Signature s = Signature [s] s [s] deriving (Eq, Ord, Show)
 tapeSignature :: ExpTape s c -> Signature s
 tapeSignature (ExpTape ls p rs) = Signature (fst <$> ls) p  (fst <$> rs)
 
+--returns true if the first signature is a subsig of the second,
+--ie if the tape matches the second, it will also match the first
+isSubSignatureOf :: (Eq s) => Signature s -> Signature s -> Bool 
+isSubSignatureOf (Signature ls p rs) (Signature ms q ss) 
+  = (ls `isPrefixOf` ms) && (p == q) && (rs `isPrefixOf` ss)
+
 getCounts :: ExpTape s c -> ([c], [c])
 getCounts (ExpTape ls _p rs) = bimapBoth (fmap snd) (ls, rs)
 

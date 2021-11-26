@@ -5,6 +5,7 @@ import Data.Map.Monoidal
 import Control.Lens
 import Safe.Exact (takeExact, dropExact)
 import Safe.Partial
+import Prettyprinter
 
 type MMap = MonoidalMap
 
@@ -59,3 +60,6 @@ allEqual (x : xs) = all (== x) xs
 
 showOnEval :: Show b => b -> b
 showOnEval x = traceShow x x 
+
+putPretty :: (Pretty a) => a -> IO ()
+putPretty = putText . show . pretty

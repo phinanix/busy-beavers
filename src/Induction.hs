@@ -323,8 +323,11 @@ simplestNExamples n hist disps = uncurry (getSlicePair hist disps) <$> increasin
     increasingIndPairs :: [(Int, Int)]
     increasingIndPairs = filter (uncurry (<)) $ (,) <$> inds <*> inds
 
-zipSigToET :: Signature b -> ([c], [c]) -> ExpTape b c
-zipSigToET (Signature b_ls p b_rs) (c_ls, c_rs) = ExpTape (zipExact b_ls c_ls) p (zipExact b_rs c_rs)
+zipSigToET :: (Partial, Show b, Pretty c) => Signature b -> ([c], [c]) -> ExpTape b c
+zipSigToET sig@(Signature b_ls p b_rs) pair@(c_ls, c_rs) = let 
+    ans = ExpTape (zipExact b_ls c_ls) p (zipExact b_rs c_rs)
+    in 
+    trace (show $ show sig <> "\n" <> pretty pair) ans 
 
 --gets the simulation history and the displacement history
 --normally these are output backwards which is of course crazy so we fix them here 
@@ -358,9 +361,11 @@ a lot of the possible "guesswhathappensnext"s are true but are once again not pr
 we're going to return a list of them instead, in the hopes that one works
 for now, lets do all of the ones that have the same signature complexity as the minimum
 -}
-guessWhatHappensNext :: Turing -> Config Count Bit -> SymbolVar -> Maybe (Skip Count Bit)
-guessWhatHappensNext machine config varToGeneralize
- = asum (generalizeOneSig <$> sortOn (signatureComplexity . view _2) (toList sigsWhichOccurred)) where  
+guessWhatHappensNext :: Turing -> Config Count Bit -> SymbolVar -> [Skip Count Bit]
+guessWhatHappensNext machine startConfig varToGeneralize
+ = mapMaybe generalizeOneSig (toList sigsWhichOccurred) where 
+    minimumComplexity = minimum $ signatureComplexity . view _2 <$> toList sigsWhichOccurred
+    sigsOfMinComplexity = filter (\x -> signatureComplexity (view _2 x) == minimumComplexity) $ toList sigsWhichOccurred
     numsToSimulateAt :: NonEmpty Natural
     numsToSimulateAt = 4 :| [5.. 5]
     pairsToSimulateAt :: NonEmpty (Int, Natural)
@@ -369,7 +374,7 @@ guessWhatHappensNext machine config varToGeneralize
     simsAtNums :: NonEmpty ([(Phase, ExpTape Bit Count)], [Int])
     simsAtNums = let 
       ans = (\(x,y) -> simForStepNumFromConfig x machine
-        $ replaceSymbolVarInConfig config varToGeneralize
+        $ replaceSymbolVarInConfig startConfig varToGeneralize
         $ FinCount y) <$> pairsToSimulateAt
       msg = toString $ T.intercalate "startsim:\n" $ (\x -> "length: " <> show (length x) <> "\n" <> displayHist x) . 
         fmap (fmap (second NotInfinity)) . fst <$> toList ans
@@ -384,7 +389,7 @@ guessWhatHappensNext machine config varToGeneralize
       in trace msg ans
     --generalizes an ending signature if possible
     generalizeOneSig :: (Phase, Signature Bit) -> Maybe (Skip Count Bit)
-    generalizeOneSig psb@(_p, sigToGeneralize) = trace ("generalizing\n" <> show sigToGeneralize)
+    generalizeOneSig psb@(_p, sigToGeneralize) = force $ trace ("generalizing\n" <> show sigToGeneralize)
       res where
         munge :: [(Phase, ExpTape Bit Count)] -> (Int, (Phase, ExpTape Bit Count))
         munge hist = case findIndex (\(p, t) -> (p, tapeSignature t) == psb) hist of
@@ -402,31 +407,57 @@ guessWhatHappensNext machine config varToGeneralize
         finalPhase :: Maybe Phase
         finalPhase = guard (allEqual finalPhases) $> U.head finalPhases
         slicedPairs :: [(ExpTape Bit Count, ExpTape Bit Count)]
-        slicedPairs = getZipList $ liftA2
+        slicedPairs = let 
+          ans = getZipList $ liftA2
             (\i (hist, disps) -> getSlicePairC hist disps 0 i)
             (ZipList finalIndices)
             (ZipList $ toList simsAtNums)
+          msg = "slicedPairs were:\n" <> show (pretty ans)
+          in 
+          trace msg ans 
         countLists :: [(([Count], [Count]), ([Count], [Count]))]
         countLists = fmap (bimapBoth getCounts) slicedPairs
         --genrealizes against the numsToSimulateAt from above 
         generalizeCL :: [Count] -> Maybe Count
-        generalizeCL cl = snd <$> (generalizeFromCounts =<< nonEmpty (zipExact (FinCount <$> toList numsToSimulateAt) cl))
+        generalizeCL cl = if allEqual cl 
+            then pure $ Unsafe.head cl 
+            else snd <$> (generalizeFromCounts =<< nonEmpty (zipExact (FinCount <$> toList numsToSimulateAt) cl))
         getAtF f = traverse generalizeCL $ transpose (f <$> countLists)
         --we want to push the outer list all the way to the inside 
         transposedCountLists :: Maybe (([Count], [Count]), ([Count], [Count]))
         transposedCountLists = (\x y z w -> ((x, y),(z,w))) <$> getAtF (fst . fst) <*> getAtF (snd . fst) <*> getAtF (fst.snd) <*> getAtF (snd.snd)
         res = do
-            ((_s_cls, _s_crs), (e_cls, e_crs)) <- transposedCountLists
+            --todo, we probably shouldn't get the start counts from the aggregator, because that is kind of bad, compared to 
+            --getting them from the startConfig. the problem is, we also need to slice the startConfig somehow, and that's 
+            --actually quite hard. 
+            ((s_cls, s_crs), (e_cls, e_crs)) <- transposedCountLists
             e_ph <- finalPhase
             let end_points = point . view (_2 . _2) <$> finalIndexAndConfig
             guard $ allEqual end_points
-            pure $ Skip
-                (replaceSymbolVarInConfig config varToGeneralize (boundVarCount (BoundVar 0) 1))
+            let startSignatures = tapeSignature . fst <$> slicedPairs
+                endSignatures = tapeSignature . snd <$> slicedPairs
+            guard $ allEqual startSignatures && allEqual endSignatures
+            let startSig = Unsafe.head startSignatures
+                endSig = Unsafe.head endSignatures
+                guessedStartConfig = etToConfig (startConfig ^. cstate) $ zipSigToET startSig (s_cls, s_crs)
+            assert (endSig `isSubSignatureOf` sigToGeneralize) $
+              pure $ Skip
+                (replaceSymbolVarInConfig guessedStartConfig varToGeneralize (boundVarCount (BoundVar 0) 1))
                 -- we have the e_cls and the e_crs, and we have psb which is the final phase 
                 --and signature we're trying to generalize across, so we just need to write 
                 -- Signature Bit -> ([Count], [Count]) -> ExpTape Bit Count with zipExact
-                (EndMiddle $ etToConfig e_ph $ zipSigToET sigToGeneralize (e_cls, e_crs))
+                (EndMiddle $ etToConfig e_ph $ zipSigToET endSig (e_cls, e_crs))
                 (FinCount 100) False Zero --TODO
+
+guessAndProveWhatHappensNext :: Turing -> Config Count Bit -> SymbolVar -> [(Skip Count Bit, SkipOrigin Bit)]
+guessAndProveWhatHappensNext machine startConfig varToGeneralize 
+  = mapMaybe getProof $ zipExact guesses proofAttempts 
+  where 
+    guesses = force $ guessWhatHappensNext machine startConfig varToGeneralize
+    proofAttempts = (\skip -> force $ proveInductively 100 machine (initBook machine) skip (BoundVar 0)) <$> guesses 
+    getProof = \case 
+        (_, Left msg) -> traceShow msg Nothing 
+        (skip, Right origin) -> Just (skip, origin)
 
 --takes a list of at least 2 pairs of counts, and returns a pair of counts that generalizes them,
 -- if possible, in the sense that it has bound vars which can be subbed to be all the pairs
@@ -436,31 +467,43 @@ guessWhatHappensNext machine config varToGeneralize
 -- else, see if they are generated by a function of the form x -> m * x + b 
 -- else give up 
 generalizeFromCounts :: NonEmpty (Count, Count) -> Maybe (Count, Count)
-generalizeFromCounts xs = allEqualPair <|> additivePair <|> affinePair where
+generalizeFromCounts xs = force $ allEqualPair <|> additivePair <|> affinePair where
     allEqualPair :: Maybe (Count, Count)
     allEqualPair = guard (list1AllEqual xs) >> pure (head xs)
     countToMaybeNat = \case
         Count n Empty Empty -> Just n
         _ -> Nothing
     naturalPairs :: Maybe (NonEmpty (Natural, Natural))
-    naturalPairs = let ans = traverse (bitraverse countToMaybeNat countToMaybeNat) xs in
-        traceShow ans ans
+    naturalPairs = let 
+        ans = traverse (bitraverse countToMaybeNat countToMaybeNat) xs 
+        msg = "attempting to generalize these pairs:\n" <> show ans
+     in
+        --trace msg ans
+        ans
     subNats :: Natural -> Natural -> Int
     subNats = (-) `on` fromIntegral
-    differences = uncurry subNats <$$> naturalPairs
+    differences = let 
+        ans = uncurry subNats <$$> naturalPairs
+        msg = "differences were\n" <> show ans 
+      in 
+        --trace msg ans
+        ans
     newBoundVarBad :: Count
     newBoundVarBad = newBoundVar 0
     --takes an integer and returns the count pair that represents a function that adds that to its input
-    generalizeAddDiff :: Int -> (Count, Count)
-    generalizeAddDiff d = case compare d 0 of
+    generalizeAddDiff :: Partial => Int -> (Count, Count)
+    generalizeAddDiff d = --trace ("about to use " <> show d <> "\n") $ 
+      case compare d 0 of
         --this means (x, y) x > y since d = x - y
         GT -> (newBoundVarBad <> finiteCount (fromIntegral d), newBoundVarBad)
         --this means (x, y) x < y
         LT -> (newBoundVarBad, newBoundVarBad <> finiteCount (fromIntegral $ -1 * d))
-        EQ -> error "generalizeAddDiff should not be called on a zero integer"
+        EQ -> (newBoundVarBad, newBoundVarBad) 
+            --todo, right now we use this case in guessWhatComesNext but we probably shouldn't
+            --error "generalizeAddDiff should not be called on a zero integer"
     additivePair :: Maybe (Count, Count)
     additivePair = differences >>= \case
-        ds@(d1 :| _rest) -> guard (list1AllEqual ds) >> pure (generalizeAddDiff d1)
+        ds@(d1 :| _rest) -> guard (list1AllEqual ds) >> pure (generalizeAddDiff d1) 
     conformsToAffine :: Natural -> Int -> (Natural, Natural) -> Bool
     conformsToAffine m b (x, y) = fromIntegral x * fromIntegral m + b == fromIntegral y
     generalizeMulDiff :: Natural -> Int -> (Count, Count)

@@ -13,6 +13,7 @@ import Data.Foldable
 import Witherable
 
 import Util
+import Prettyprinter
 
 --a variable with logical type positive integer which is "undergoing universal
 -- generalization" - when you step inside the ∀x . Q(x), the x
@@ -114,6 +115,9 @@ dispCount (Count n symbols bound)
   <> mconcat (dispSymbolVar <$> assocs symbols)
   <> mconcat (dispBoundVar <$> assocs bound)
 
+instance Pretty Count where 
+  pretty = pretty . dispCount 
+  
 --a count which has the potential to be "infinity" eg the infinite string of zeros at the
 --end of a Turing Machine's tape
 --infinity comes second so it's bigger than NotInfinity

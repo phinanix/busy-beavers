@@ -32,6 +32,7 @@ data SkipOrigin s = Initial --from an atomic transition of the machine
                   | Induction (SkipBook s) Int --from stepping forward the given number of times, with the given skipbook
                   | InductionHypothesis 
                   deriving (Eq, Ord, Show, Generic)
+instance (NFData s) => NFData (SkipOrigin s)
 
 --the data type storing various proven skips associated with a machine
 --the "Phase, s" is the Phase on start and the "s" that the point is made of

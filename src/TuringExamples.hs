@@ -25,6 +25,16 @@ counterIndHyp :: Config Count Bit
 -- eg @ step 170
 counterIndHyp = Config (Phase 2) [(False, symbolVarCount (SymbolVar 0) 1)] True [(True, One), (False, One)]
 
+counterIndHypReal :: Config Count Bit 
+-- 2 F T (F, n) >T< T F 
+-- eg @ step 100
+-- the thing we hope it guesses is
+-- 2 (F, n) >T< T F 
+-- 0 (T, n) >T< T F 
+-- eg @ step 170
+--note that it needs to ignore the stuff that "doesn't matter"
+counterIndHypReal = Config (Phase 2) [(False, symbolVarCount (SymbolVar 0) 1), (True, One), (False, One)] True [(True, One), (False, One)]
+
 almostweird3 :: Turing
 almostweird3 = Turing {states = 3, transitions = fromList
   [((Phase {unPhase = 0},False),Step (Phase {unPhase = 2}) False L)

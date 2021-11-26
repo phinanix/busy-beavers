@@ -5,7 +5,7 @@ import Control.Lens
 import Witherable
 import Prettyprinter 
 
-import Turing
+import Turing ( dispPhase, Dir(..), Phase )
 import Count
 import Util
 import ExpTape
@@ -78,7 +78,7 @@ instance Pretty s => Pretty (SkipEnd Count s) where
 instance Pretty s => Pretty (Skip Count s) where
   pretty (Skip s e c halts displace) = prettyText "in " <> pretty (dispCount c) <> prettyText " steps we turn\n"
     <> pretty s <> prettyText "\ninto: \n" <> pretty e <> prettyText (if halts then "\n and halt" else "") 
-    <> prettyText "\n displacement of: " <> show displace
+    <> prettyText "\n displacement of: " <> show displace <> "\n"
 
 getSkipEndPhase :: SkipEnd c s -> Phase
 getSkipEndPhase (EndSide p _ _) = p

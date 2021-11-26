@@ -137,7 +137,7 @@ simProgram display results = do
 --that will leave the only size 3 machine that is unproven the checkerboard sweeper, I think
 --
 --next todos, rewritten: 
--- figure out how to make induction guesser guess things of the right length in/out
+-- -- figure out how to make induction guesser guess things of the right length in/out
 -- attempt to connect induction guesser to induction prover
 -- when we prove new skips, add logic to detect when that skip proves a machine will run forever
 -- -- make the simulateMultipleMachinesOuterLoop function
@@ -151,7 +151,17 @@ simProgram display results = do
 -- more todos
 -- -- add deflection to left and right tracking (added to skips, now just need to add to simstate / applyskip)
 -- -- use deflection tracking to do the end of tape cycle guesser right
--- use deflection tracking to do the better induction guesser 
+-- -- use deflection tracking to do the better induction guesser 
+
+-- more todos 27 nov 
+-- fix step and displacement tracking in induction guesser / prover
+-- select between different successful inductions via total number of steps?
+-- split bw search into DFS and graph-gen so it can be better tested
+-- make induction guesser use the "guesswhathappensnext" feature to get unstuck
+-- make induction guesser "finish the proof" once it is unstuck, 
+--       so it can prove inductions with the same sig in and out
+-- integrate induction guesser into overall simulation loop; tune it 
+
 main :: IO ()
 main = do
   let results = Simulate.simulate 1000 $ startMachine1 5
