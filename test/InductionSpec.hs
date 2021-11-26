@@ -19,7 +19,7 @@ import HaltProof
 import MoreSimulationLoops
 
 
-checkerboardFalseGoal :: Skip Bit
+checkerboardFalseGoal :: Skip Count Bit
 checkerboardFalseGoal = Skip
     -- 0 >F< T (F, n) T goes to 
     -- 0 (T, n+3) >
@@ -31,7 +31,7 @@ checkerboardFalseGoal = Skip
     False
     Zero --obviously this is fake for now 
 
-simple_sweeperGoal :: Skip Bit
+simple_sweeperGoal :: Skip Count Bit
 simple_sweeperGoal = Skip
   --  F >T< (T, n) F goes to 
   -- >T< (T, n+1)  F 

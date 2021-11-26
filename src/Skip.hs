@@ -15,17 +15,17 @@ import ExpTape
 --left and right looking as specified
 data Config c s = Config
   { _cstate :: Phase
-  , _ls :: [(s, Count)]
+  , _ls :: [(s, c)]
   , _c_point :: s
-  , _rs :: [(s, Count)]
+  , _rs :: [(s, c)]
   } deriving (Eq, Ord, Show, Generic, Functor)
-instance (NFData s) => NFData (Config c s)
+instance (NFData s, NFData c) => NFData (Config c s)
 
 --at the end of a skip, you might've fallen off the L of the given pile of bits, or you might be in the middle of some 
 --known bits, which is a config
-data SkipEnd s = EndSide Phase Dir [(s, Count)] | EndMiddle (Config s) 
+data SkipEnd c s = EndSide Phase Dir [(s, Count)] | EndMiddle (Config c s) 
   deriving (Eq, Ord, Show, Generic, Functor)
-instance (NFData s) => NFData (SkipEnd s)
+instance (NFData s, NFData c) => NFData (SkipEnd c s)
 
 --Zero and OneDir as they say, BothDirs goes the first count steps left and the second count steps right 
 data Displacement c = Zero | OneDir Dir c | BothDirs c c deriving (Eq, Ord, Show, Generic, Functor) 
@@ -39,14 +39,14 @@ dispToInt = \case
   BothDirs (NotInfinity (FinCount n)) (NotInfinity (FinCount m)) -> fromIntegral m - fromIntegral n
   other -> error $ "couldn't convert " <> show other <> " to an int"
 
-data Skip s = Skip
-  { _start :: Config s
-  , _end :: SkipEnd s
+data Skip c s = Skip
+  { _start :: Config c s
+  , _end :: SkipEnd c s
   , _hops :: Count --number of atomic TM steps
   , _halts :: Bool --true if the skip results in the machine halting
   , _displacement :: Displacement Count 
   } deriving (Eq, Ord, Show, Generic, Functor)
-instance (NFData s) => NFData (Skip s)
+instance (NFData s, NFData c) => NFData (Skip c s)
 
 $(makeLenses ''Config)
 $(makeLenses ''Skip)
@@ -54,31 +54,31 @@ $(makeLenses ''Skip)
 prettyText :: Text -> Doc ann 
 prettyText = pretty 
 
-instance Pretty s => Pretty (Config s) where
+instance Pretty s => Pretty (Config Count s) where
   pretty (Config p ls point rs) = pretty $ "phase: " <> dispPhase p <> "  "
     <> mconcat (dispBitCount <$> reverse ls)
     <> dispPoint point
     <> mconcat (dispBitCount <$> rs)
 
-instance Pretty s => Pretty (SkipEnd s) where
+instance Pretty s => Pretty (SkipEnd Count s) where
   pretty (EndSide p L ls) =  pretty $ "phase: " <> dispPhase p <> "  <|" <> mconcat (dispBitCount <$> ls)
   pretty (EndSide p R ls) =  pretty $ "phase: " <> dispPhase p <> " " <> mconcat (dispBitCount <$> ls) <> "|>"
   pretty (EndMiddle c) = pretty c
 
-instance Pretty s => Pretty (Skip s) where
+instance Pretty s => Pretty (Skip Count s) where
   pretty (Skip s e c halts displace) = prettyText "in " <> pretty (dispCount c) <> prettyText " steps we turn\n"
     <> pretty s <> prettyText "\ninto: \n" <> pretty e <> prettyText (if halts then "\n and halt" else "") 
     <> prettyText "\n displacement of: " <> show displace
 
-getSkipEndPhase :: SkipEnd s -> Phase
+getSkipEndPhase :: SkipEnd c s -> Phase
 getSkipEndPhase (EndSide p _ _) = p
 getSkipEndPhase (EndMiddle (Config p _ _ _)) = p
 
 -- --TODO: this code is not pretty but it works
-configToET :: Config s -> (Phase, ExpTape s Count)
+configToET :: Config Count s -> (Phase, ExpTape s Count)
 configToET (Config p ls point rs) = (p, ExpTape ls point rs)
 
-etToConfig :: Phase -> ExpTape s Count -> Config s
+etToConfig :: Phase -> ExpTape s Count -> Config Count s
 etToConfig p (ExpTape ls point rs) = Config p ls point rs 
 
 -- glomPointConfig :: (Eq s) => Config s -> Config s
@@ -187,7 +187,7 @@ getTapeRemain (SkipLeft _) = Nothing
 
 --match a config to a tape, and return the lists that remain on each side of the
 --tape after matching
-matchConfigTape :: (Eq s) => Config s -> ExpTape s InfCount
+matchConfigTape :: (Eq s) => Config Count s -> ExpTape s InfCount
   -> Equations ([(s, InfCount)], [(s, InfCount)])
 matchConfigTape (Config _p lsC pointC rsC) (ExpTape lsT pointT rsT)
   = do
@@ -197,7 +197,7 @@ matchConfigTape (Config _p lsC pointC rsC) (ExpTape lsT pointT rsT)
   matchSides left right = bisequence (mapMaybe getTapeRemain $ matchTape lsC left
                                      , mapMaybe getTapeRemain $ matchTape rsC right)
 
-matchSkipTape :: (Eq s) => Skip s -> ExpTape s InfCount 
+matchSkipTape :: (Eq s) => Skip Count s -> ExpTape s InfCount 
   -> Equations ([(s, InfCount)], [(s, InfCount)])
 matchSkipTape (Skip config end _hops _halts _displacement) tape = do 
   out@(lRem, rRem) <- matchConfigTape config tape 

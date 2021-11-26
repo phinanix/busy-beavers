@@ -28,7 +28,7 @@ simpleTape = ExpTape
   False
   [(True, inum 3), (False, newInfBoundVar 0)]
 
-simpleSkip :: Skip Bit
+simpleSkip :: Skip Count Bit
 simpleSkip = Skip
   (Config (Phase 0) [(False, num 1)] False [])
   (EndMiddle (Config (Phase 1)
@@ -44,7 +44,7 @@ simpleResult = ExpTape
   [(False, inum 3), (True, inum 8), (False, newInfBoundVar 0)]
 
 
-exampleSkip :: Skip Bit
+exampleSkip :: Skip Count Bit
 exampleSkip = Skip
   (Config (Phase 0) [(True, One)]
     True
@@ -67,7 +67,7 @@ exampleResult = ExpTape
   False
   [(False, inum 3), (True, inum 7), (False, newInfBoundVar 0)]
 
-varSkip :: Skip Bit
+varSkip :: Skip Count Bit
 varSkip = Skip
   (Config (Phase 0) [(True, One)]
     True

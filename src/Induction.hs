@@ -44,7 +44,7 @@ import Safe.Partial (Partial)
 -- the BoundVar is the variable on which we are going to do induction
 --returns Left with an error message 
 --or Right with success
-proveInductively :: Int -> Turing -> SkipBook Bit -> Skip Bit -> BoundVar -> Either Text (SkipOrigin Bit)
+proveInductively :: Int -> Turing -> SkipBook Bit -> Skip Count Bit -> BoundVar -> Either Text (SkipOrigin Bit)
 proveInductively limit t book goal indVar = case baseCase of
     Left m -> Left $ "failed base: " <> m
     Right _ -> case indCase of
@@ -55,18 +55,18 @@ proveInductively limit t book goal indVar = case baseCase of
     origin = Induction book limit
     baseCase :: Either Text Count
     baseCase = proveBySimulating limit t book baseGoal
-    baseGoal :: Skip Bit
+    baseGoal :: Skip Count Bit
     baseGoal = replaceVarInSkip goal indVar $ finiteCount 1
     indCase :: Either Text Count
     --this doesn't actually add the inductive hypothesis to the book!
     indCase = trace "\n\nstarting ind\n\n\n\n" proveBySimulating limit t book indGoal
-    indGoal :: Skip Bit
+    indGoal :: Skip Count Bit
     indGoal = replaceVarInSkip goal indVar $ symbolVarCount newSymbolVar 1
     newSymbolVar :: SymbolVar --TODO: this is obviously incredibly unsafe
     newSymbolVar = SymbolVar 4
 
 -- given a skip, replaces all occurences of a particular BoundVar with a particular Count
-replaceVarInSkip :: Skip s -> BoundVar -> Count -> Skip s
+replaceVarInSkip :: Skip Count s -> BoundVar -> Count -> Skip Count s
 replaceVarInSkip (Skip sConfig eSE hopCount halts displacement) varIn countOut =
     Skip newConfig newSE (replaceVarInCount hopCount) halts (replaceVarInDisplacement displacement) where
     newConfig = replaceVarInConfig sConfig
@@ -94,7 +94,7 @@ replaceVarInSkip (Skip sConfig eSE hopCount halts displacement) varIn countOut =
 
 -- input int is limit on number of steps to simulate
 -- output count is the number of steps it actually took 
-proveBySimulating :: Int -> Turing -> SkipBook Bit -> Skip Bit -> Either Text Count
+proveBySimulating :: Int -> Turing -> SkipBook Bit -> Skip Count Bit -> Either Text Count
 proveBySimulating limit t book (Skip start goal _ _ _)
     = traceShow (pretty start) $ loop 0
     (start ^. cstate)
@@ -117,7 +117,7 @@ proveBySimulating limit t book (Skip start goal _ _ _)
             Stepped Infinity _ _ _ _ -> Left "hopped to infinity"
             Stepped (NotInfinity hopsTaken) newPhase newTape _ _
                 -> loop (numSteps + 1) newPhase newTape (curCount <> hopsTaken)
-    indMatch :: Phase -> ExpTape Bit InfCount -> SkipEnd Bit -> Bool
+    indMatch :: Phase -> ExpTape Bit InfCount -> SkipEnd Count Bit -> Bool
     indMatch cur_p et se = case bitraverse pure deInfCount et of
         Nothing -> False
         Just tape@(ExpTape ls point rs) -> case se of
@@ -251,11 +251,11 @@ addZeros (dl, dr) (ls, rs) = (lFunc ls, rFunc rs) where
     rFunc = if dr then appendZero else id
 
 --I have no idea how to write this function
-generalizeFromExamples :: [(ExpTape Bit Count, ExpTape Bit Count)] -> Maybe (Skip Bit)
+generalizeFromExamples :: [(ExpTape Bit Count, ExpTape Bit Count)] -> Maybe (Skip Count Bit)
 generalizeFromExamples slicePairs =
     undefined
 
-guessInductionHypothesis :: [(Phase, ExpTape Bit InfCount)] -> [Int] -> Maybe (Skip Bit)
+guessInductionHypothesis :: [(Phase, ExpTape Bit InfCount)] -> [Int] -> Maybe (Skip Count Bit)
 guessInductionHypothesis hist disps = do
   let
     criticalConfig@(criticalPhase, _criticalSignature) = guessCriticalConfiguration hist
@@ -301,7 +301,7 @@ guessInductionHypothesis hist disps = do
   --finishing from here is just munging - we have the common signature (almost), we have the common count 
   --pairlists, we just need to assemble them all into the skip of our dreams
   where
-  combineIntoConfig :: Phase -> ([Count], [Count]) -> Signature Bit -> Config Bit
+  combineIntoConfig :: Phase -> ([Count], [Count]) -> Signature Bit -> Config Count Bit
   combineIntoConfig phase (leftCounts, rightCounts) (Signature leftBits p rightBits) =
     Config phase (zipExact leftBits (deleteZerosAtEnd leftCounts)) p
         (zipExact rightBits (deleteZerosAtEnd rightCounts))
@@ -327,7 +327,7 @@ zipSigToET (Signature b_ls p b_rs) (c_ls, c_rs) = ExpTape (zipExact b_ls c_ls) p
 
 --gets the simulation history and the displacement history
 --normally these are output backwards which is of course crazy so we fix them here 
-simForStepNumFromConfig :: Int -> Turing -> Config Bit -> ([(Phase, ExpTape Bit Count)], [Int])
+simForStepNumFromConfig :: Int -> Turing -> Config Count Bit -> ([(Phase, ExpTape Bit Count)], [Int])
 simForStepNumFromConfig limit machine startConfig
     = (reverse $ second deInfCount <$$> finalState ^. s_history, reverse $ finalState ^. s_disp_history)
     where
@@ -336,7 +336,7 @@ simForStepNumFromConfig limit machine startConfig
     res = simulateOneMachineOuterLoop actionList machine (skipStateFromPhTape machine startPh startTape)
     finalState = last $ snd res
 
-replaceSymbolVarInConfig :: Config s -> SymbolVar -> Count -> Config s
+replaceSymbolVarInConfig :: Config Count s -> SymbolVar -> Count -> Config Count s
 replaceSymbolVarInConfig (Config ph ls p rs) sv ans
     = Config ph (replaceSymbolVarInCount <$$> ls) p (replaceSymbolVarInCount <$$> rs) where
         replaceSymbolVarInCount :: Count -> Count
@@ -353,7 +353,7 @@ generates the coefficients of 0 1 and 0 from the instantiated symbolvar)
 right now generalizeFromCounts returns always (BoundVar 0), so as a hack we're going to change 
 the symbolvar in the input config to be (BoundVar 0) also so it is the same
 -}
-guessWhatHappensNext :: Turing -> Config Bit -> SymbolVar -> Maybe (Skip Bit)
+guessWhatHappensNext :: Turing -> Config Count Bit -> SymbolVar -> Maybe (Skip Count Bit)
 guessWhatHappensNext machine config varToGeneralize
  = asum (generalizeOneSig <$> sortOn (signatureComplexity . view _2) (toList sigsWhichOccurred)) where  
     numsToSimulateAt :: NonEmpty Natural
@@ -378,7 +378,7 @@ guessWhatHappensNext machine config varToGeneralize
         msg = toString $ T.intercalate "\n" $ show <$> toList ans
       in trace msg ans
     --generalizes an ending signature if possible
-    generalizeOneSig :: (Phase, Signature Bit) -> Maybe (Skip Bit)
+    generalizeOneSig :: (Phase, Signature Bit) -> Maybe (Skip Count Bit)
     generalizeOneSig psb@(_p, sigToGeneralize) = trace ("generalizing\n" <> show sigToGeneralize)
       res where
         munge :: [(Phase, ExpTape Bit Count)] -> (Int, (Phase, ExpTape Bit Count))

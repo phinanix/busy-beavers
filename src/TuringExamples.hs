@@ -17,7 +17,7 @@ weird3 = Turing {states = 3, transitions = fromList
   ,((Phase 2,True ),Step (Phase 2) True L)
   ]}
 
-counterIndHyp :: Config Bit 
+counterIndHyp :: Config Count Bit 
 -- 2 (F, n) >T< T F 
 -- eg @ step 100
 -- the thing we hope it goes to is

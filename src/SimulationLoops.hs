@@ -96,7 +96,7 @@ runIfCond cond act machine state = if cond state then act machine state else pur
 runAtCount :: Int -> SimOneAction -> SimOneAction
 runAtCount n = runIfCond (\state -> state ^. s_counter == n)
 
-addSkipToStateOrInf :: Skip Bit -> SkipOrigin Bit -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
+addSkipToStateOrInf :: Skip Count Bit -> SkipOrigin Bit -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
 addSkipToStateOrInf skip origin state = if skipGoesForever skip && skipAppliedInHist skip (state ^. s_history)
   then Left (ContinueForever (SkippedToInfinity (state ^. s_steps) skip))
   else Right $ state & s_book %~ addSkipToBook skip origin
@@ -155,7 +155,7 @@ checkSeenBefore _machine state = case state ^. s_history_set . at histEnt of
   curStepCount = state ^. s_steps
 
 --applies the skip to everything in the list, checks if any of them have just 
-skipAppliedInHist :: Skip Bit -> [(Phase, ExpTape Bit InfCount)] -> Bool
+skipAppliedInHist :: Skip Count Bit -> [(Phase, ExpTape Bit InfCount)] -> Bool
 skipAppliedInHist skip hist = any (has _Just) $ applySkip skip <$> hist
 
 {-

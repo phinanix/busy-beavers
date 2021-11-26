@@ -13,6 +13,7 @@ import Config
 import Turing
 import Tape
 import Skip
+import Count
 
 --the type of proofs that a TM will not halt
 -- - HaltUnreachable means the Halt state is never transitioned to from the current state
@@ -31,7 +32,7 @@ data HaltProof
   | Cycle Steps Steps
   | OffToInfinityN Steps Dir
   | BackwardSearch
-  | SkippedToInfinity Steps (Skip Bit)
+  | SkippedToInfinity Steps (Skip Count Bit)
   deriving (Eq, Ord, Show, Generic)
 instance NFData HaltProof
 

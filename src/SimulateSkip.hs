@@ -22,19 +22,19 @@ import Simulate (initSimState)
 
 
 data PartialStepResult a = Unknown Edge
-                         | Stopped InfCount a (Skip Bit) (Displacement InfCount)
-                         | Stepped InfCount Phase a (Skip Bit) (Displacement InfCount)
+                         | Stopped InfCount a (Skip Count Bit) (Displacement InfCount)
+                         | Stepped InfCount Phase a (Skip Count Bit) (Displacement InfCount)
                          | MachineStuck
 
 data SkipOrigin s = Initial --from an atomic transition of the machine 
-                  | Glued (Skip s) (Skip s) --from gluing together the two skips in question in order
+                  | Glued (Skip Count s) (Skip Count s) --from gluing together the two skips in question in order
                   | GlueStepRange Steps Steps --gluing together all skips used in a given range of steps
                   | Induction (SkipBook s) Int --from stepping forward the given number of times, with the given skipbook
                   deriving (Eq, Ord, Show, Generic)
 
 --the data type storing various proven skips associated with a machine
 --the "Phase, s" is the Phase on start and the "s" that the point is made of
-type SkipBook s = Map (Phase,  s) (Map (Skip s) (SkipOrigin s))
+type SkipBook s = Map (Phase,  s) (Map (Skip Count s) (SkipOrigin s))
 
 data SimState = SimState
   { _s_phase :: Phase
@@ -44,7 +44,7 @@ data SimState = SimState
   -- a list of the skips used so far in order
   -- since it is the skips used in order, the index 0 one takes us from step 0 to step 1
   --the slice that takes you from step 5 to step 13 is index 5 to index 12 inclusive
-  , _s_trace :: [Skip Bit]
+  , _s_trace :: [Skip Count Bit]
    --a list of the (phase, tape)s seen so far in order
   , _s_history :: [(Phase, ExpTape Bit InfCount)]
     --a map of the (phase, tape)s seen so far to the step count at which they were seen 
@@ -88,13 +88,13 @@ instance (Ord s, Pretty s) => Pretty (SkipBook s) where
               $ assocs skipPile
 
 --returns nothing if the skip is inapplicable, else returns a new tape
-applySkip :: forall s. (Eq s) => Skip s -> (Phase, ExpTape s InfCount)
+applySkip :: forall s. (Eq s) => Skip Count s -> (Phase, ExpTape s InfCount)
   -> Maybe (SkipResult s InfCount)
 applySkip skip@(Skip s _ _ _ _) (p, tape)
   = guard (s^.cstate == p) >> either (const Nothing) Just
       (packageResult skip =<< runEquations (matchSkipTape skip tape))
 
-packageResult :: forall s. (Eq s) => Skip s
+packageResult :: forall s. (Eq s) => Skip Count s
   -> (Map BoundVar InfCount, ([(s, InfCount)], [(s, InfCount)]))
   -> Either Text (SkipResult s InfCount)
 packageResult (Skip _ e hopCount _ displacement) (boundVs, (newLs, newRs)) = (Skipped
@@ -103,7 +103,7 @@ packageResult (Skip _ e hopCount _ displacement) (boundVs, (newLs, newRs)) = (Sk
   <$> getFinalET e (newLs, newRs)) ??
   (simplifyInfDisplacement $ updateCountToInf boundVs <$> displacement)
   where
-    getFinalET :: SkipEnd s -> ([(s, InfCount)], [(s, InfCount)]) -> Either Text (ExpTape s InfCount)
+    getFinalET :: SkipEnd Count s -> ([(s, InfCount)], [(s, InfCount)]) -> Either Text (ExpTape s InfCount)
     getFinalET (EndMiddle c) (remLs, remRs) = pure $ ExpTape
       (finalizeList (c^.ls) `etApp` remLs)
       (c ^. c_point)
@@ -132,7 +132,7 @@ packageResult (Skip _ e hopCount _ displacement) (boundVs, (newLs, newRs)) = (Sk
 
 --the skip that results from the atomic transition given an edge leading to a
 --transition of the specified Phase, Bit, Dir
-oneStepSkip :: Edge -> Phase -> Bit -> Dir -> Skip Bit
+oneStepSkip :: Edge -> Phase -> Bit -> Dir -> Skip Count Bit
 oneStepSkip (p, b) q c d = Skip
   (Config p [] b [])
   (EndSide q d [(c, finiteCount 1)])
@@ -142,7 +142,7 @@ oneStepSkip (p, b) q c d = Skip
 
 --the skip that results from an atomic transition which transitions a phase to itself
 --writing the given bit and dir
-infiniteSkip :: Edge -> Bit -> Dir -> Skip Bit
+infiniteSkip :: Edge -> Bit -> Dir -> Skip Count Bit
 infiniteSkip (p, b) c L = Skip
   -- (Config p [] (b, Side (newBoundVar 0) R) [])
   (Config p [(b, newBoundVar 0)] b [])
@@ -159,7 +159,7 @@ infiniteSkip (p, b) c R = Skip
   False
   (OneDir R $ One <> newBoundVar 0)
 
-initTransSkip :: Edge -> Trans -> Set (Skip Bit)
+initTransSkip :: Edge -> Trans -> Set (Skip Count Bit)
 --we need to modify this skip so that it's halt question is true
 initTransSkip e@(p, _b) Halt = one $ oneStepSkip e p True L & halts .~ True
 initTransSkip e@(p, _b) (Step q c d) | p == q = fromList
@@ -168,24 +168,24 @@ initTransSkip e@(p, _b) (Step q c d) | p == q = fromList
   ]
 initTransSkip e (Step q c d) = one $ oneStepSkip e q c d
 
-addSkipToBook :: (Ord s) => Skip s -> SkipOrigin s -> SkipBook s -> SkipBook s
+addSkipToBook :: (Ord s) => Skip Count s -> SkipOrigin s -> SkipBook s -> SkipBook s
 addSkipToBook skip origin = atE (skip^.start.cstate, skip^.start.c_point)
   . at skip ?~ origin
 
-addInitialSkipToBook :: (Ord s) => Skip s -> SkipBook s -> SkipBook s
+addInitialSkipToBook :: (Ord s) => Skip Count s -> SkipBook s -> SkipBook s
 addInitialSkipToBook skip = addSkipToBook skip Initial
 
 initBook :: Turing -> SkipBook Bit
 initBook (Turing _n trans) = appEndo (foldMap (Endo . addInitialSkipToBook) skips) Empty where
   skips = foldMap (uncurry initTransSkip) $ assocs trans
 
-lookupSkips :: (Ord s) => (Phase, s) -> SkipBook s -> Set (Skip s)
+lookupSkips :: (Ord s) => (Phase, s) -> SkipBook s -> Set (Skip Count s)
 lookupSkips (p, s) book = keysSet $ book ^. atE (p, s)
 
 --if the machine halts, pick that one, else pick the one that goes farther
-skipFarthest :: (Eq s, Eq c)
-  => (Skip s, SkipResult s c)
-  -> (Skip s, SkipResult s c)
+skipFarthest :: (Eq s, Eq c, Eq c')
+  => (Skip c s, SkipResult s c')
+  -> (Skip c s, SkipResult s c')
   -> Ordering
 skipFarthest a b | a == b = EQ
 skipFarthest (Skip _ _ _ True _, _)   _ = LT
@@ -225,7 +225,7 @@ initSkipState :: Turing -> SimState
 initSkipState t = skipStateFromPhTape t (Phase 0) (initExpTape False)
 
 simulateOneMachine :: Int -> Turing -> SimState
-  -> ([Skip Bit], Either Edge (SimResult SkipTape))
+  -> ([Skip Count Bit], Either Edge (SimResult SkipTape))
 simulateOneMachine limit t = \case
   --SimState p tape _book steps@((>= limit) -> True) trace _hist _ _counter -> (trace, Right $ Continue steps p tape)
   state | state ^. s_steps >= limit -> (state ^. s_trace, Right $ Continue (state ^. s_steps) (state ^. s_phase) (state ^. s_tape) (state ^. s_displacement))
@@ -238,7 +238,7 @@ simulateOneMachine limit t = \case
       c -> simulateOneMachine limit t $ SimState newP newTape book (steps + infCountToInt c) (skip : trace)
         hist histSet counter (disp + dispToInt newDisp) (disp : dispHist)
 
-simulateOneTotalMachine :: Int -> Turing -> ([Skip Bit], SimResult (ExpTape Bit InfCount))
+simulateOneTotalMachine :: Int -> Turing -> ([Skip Count Bit], SimResult (ExpTape Bit InfCount))
 simulateOneTotalMachine limit machine = (^?! _Right) <$> simulateOneMachine limit machine (initSkipState machine)
 
 updateBook :: Edge -> Turing -> SkipBook Bit -> SkipBook Bit
@@ -316,7 +316,7 @@ updateBook edge (Turing _ trans) book =
 --           foldr addInitialSkipToBook book newSkips
 --   recurse [] result = result
 --   recurse (x : xs) result = loop x xs result
-weird3Goal :: Skip Bit
+weird3Goal :: Skip Count Bit
 weird3Goal = Skip
     -- 0 F (T, n) >T< F goes to 
     -- 0 (T, n+1) >T< F

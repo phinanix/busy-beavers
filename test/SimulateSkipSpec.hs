@@ -10,6 +10,7 @@ import Test.QuickCheck
 import Turing 
 import TuringExamples
 import Results  
+import Count
 import Tape 
 import ExpTape
 import Skip
@@ -49,7 +50,7 @@ simulatesSameForAll func limit t = for_ [0.. limit]
 
 -- the point of this function is given a machine plus a skip we expect to hold for that machine, 
 -- to check that skip in fact holds for the machine by using naive simulation 
-skipIsCorrect :: Int -> Turing -> Skip Bit -> Expectation 
+skipIsCorrect :: Int -> Turing -> Skip Count Bit -> Expectation 
 skipIsCorrect limit t skip = undefined 
 
 spec :: Spec 
