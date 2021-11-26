@@ -256,7 +256,7 @@ glueSkips (Skip startConfig middleSkipEnd c b d) (Skip middleConfig endSkipEnd c
                 b'
                 (glueDisplacements d d') 
               
-skipGoesForever :: forall c s. (Eq s, Show s) => Skip Count s -> Bool 
+skipGoesForever :: forall s. (Eq s, Show s) => Skip Count s -> Bool 
 skipGoesForever skip = has _Right (glueSkips skip skip) 
 
 glueMany :: (Eq s, Show s) => NonEmpty (Skip Count s) -> Either Text (Skip Count s)

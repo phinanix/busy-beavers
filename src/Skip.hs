@@ -3,7 +3,6 @@ module Skip where
 import Relude hiding (mapMaybe)
 import Control.Lens
 import Witherable
-import Data.Text.Prettyprint.Doc
 import Prettyprinter 
 
 import Turing
@@ -21,11 +20,19 @@ data Config c s = Config
   } deriving (Eq, Ord, Show, Generic, Functor)
 instance (NFData s, NFData c) => NFData (Config c s)
 
+instance Bifunctor Config where 
+    bimap f g (Config ph ls p rs) = Config ph (bimap g f <$> ls) (g p) (bimap g f <$> rs) 
+
 --at the end of a skip, you might've fallen off the L of the given pile of bits, or you might be in the middle of some 
 --known bits, which is a config
-data SkipEnd c s = EndSide Phase Dir [(s, Count)] | EndMiddle (Config c s) 
+data SkipEnd c s = EndSide Phase Dir [(s, c)] | EndMiddle (Config c s) 
   deriving (Eq, Ord, Show, Generic, Functor)
 instance (NFData s, NFData c) => NFData (SkipEnd c s)
+
+instance Bifunctor SkipEnd where 
+  bimap f g = \case 
+    EndSide p d xs -> EndSide p d $ bimap g f <$> xs
+    EndMiddle c -> EndMiddle $ bimap f g c 
 
 --Zero and OneDir as they say, BothDirs goes the first count steps left and the second count steps right 
 data Displacement c = Zero | OneDir Dir c | BothDirs c c deriving (Eq, Ord, Show, Generic, Functor) 
@@ -42,11 +49,14 @@ dispToInt = \case
 data Skip c s = Skip
   { _start :: Config c s
   , _end :: SkipEnd c s
-  , _hops :: Count --number of atomic TM steps
+  , _hops :: c --number of atomic TM steps
   , _halts :: Bool --true if the skip results in the machine halting
-  , _displacement :: Displacement Count 
+  , _displacement :: Displacement c 
   } deriving (Eq, Ord, Show, Generic, Functor)
 instance (NFData s, NFData c) => NFData (Skip c s)
+
+instance Bifunctor Skip where 
+  bimap f g (Skip c se hop halt disp) = Skip (bimap f g c) (bimap f g se) (f hop) halt (f <$> disp)
 
 $(makeLenses ''Config)
 $(makeLenses ''Skip)
