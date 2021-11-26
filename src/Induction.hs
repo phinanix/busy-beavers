@@ -25,17 +25,9 @@ import Skip
 import ExpTape
 import Turing
 import SimulateSkip
-    ( s_disp_history,
-      s_history,
-      skipStateFromPhTape,
-      skipStep,
-      PartialStepResult(Stepped, Unknown, Stopped, MachineStuck),
-      SkipBook,
-      SkipOrigin(Induction) )
 import SimulationLoops
 import Display
 import Safe.Partial
-import Safe.Partial (Partial)
 
 --goal: make a thing that takes a skip that might apply to a certain machine, 
 --attempts to simulate forward to prove that skip using induction
@@ -57,11 +49,21 @@ proveInductively limit t book goal indVar = case baseCase of
     baseCase = proveBySimulating limit t book baseGoal
     baseGoal :: Skip Count Bit
     baseGoal = replaceVarInSkip goal indVar $ finiteCount 1
+    goalPlusX x = replaceVarInSkip goal indVar $ FinCount x <> symbolVarCount newSymbolVar 1
     indCase :: Either Text Count
     --this doesn't actually add the inductive hypothesis to the book!
-    indCase = trace "\n\nstarting ind\n\n\n\n" proveBySimulating limit t book indGoal
+    indCase = trace "\n\nstarting ind\n\n\n\n" $ deepseq indHyp $
+        proveBySimulating limit t 
+         (addSkipToBook (goalPlusX 0) InductionHypothesis $ addSkipToBook indHyp InductionHypothesis book) 
+         indGoal
+    indHyp :: Skip Count Bit 
+    indHyp = let 
+        ans = goalPlusX 1 
+        msg = "indHyp is:\n" <> show (pretty ans)
+      in 
+        force $ trace msg ans
     indGoal :: Skip Count Bit
-    indGoal = replaceVarInSkip goal indVar $ symbolVarCount newSymbolVar 1
+    indGoal = goalPlusX 2 
     newSymbolVar :: SymbolVar --TODO: this is obviously incredibly unsafe
     newSymbolVar = SymbolVar 4
 
@@ -96,7 +98,7 @@ replaceVarInSkip (Skip sConfig eSE hopCount halts displacement) varIn countOut =
 -- output count is the number of steps it actually took 
 proveBySimulating :: Int -> Turing -> SkipBook Bit -> Skip Count Bit -> Either Text Count
 proveBySimulating limit t book (Skip start goal _ _ _)
-    = traceShow (pretty start) $ loop 0
+    = trace ("starting pos:\n" <> show (pretty start) <> "\n") $ loop 0
     (start ^. cstate)
     (second NotInfinity $ configToET start ^. _2)
     (finiteCount 0)
@@ -252,8 +254,7 @@ addZeros (dl, dr) (ls, rs) = (lFunc ls, rFunc rs) where
 
 --I have no idea how to write this function
 generalizeFromExamples :: [(ExpTape Bit Count, ExpTape Bit Count)] -> Maybe (Skip Count Bit)
-generalizeFromExamples slicePairs =
-    undefined
+generalizeFromExamples slicePairs = undefined
 
 guessInductionHypothesis :: [(Phase, ExpTape Bit InfCount)] -> [Int] -> Maybe (Skip Count Bit)
 guessInductionHypothesis hist disps = do
@@ -337,8 +338,8 @@ simForStepNumFromConfig limit machine startConfig
     finalState = last $ snd res
 
 replaceSymbolVarInConfig :: Config Count s -> SymbolVar -> Count -> Config Count s
-replaceSymbolVarInConfig (Config ph ls p rs) sv ans
-    = Config ph (replaceSymbolVarInCount <$$> ls) p (replaceSymbolVarInCount <$$> rs) where
+replaceSymbolVarInConfig config sv ans
+    = first replaceSymbolVarInCount config where
         replaceSymbolVarInCount :: Count -> Count
         replaceSymbolVarInCount (Count n as xs) = Count n Empty xs <> foldMap updateVar (assocs as) where
             updateVar (v, Sum n) = if v == sv then n `nTimes` ans else symbolVarCount v n
@@ -352,6 +353,10 @@ generates the coefficients of 0 1 and 0 from the instantiated symbolvar)
 
 right now generalizeFromCounts returns always (BoundVar 0), so as a hack we're going to change 
 the symbolvar in the input config to be (BoundVar 0) also so it is the same
+
+a lot of the possible "guesswhathappensnext"s are true but are once again not proveable via weak induction, so 
+we're going to return a list of them instead, in the hopes that one works
+for now, lets do all of the ones that have the same signature complexity as the minimum
 -}
 guessWhatHappensNext :: Turing -> Config Count Bit -> SymbolVar -> Maybe (Skip Count Bit)
 guessWhatHappensNext machine config varToGeneralize
@@ -411,18 +416,17 @@ guessWhatHappensNext machine config varToGeneralize
         transposedCountLists :: Maybe (([Count], [Count]), ([Count], [Count]))
         transposedCountLists = (\x y z w -> ((x, y),(z,w))) <$> getAtF (fst . fst) <*> getAtF (snd . fst) <*> getAtF (fst.snd) <*> getAtF (snd.snd)
         res = do
-            ((s_cls, s_crs), (e_cls, e_crs)) <- transposedCountLists
+            ((_s_cls, _s_crs), (e_cls, e_crs)) <- transposedCountLists
             e_ph <- finalPhase
             let end_points = point . view (_2 . _2) <$> finalIndexAndConfig
             guard $ allEqual end_points
-            let end_point = U.head end_points
             pure $ Skip
-                config 
+                (replaceSymbolVarInConfig config varToGeneralize (boundVarCount (BoundVar 0) 1))
                 -- we have the e_cls and the e_crs, and we have psb which is the final phase 
                 --and signature we're trying to generalize across, so we just need to write 
                 -- Signature Bit -> ([Count], [Count]) -> ExpTape Bit Count with zipExact
                 (EndMiddle $ etToConfig e_ph $ zipSigToET sigToGeneralize (e_cls, e_crs))
-                Empty False Zero --TODO
+                (FinCount 100) False Zero --TODO
 
 --takes a list of at least 2 pairs of counts, and returns a pair of counts that generalizes them,
 -- if possible, in the sense that it has bound vars which can be subbed to be all the pairs

@@ -30,6 +30,7 @@ data SkipOrigin s = Initial --from an atomic transition of the machine
                   | Glued (Skip Count s) (Skip Count s) --from gluing together the two skips in question in order
                   | GlueStepRange Steps Steps --gluing together all skips used in a given range of steps
                   | Induction (SkipBook s) Int --from stepping forward the given number of times, with the given skipbook
+                  | InductionHypothesis 
                   deriving (Eq, Ord, Show, Generic)
 
 --the data type storing various proven skips associated with a machine

@@ -4,6 +4,7 @@ import Relude
 import Data.Map.Monoidal
 import Control.Lens
 import Safe.Exact (takeExact, dropExact)
+import Safe.Partial
 
 type MMap = MonoidalMap
 
@@ -30,11 +31,15 @@ infixl 4 <$$>
 (<%>) = traverse
 infixl 5 <%>
 
-unsafeFromLeft :: Either a b -> a
+fromJust :: Partial => Maybe a -> a 
+fromJust (Just a) = a 
+fromJust Nothing = error "unsafe"
+
+unsafeFromLeft :: Partial => Either a b -> a
 unsafeFromLeft (Left a) = a
 unsafeFromLeft (Right _) = error "unsafe"
 
-unsafeFromRight :: Either a b -> b
+unsafeFromRight :: Partial => Either a b -> b
 unsafeFromRight (Right a) = a
 unsafeFromRight (Left _) = error "unsafe"
 
