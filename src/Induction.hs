@@ -28,6 +28,28 @@ import SimulateSkip
 import SimulationLoops
 import Display
 import Safe.Partial
+import HaltProof
+
+{-
+27 Nov 21 
+Shortrange plan to get a thing which can prove the counter machine into main
+- make a filter for "interesting skip" since rn "whathappensnext" proves a bunch of useless stuff 
+   (means a skip has a var probably)
+- write proveInductivelyIMeanIt which does 
+  - guessInductionHypothesis
+  - attempts proveInductively on same
+  - if that gets stuck (modify ^ to return stuckness), then attempts guessWhatHappensNext
+  - if any of those return as interesting, re-attempt to proveInductively the original hypothesis
+  - (bonus) if stuck again, return to above if stuck on a new thing, up to a finite limit
+  - one round of this should be enough to prove the counter!
+  - write / integrate the thing which checks whether a skip allows you to prove the machine runs forever, and if so,
+    then you return a haltproof
+- also fix all the tests >> 
+- and do the bwsearch DFS thing whenever
+-}
+
+proveInductivelyIMeanIT :: Turing -> SkipBook Bit -> [(Phase, ExpTape Bit InfCount)] -> [Int] -> (SkipBook Bit, Maybe HaltProof)
+proveInductivelyIMeanIT machine book hist dispHist = undefined 
 
 --goal: make a thing that takes a skip that might apply to a certain machine, 
 --attempts to simulate forward to prove that skip using induction
