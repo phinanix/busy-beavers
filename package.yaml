@@ -36,7 +36,8 @@ library:
   - witherable
   - QuickCheck
   - hspec
-  
+  - either 
+    
 executables:
   busy-beavers-exe:
     main:                Main.hs

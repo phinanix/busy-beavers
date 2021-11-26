@@ -177,6 +177,9 @@ addSkipToBook skip origin = atE (skip^.start.cstate, skip^.start.c_point)
 addInitialSkipToBook :: (Ord s) => Skip Count s -> SkipBook s -> SkipBook s
 addInitialSkipToBook skip = addSkipToBook skip Initial
 
+addMultipleToBook :: (Ord s) => [(Skip Count s, SkipOrigin s)] -> SkipBook s -> SkipBook s
+addMultipleToBook xs book = foldr (uncurry addSkipToBook) book xs 
+
 initBook :: Turing -> SkipBook Bit
 initBook (Turing _n trans) = appEndo (foldMap (Endo . addInitialSkipToBook) skips) Empty where
   skips = foldMap (uncurry initTransSkip) $ assocs trans

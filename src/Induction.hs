@@ -7,6 +7,7 @@ import qualified Data.Map as M
 import qualified Data.Text as T (concat, intercalate)
 import qualified Data.Set as S
 import Prettyprinter
+import Data.Either.Combinators
 
 import Data.Bits (Bits(bit))
 import Data.List (minimumBy, findIndex)
@@ -29,6 +30,7 @@ import SimulationLoops
 import Display
 import Safe.Partial
 import HaltProof
+import Glue
 
 {-
 27 Nov 21 
@@ -48,44 +50,85 @@ Shortrange plan to get a thing which can prove the counter machine into main
 - and do the bwsearch DFS thing whenever
 -}
 
-proveInductivelyIMeanIT :: Turing -> SkipBook Bit -> [(Phase, ExpTape Bit InfCount)] -> [Int] -> (SkipBook Bit, Maybe HaltProof)
-proveInductivelyIMeanIT machine book hist dispHist = undefined 
+--we need the current step for the haltproof
+--we always return the new book
+--we return either a haltproof, or a text saying how we failed
+proveInductivelyIMeanIT :: Turing -> SkipBook Bit -> Steps -> [(Phase, ExpTape Bit InfCount)] -> [Int] 
+    -> (SkipBook Bit, Either Text HaltProof)
+proveInductivelyIMeanIT machine book curStep hist dispHist 
+  = case guessInductionHypothesis hist dispHist of 
+    Nothing -> (book, Left "failed to guessIndHyp")
+    Just indHyp -> let (newBook, tOrOrigin) = proveStrong 5 machine book indHyp (BoundVar 0) in 
+      case tOrOrigin of 
+        Left msg -> (newBook, Left $ "couldn't prove indHyp:\n" <> msg)
+        Right origin -> let finalBook = addSkipToBook indHyp origin newBook
+                            mbProof = if skipGoesForever indHyp 
+                              then Right $ SkippedToInfinity curStep indHyp
+                              else Left $ "indhyp doesn't go forever:\n" <> show (pretty indHyp)
+         in (finalBook, mbProof)
+
+
+--the function that does most of the work alternates two functions:
+--proveOrStuck, which is a slight modification of proveInductively to tell you where it is stuck, and
+--guessAndProveWhatHappensNext, which the program uses to try to get unstuck
+--the latter makes no progress if it proves 0 things, which is one way to abort
+--the former makes no progress if it gets stuck on the same thing as last time, which we note in order to track
+--we also as usual put a finite integer on the number of loops we can do, although hitting that would be pretty insane
+proveStrong :: Int -> Turing -> SkipBook Bit -> Skip Count Bit -> BoundVar -> (SkipBook Bit, Either Text (SkipOrigin Bit))
+proveStrong loopLim machine book goal indVar = swapEither <$> loop 0 book Nothing where
+  -- the skiporigin is one for specifically the goal 
+  -- the text is "we failed"
+  loop :: Int -> SkipBook Bit -> Maybe (Config Count Bit) -> (SkipBook Bit, Either (SkipOrigin Bit) Text)
+  loop idx curBook mbLastStuck = if idx > loopLim then error "wow we exceeded looplim!" -- Right "limit exceeded" 
+    else case proveInductively 100 machine curBook goal indVar of 
+      Right skipOrigin -> (curBook, Left skipOrigin)
+      Left (msg, maybeStuckConfig) -> if has _Just mbLastStuck && mbLastStuck == maybeStuckConfig
+        then (curBook, Right $ "got stuck on same thing twice:\n" <> show (pretty mbLastStuck))
+        else case maybeStuckConfig of
+          Nothing -> (curBook, Right $ "proveInd failed not due to being stuck:\n" <> msg)
+          Just stuckConfig -> let scatter = guessAndProveWhatHappensNext machine curBook stuckConfig (SymbolVar 0) in
+            if null scatter
+              then (curBook, Right $ "guessAndProveWhatHappensNext did not get us unstuck from:\n" <> show (pretty stuckConfig))
+              else let newBook = addMultipleToBook scatter curBook in
+                loop (idx + 1) newBook (Just stuckConfig)
+
 
 --goal: make a thing that takes a skip that might apply to a certain machine, 
 --attempts to simulate forward to prove that skip using induction
 -- the first int is the limit on the number of steps to take before giving up 
 --the (skip bit) input is the goal to be proven, 
 -- the BoundVar is the variable on which we are going to do induction
---returns Left with an error message 
+--returns Left with an error message, and the config we got stuck on 
 --or Right with success
-proveInductively :: Int -> Turing -> SkipBook Bit -> Skip Count Bit -> BoundVar -> Either Text (SkipOrigin Bit)
+proveInductively :: Int -> Turing -> SkipBook Bit -> Skip Count Bit -> BoundVar
+    -> Either (Text, Maybe (Config Count Bit)) (SkipOrigin Bit)
 proveInductively limit t book goal indVar = case baseCase of
-    Left m -> Left $ "failed base: " <> m
+    Left res -> Left $ first ("failed base: " <>) res
     Right _ -> case indCase of
-        Left m -> Left $ "failed ind: " <> m
+        Left res -> Left $ first ("failed ind: " <>) res
         Right _ ->  pure origin
     where
     origin :: SkipOrigin Bit
     origin = Induction book limit
-    baseCase :: Either Text Count
+    baseCase :: Either (Text, Maybe (Config Count Bit)) Count
     baseCase = proveBySimulating limit t book baseGoal
     baseGoal :: Skip Count Bit
     baseGoal = replaceVarInSkip goal indVar $ finiteCount 1
     goalPlusX x = replaceVarInSkip goal indVar $ FinCount x <> symbolVarCount newSymbolVar 1
-    indCase :: Either Text Count
+    indCase :: Either (Text, Maybe (Config Count Bit)) Count
     --this doesn't actually add the inductive hypothesis to the book!
     indCase = trace "\n\nstarting ind\n\n\n\n" $ deepseq indHyp $
-        proveBySimulating limit t 
-         (addSkipToBook (goalPlusX 0) InductionHypothesis $ addSkipToBook indHyp InductionHypothesis book) 
+        proveBySimulating limit t
+         (addSkipToBook (goalPlusX 0) InductionHypothesis $ addSkipToBook indHyp InductionHypothesis book)
          indGoal
-    indHyp :: Skip Count Bit 
-    indHyp = let 
-        ans = goalPlusX 1 
+    indHyp :: Skip Count Bit
+    indHyp = let
+        ans = goalPlusX 1
         msg = "indHyp is:\n" <> show (pretty ans)
-      in 
+      in
         force $ trace msg ans
     indGoal :: Skip Count Bit
-    indGoal = goalPlusX 2 
+    indGoal = goalPlusX 2
     newSymbolVar :: SymbolVar --TODO: this is obviously incredibly unsafe
     newSymbolVar = SymbolVar 4
 
@@ -118,31 +161,36 @@ replaceVarInSkip (Skip sConfig eSE hopCount halts displacement) varIn countOut =
 
 -- input int is limit on number of steps to simulate
 -- output count is the number of steps it actually took 
-proveBySimulating :: Int -> Turing -> SkipBook Bit -> Skip Count Bit -> Either Text Count
+proveBySimulating :: Int -> Turing -> SkipBook Bit -> Skip Count Bit -> Either (Text, Maybe (Config Count Bit)) Count
 proveBySimulating limit t book (Skip start goal _ _ _)
-    = trace ("starting pos:\n" <> show (pretty start) <> "\n") $ loop 0
+    = trace ("starting pos:\n" <> show (pretty start) <> "\n") $
+    loop 0
     (start ^. cstate)
     (second NotInfinity $ configToET start ^. _2)
     (finiteCount 0)
     where
     -- four conditions: we've taken more steps than the limit,
     -- we've succeeded, stepping fails for some reason, or we continue 
-    loop :: Int -> Phase -> ExpTape Bit InfCount -> Count -> Either Text Count
+    loop :: Int -> Phase -> ExpTape Bit InfCount -> Count -> Either (Text, Maybe (Config Count Bit)) Count
     loop numSteps p tape curCount
       | trace (toString $ "p:" <> dispPhase p <> " tape is: " <> dispExpTapeIC tape) False = undefined
       |indMatch p tape goal = pure curCount
-      | numSteps > limit = Left "exceeded limit while simulating"
+      | numSteps > limit = Left ("exceeded limit while simulating", Nothing)
       | otherwise = case skipStep t book p tape of
-            Unknown e -> Left $ "hit unknown edge" <> show e
-            Stopped {} -> Left "halted while simulating"
-            MachineStuck -> Left $ "machine stuck on step: " <> show numSteps
-                <> " in phase:" <> show p
-                <> "\ngoal:" <> show (pretty goal) <> "\ncur tape:" <> dispExpTapeIC tape
-            Stepped Infinity _ _ _ _ -> Left "hopped to infinity"
+            Unknown e -> Left ("hit unknown edge" <> show e, Nothing)
+            Stopped {} -> Left ("halted while simulating", Nothing)
+            MachineStuck -> let
+                stuckConfig = etToConfig p $ second deInfCount tape
+                msg = "machine stuck on step: " <> show numSteps
+                  <> " in phase:" <> show p
+                  <> "\ngoal:" <> show (pretty goal) <> "\ncur tape:" <> dispExpTapeIC tape
+                in
+                Left (msg, Just stuckConfig)
+            Stepped Infinity _ _ _ _ -> Left ("hopped to infinity", Nothing)
             Stepped (NotInfinity hopsTaken) newPhase newTape _ _
                 -> loop (numSteps + 1) newPhase newTape (curCount <> hopsTaken)
     indMatch :: Phase -> ExpTape Bit InfCount -> SkipEnd Count Bit -> Bool
-    indMatch cur_p et se = case bitraverse pure deInfCount et of
+    indMatch cur_p et se = case bitraverse pure mbdeInfCount et of
         Nothing -> False
         Just tape@(ExpTape ls point rs) -> case se of
             EndMiddle (Config ph c_ls c_p c_rs)
@@ -163,8 +211,8 @@ proveBySimulating limit t book (Skip start goal _ _ _)
                 Nothing -> False
                 (Just Halt) -> goal_d == L
                 (Just (Step transPhase _bit d)) -> goal_d == d && goalPhase == transPhase
-        deInfCount Infinity = Nothing
-        deInfCount (NotInfinity c) = Just c
+        mbdeInfCount Infinity = Nothing
+        mbdeInfCount (NotInfinity c) = Just c
 
 transposeNE :: NonEmpty [a] -> [NonEmpty a]
 transposeNE (x :| xs) = getZipList $ (:|) <$> ZipList x <*> ZipList (transpose xs)
@@ -230,7 +278,7 @@ getSlicePair'' :: Partial
   -> (ExpTape Bit Count, ExpTape Bit Count)
 getSlicePair'' sT eT = getSlicePair' (second NotInfinity sT) (second NotInfinity eT)
 
-getSlicePair' :: Partial 
+getSlicePair' :: Partial
   => ExpTape Bit InfCount
   -> ExpTape Bit InfCount
   -> [Int] -> Int -> Int
@@ -346,10 +394,10 @@ simplestNExamples n hist disps = uncurry (getSlicePair hist disps) <$> increasin
     increasingIndPairs = filter (uncurry (<)) $ (,) <$> inds <*> inds
 
 zipSigToET :: (Partial, Show b, Pretty c) => Signature b -> ([c], [c]) -> ExpTape b c
-zipSigToET sig@(Signature b_ls p b_rs) pair@(c_ls, c_rs) = let 
+zipSigToET sig@(Signature b_ls p b_rs) pair@(c_ls, c_rs) = let
     ans = ExpTape (zipExact b_ls c_ls) p (zipExact b_rs c_rs)
-    in 
-    trace (show $ show sig <> "\n" <> pretty pair) ans 
+    in
+    trace (show $ show sig <> "\n" <> pretty pair) ans
 
 --gets the simulation history and the displacement history
 --normally these are output backwards which is of course crazy so we fix them here 
@@ -385,7 +433,7 @@ for now, lets do all of the ones that have the same signature complexity as the 
 -}
 guessWhatHappensNext :: Turing -> Config Count Bit -> SymbolVar -> [Skip Count Bit]
 guessWhatHappensNext machine startConfig varToGeneralize
- = mapMaybe generalizeOneSig (toList sigsWhichOccurred) where 
+ = mapMaybe generalizeOneSig (toList sigsWhichOccurred) where
     minimumComplexity = minimum $ signatureComplexity . view _2 <$> toList sigsWhichOccurred
     sigsOfMinComplexity = filter (\x -> signatureComplexity (view _2 x) == minimumComplexity) $ toList sigsWhichOccurred
     numsToSimulateAt :: NonEmpty Natural
@@ -394,11 +442,11 @@ guessWhatHappensNext machine startConfig varToGeneralize
     pairsToSimulateAt = (\x -> (fromIntegral $ 1200, x)) <$> numsToSimulateAt
     -- the simulation history and the displacement history
     simsAtNums :: NonEmpty ([(Phase, ExpTape Bit Count)], [Int])
-    simsAtNums = let 
+    simsAtNums = let
       ans = (\(x,y) -> simForStepNumFromConfig x machine
         $ replaceSymbolVarInConfig startConfig varToGeneralize
         $ FinCount y) <$> pairsToSimulateAt
-      msg = toString $ T.intercalate "startsim:\n" $ (\x -> "length: " <> show (length x) <> "\n" <> displayHist x) . 
+      msg = toString $ T.intercalate "startsim:\n" $ (\x -> "length: " <> show (length x) <> "\n" <> displayHist x) .
         fmap (fmap (second NotInfinity)) . fst <$> toList ans
       in
       trace msg ans
@@ -422,27 +470,27 @@ guessWhatHappensNext machine startConfig varToGeneralize
         finalIndexAndConfig = let
              ans = munge . view _1 <$> toList simsAtNums
              msg = "final indices and configs\n" <> toString (T.intercalate "\n" $ show . pretty <$> ans)
-            in 
-                trace msg ans 
+            in
+                trace msg ans
         finalIndices = view _1 <$> finalIndexAndConfig
         finalPhases = view (_2 . _1) <$> finalIndexAndConfig
         finalPhase :: Maybe Phase
         finalPhase = guard (allEqual finalPhases) $> U.head finalPhases
         slicedPairs :: [(ExpTape Bit Count, ExpTape Bit Count)]
-        slicedPairs = let 
+        slicedPairs = let
           ans = getZipList $ liftA2
             (\i (hist, disps) -> getSlicePairC hist disps 0 i)
             (ZipList finalIndices)
             (ZipList $ toList simsAtNums)
           msg = "slicedPairs were:\n" <> show (pretty ans)
-          in 
-          trace msg ans 
+          in
+          trace msg ans
         countLists :: [(([Count], [Count]), ([Count], [Count]))]
         countLists = fmap (bimapBoth getCounts) slicedPairs
         --genrealizes against the numsToSimulateAt from above 
         generalizeCL :: [Count] -> Maybe Count
-        generalizeCL cl = if allEqual cl 
-            then pure $ Unsafe.head cl 
+        generalizeCL cl = if allEqual cl
+            then pure $ Unsafe.head cl
             else snd <$> (generalizeFromCounts =<< nonEmpty (zipExact (FinCount <$> toList numsToSimulateAt) cl))
         getAtF f = traverse generalizeCL $ transpose (f <$> countLists)
         --we want to push the outer list all the way to the inside 
@@ -471,14 +519,14 @@ guessWhatHappensNext machine startConfig varToGeneralize
                 (EndMiddle $ etToConfig e_ph $ zipSigToET endSig (e_cls, e_crs))
                 (FinCount 100) False Zero --TODO
 
-guessAndProveWhatHappensNext :: Turing -> Config Count Bit -> SymbolVar -> [(Skip Count Bit, SkipOrigin Bit)]
-guessAndProveWhatHappensNext machine startConfig varToGeneralize 
-  = mapMaybe getProof $ zipExact guesses proofAttempts 
-  where 
+guessAndProveWhatHappensNext :: Turing -> SkipBook Bit -> Config Count Bit -> SymbolVar -> [(Skip Count Bit, SkipOrigin Bit)]
+guessAndProveWhatHappensNext machine book startConfig varToGeneralize
+  = mapMaybe getProof $ zipExact guesses proofAttempts
+  where
     guesses = force $ guessWhatHappensNext machine startConfig varToGeneralize
-    proofAttempts = (\skip -> force $ proveInductively 100 machine (initBook machine) skip (BoundVar 0)) <$> guesses 
-    getProof = \case 
-        (_, Left msg) -> traceShow msg Nothing 
+    proofAttempts = (\skip -> force $ proveInductively 100 machine book skip (BoundVar 0)) <$> guesses
+    getProof = \case
+        (_, Left msg) -> traceShow msg Nothing
         (skip, Right origin) -> Just (skip, origin)
 
 --takes a list of at least 2 pairs of counts, and returns a pair of counts that generalizes them,
@@ -496,18 +544,18 @@ generalizeFromCounts xs = force $ allEqualPair <|> additivePair <|> affinePair w
         Count n Empty Empty -> Just n
         _ -> Nothing
     naturalPairs :: Maybe (NonEmpty (Natural, Natural))
-    naturalPairs = let 
-        ans = traverse (bitraverse countToMaybeNat countToMaybeNat) xs 
+    naturalPairs = let
+        ans = traverse (bitraverse countToMaybeNat countToMaybeNat) xs
         msg = "attempting to generalize these pairs:\n" <> show ans
      in
         --trace msg ans
         ans
     subNats :: Natural -> Natural -> Int
     subNats = (-) `on` fromIntegral
-    differences = let 
+    differences = let
         ans = uncurry subNats <$$> naturalPairs
-        msg = "differences were\n" <> show ans 
-      in 
+        msg = "differences were\n" <> show ans
+      in
         --trace msg ans
         ans
     newBoundVarBad :: Count
@@ -520,12 +568,12 @@ generalizeFromCounts xs = force $ allEqualPair <|> additivePair <|> affinePair w
         GT -> (newBoundVarBad <> finiteCount (fromIntegral d), newBoundVarBad)
         --this means (x, y) x < y
         LT -> (newBoundVarBad, newBoundVarBad <> finiteCount (fromIntegral $ -1 * d))
-        EQ -> (newBoundVarBad, newBoundVarBad) 
+        EQ -> (newBoundVarBad, newBoundVarBad)
             --todo, right now we use this case in guessWhatComesNext but we probably shouldn't
             --error "generalizeAddDiff should not be called on a zero integer"
     additivePair :: Maybe (Count, Count)
     additivePair = differences >>= \case
-        ds@(d1 :| _rest) -> guard (list1AllEqual ds) >> pure (generalizeAddDiff d1) 
+        ds@(d1 :| _rest) -> guard (list1AllEqual ds) >> pure (generalizeAddDiff d1)
     conformsToAffine :: Natural -> Int -> (Natural, Natural) -> Bool
     conformsToAffine m b (x, y) = fromIntegral x * fromIntegral m + b == fromIntegral y
     generalizeMulDiff :: Natural -> Int -> (Count, Count)

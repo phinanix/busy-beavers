@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 342492579055a7e4aafec534602b8230aa07f9db915378cafd3acf037c6742a7
+-- hash: 6998ca645cb70a530bfa699dc7c6c56471eb5c16105b82eee7bf53e446dbba36
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -57,6 +57,7 @@ library
       QuickCheck
     , base
     , containers
+    , either
     , hspec
     , lens
     , monoidal-containers
