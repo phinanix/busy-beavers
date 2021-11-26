@@ -13,13 +13,13 @@ import ExpTape
 
 --a configuration of the machine's state - it is in a given phase, with the point of the tape and the stuff to the 
 --left and right looking as specified
-data Config s = Config
+data Config c s = Config
   { _cstate :: Phase
   , _ls :: [(s, Count)]
   , _c_point :: s
   , _rs :: [(s, Count)]
   } deriving (Eq, Ord, Show, Generic, Functor)
-instance (NFData s) => NFData (Config s)
+instance (NFData s) => NFData (Config c s)
 
 --at the end of a skip, you might've fallen off the L of the given pile of bits, or you might be in the middle of some 
 --known bits, which is a config

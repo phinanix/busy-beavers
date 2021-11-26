@@ -228,6 +228,9 @@ getSlicePair hist disps start end = getSlicePair' startTape endTape disps start 
     startTape = hist ^?! ix start . _2
     endTape = hist ^?! ix end . _2
 
+getSlicePairC :: [(Phase, ExpTape Bit Count)] -> [Int] -> Int -> Int -> (ExpTape Bit Count, ExpTape Bit Count)
+getSlicePairC hist = getSlicePair $ (fmap $ fmap $ second NotInfinity) hist
+
 --says whether by dropping one or both the left or the right bits of the start sig, we can reach the end sig
 calcCommonSig :: Signature Bit -> Signature Bit -> Maybe (Bool, Bool)
 calcCommonSig start end = asum $ check <$> tf <*> tf where
@@ -346,10 +349,13 @@ algorithm: instatiate the variable at several values, simulate forward a bunch o
 take all signatures that occurred in each simulation, and try to generalize accross them, 
 starting with the simplest first (eg, if 010 occurred many times, try to guess the function that
 generates the coefficients of 0 1 and 0 from the instantiated symbolvar) 
+
+right now generalizeFromCounts returns always (BoundVar 0), so as a hack we're going to change 
+the symbolvar in the input config to be (BoundVar 0) also so it is the same
 -}
 guessWhatHappensNext :: Turing -> Config Bit -> SymbolVar -> Maybe (Skip Bit)
 guessWhatHappensNext machine config varToGeneralize
- = asum (generalizeOneSig <$> sortOn (signatureComplexity . view _2) (toList sigsWhichOccurred)) where
+ = asum (generalizeOneSig <$> sortOn (signatureComplexity . view _2) (toList sigsWhichOccurred)) where  
     numsToSimulateAt :: NonEmpty Natural
     numsToSimulateAt = 4 :| [5.. 5]
     pairsToSimulateAt :: NonEmpty (Int, Natural)
@@ -380,28 +386,21 @@ guessWhatHappensNext machine config varToGeneralize
             Nothing -> error "there was nothing with a signature we checked is in everything"
             Just i -> (i, hist !! i)
         --for each hisory, the time at which the signature occured, and the simstate at that point
-        -- note that the final index here is in the backwards history, ie index 0 means occurred last, not first
-        --hopefully this is just fine?
-        --it also means that we select the last thing which everyone had in common, rather than eg the first, which seems
-        --probably best?
         finalIndexAndConfig :: [(Int, (Phase, ExpTape Bit Count))]
         finalIndexAndConfig = let
              ans = munge . view _1 <$> toList simsAtNums
              msg = "final indices and configs\n" <> toString (T.intercalate "\n" $ show . pretty <$> ans)
             in 
                 trace msg ans 
+        finalIndices = view _1 <$> finalIndexAndConfig
         finalPhases = view (_2 . _1) <$> finalIndexAndConfig
         finalPhase :: Maybe Phase
         finalPhase = guard (allEqual finalPhases) $> U.head finalPhases
         slicedPairs :: [(ExpTape Bit Count, ExpTape Bit Count)]
         slicedPairs = getZipList $ liftA2
-        --the problem is that we're trying to slice out of the original config, but that obviously doesn't work
-        --because the original config has symbolic variables in it
-        --instead we need to slice out of the configs created up on line 361 in simsAtNums that have actual numbers 
-        --in them, or frankly at history 0 would probably also be pretty damn reasonable
-            (\(i, (_p, t)) disps -> getSlicePair'' (view _2 $ configToET config) t disps 0 i)
-            (ZipList finalIndexAndConfig)
-            (ZipList $ view _2 <$> toList simsAtNums)
+            (\i (hist, disps) -> getSlicePairC hist disps 0 i)
+            (ZipList finalIndices)
+            (ZipList $ toList simsAtNums)
         countLists :: [(([Count], [Count]), ([Count], [Count]))]
         countLists = fmap (bimapBoth getCounts) slicedPairs
         --genrealizes against the numsToSimulateAt from above 
@@ -414,12 +413,11 @@ guessWhatHappensNext machine config varToGeneralize
         res = do
             ((s_cls, s_crs), (e_cls, e_crs)) <- transposedCountLists
             e_ph <- finalPhase
-            let (s_ph, ExpTape s_ls s_p s_rs) = configToET config
-                end_points = point . view (_2 . _2) <$> finalIndexAndConfig
+            let end_points = point . view (_2 . _2) <$> finalIndexAndConfig
             guard $ allEqual end_points
             let end_point = U.head end_points
             pure $ Skip
-                (Config s_ph s_ls s_p s_rs)
+                config 
                 -- we have the e_cls and the e_crs, and we have psb which is the final phase 
                 --and signature we're trying to generalize across, so we just need to write 
                 -- Signature Bit -> ([Count], [Count]) -> ExpTape Bit Count with zipExact
