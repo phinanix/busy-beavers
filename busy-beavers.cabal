@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 605fe50235eaaaad74e5ffd1cfcfa3606330cd5e620bb0ef01e092e4f71cf46d
+-- hash: 25d201e64bb6cbc05adde8c35a3a5451c8e7f005c2eb59dc7cf4bb9c2b018b33
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -27,6 +27,7 @@ source-repository head
 
 library
   exposed-modules:
+      BackwardSearch
       Config
       Count
       Display
@@ -91,6 +92,7 @@ test-suite busy-beavers-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      BackwardSearchSpec
       CountSpec
       GlueSpec
       GraphsSpec
