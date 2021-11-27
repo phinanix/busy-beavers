@@ -42,6 +42,12 @@ simple_sweeperGoal = Skip
   False
   Zero --obviously this is fake for now 
 
+beforeReplace :: Config Count Bit 
+beforeReplace = Config (Phase 2) [(False, symbolVarCount (SymbolVar 0) 1)] True [(True, One), (False, One)]
+
+afterReplace :: Config Count Bit
+afterReplace = Config (Phase 2) [(False, FinCount 5)] True [(True, One), (False, One)]
+
 c = finiteCount
 
 assertPrettySkip :: (Pretty a1, Pretty a2) => Maybe a1 -> a2 -> Expectation
@@ -56,16 +62,16 @@ spec = do
     it "proves a simple thing" $
       proveInductively 20 simple_sweeper (initBook simple_sweeper) simple_sweeperGoal (BoundVar 0)
       `shouldBe` Right (Induction (initBook simple_sweeper) 20)
-    it "proves a counter machine counts" $
+    xit "proves a counter machine counts" $
       proveInductively 20 weird3 (initBook weird3) weird3Goal (BoundVar 0)
       `shouldBe` Right (Induction (initBook weird3) 20)
     it "fails to pvoe a thing that is false" $
       proveInductively 20 checkerboardSweeper (initBook checkerboardSweeper) checkerboardFalseGoal
-      (BoundVar 0) `shouldBe` Left "failed ind: machine stuck on step: 1 in phase:(Phase 1)\ngoal:phase: 0 (True, 3 + 1*a_4 ) |>\ncur tape:(T, 1) |>True<|(F, 0 + 1*a_4 ) (T, 1) "
-    it "proves a guess for the counter machine" $ 
+      (BoundVar 0) `shouldSatisfy` (has _Left)
+    xit "proves a guess for the counter machine" $ 
       let fromJust (Just x) = x 
           goal = fromJust $ makeIndGuess 100 weird3 in 
-        proveInductively 20 weird3 (initBook weird3) goal (BoundVar 0) `shouldBe` Left ""
+        proveInductively 20 weird3 (initBook weird3) goal (BoundVar 0) `shouldBe` Left ("", Nothing)
   describe "replaceVarInSkip" $ do
     it "solves a simple case" $ do
       3 `shouldBe` 3
@@ -126,4 +132,6 @@ spec = do
 
              [(True, Count 2 Empty (fromList [(BoundVar 0, Sum 1)]))] False []))
         Empty False Zero)
-      
+  describe "replaceSymbolVarInConfig" $ do 
+    it "replaces in a simple example" $ do 
+      replaceSymbolVarInConfig True beforeReplace (SymbolVar 0) (FinCount 5) `shouldBe` afterReplace

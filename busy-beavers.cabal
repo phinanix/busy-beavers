@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 6998ca645cb70a530bfa699dc7c6c56471eb5c16105b82eee7bf53e446dbba36
+-- hash: 605fe50235eaaaad74e5ffd1cfcfa3606330cd5e620bb0ef01e092e4f71cf46d
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -32,6 +32,7 @@ library
       Display
       ExpTape
       Glue
+      Graphs
       HaltProof
       Induction
       MoreSimulationLoops
@@ -92,6 +93,7 @@ test-suite busy-beavers-test
   other-modules:
       CountSpec
       GlueSpec
+      GraphsSpec
       InductionSpec
       SimulateSkipSpec
       SimulateSpec
@@ -106,10 +108,16 @@ test-suite busy-beavers-test
       QuickCheck
     , base
     , busy-beavers
+    , containers
+    , either
     , hspec
     , lens
     , monoidal-containers
+    , mtl
     , prettyprinter
     , quickcheck-instances
     , relude
+    , safe
+    , text
+    , witherable
   default-language: Haskell2010

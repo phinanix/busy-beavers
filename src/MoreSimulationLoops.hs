@@ -32,7 +32,7 @@ attemptInductionGuess machine state = case guessInductionHypothesis hist dispHis
 
 attemptInductionGuess2 :: Turing -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
 attemptInductionGuess2 machine state = case eTProof of  
-  Left _txt -> Right $ state & s_book .~ newbook 
+  Left txt -> trace (toString txt) $ Right $ state & s_book .~ newbook 
   Right hp -> Left $ ContinueForever hp
   where
     (newbook, eTProof) = proveInductivelyIMeanIT machine (state ^. s_book) (state ^. s_steps) hist dispHist

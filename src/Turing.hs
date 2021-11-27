@@ -76,6 +76,9 @@ dispET e t = dispEdge e <> " | " <> dispTrans t <> "\n"
 dispTuring :: Turing -> Text
 dispTuring (Turing _ transitions) = ifoldMap dispET transitions
 
+instance Pretty Turing where 
+  pretty = pretty . dispTuring 
+  
 --crashes if the Int is not >0, which is true of much of the program
 uniPhase :: Int -> NonEmpty Phase
 uniPhase n = Phase <$> 0 :| [1.. n-1]

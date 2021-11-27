@@ -72,6 +72,14 @@ tests:
     - quickcheck-instances
     - monoidal-containers
     - prettyprinter
+    - containers
+    - mtl
+    - safe
+    - text
+    - witherable
+    - either 
+
+
 default-extensions:
   - ApplicativeDo
   - BangPatterns
