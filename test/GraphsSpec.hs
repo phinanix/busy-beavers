@@ -19,7 +19,11 @@ import Graphs
 newtype GraphWithBranches = GraphWithBranches (Int, Int) deriving (Eq, Ord, Show, Generic)
 
 instance Graph GraphWithBranches where  
-    getAdjacent (GraphWithBranches (n, tag)) = GraphWithBranches . (n - 1,) <$> take n [0, 1 ..] 
+    getAdjacent (GraphWithBranches (n, _tag)) = GraphWithBranches . (n - 1,) <$> take n [0, 1 ..] 
+
+newtype BinarySeq = BinarySeq [Bool] deriving (Eq, Ord, Show, Generic)
+instance Graph BinarySeq where 
+    getAdjacent (BinarySeq xs) = (\x -> BinarySeq (x : xs)) <$> [False, True]
 
 spec :: Spec
 spec = do 
@@ -30,3 +34,8 @@ spec = do
       dfs 5 100 (== GraphWithBranches (0,0)) (GraphWithBranches (5,0)) `shouldBe` (Just $ Success $ GraphWithBranches . (,0) <$> [5,4..0])
     it "bottoms out if the search isn't deep enough" $
       dfs 4 100 (== GraphWithBranches (0,0)) (GraphWithBranches (5,0)) `shouldBe` Nothing
+    it "finds a node with a lot of branching paths" $ 
+      dfs 7 500 (== BinarySeq (take 6 (repeat True))) (BinarySeq []) `shouldBe` 
+        (Just $ Success $ (\n -> BinarySeq (take n (repeat True))) <$> [0.. 6])
+    it "fails if there are too many nodes" $
+      dfs 10 100 (== BinarySeq (take 7 (repeat True))) (BinarySeq []) `shouldBe`Nothing

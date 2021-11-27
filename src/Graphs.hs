@@ -10,7 +10,7 @@ import Prettyprinter
 import Data.Either.Combinators
 import Safe.Exact
 
-class Ord v => Graph v where 
+class (Show v, Ord v) => Graph v where 
     getAdjacent :: v -> [v] 
 
 --NoSuccess means we explored the whole graph and proved there are no success nodes in it
@@ -31,6 +31,8 @@ dfs depthLimit nodeLimit isSuccess startVertex = munge $ loop True Empty [] [(0,
   --explored nodes, the path from the start to here, and the stack of things to explore
   --the stack is a list of depths and a vertex at that depth
   loop :: Bool -> Set v -> [v] -> [(Int, v)] -> (Bool, Maybe [v])
+  -- loop searchWasExhaustive explored curPath stack | 
+  --    trace ("curStack: " <> show stack) False = undefined 
   loop searchWasExhaustive explored curPath stack = if length explored > nodeLimit then (False, Nothing) else 
     case stack of 
       [] -> (searchWasExhaustive, Nothing)
