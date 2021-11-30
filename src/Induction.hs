@@ -31,6 +31,8 @@ import Display
 import Safe.Partial
 import HaltProof
 import Glue
+import Data.Bifoldable (Bifoldable)
+import Graphs
 
 {-
 27 Nov 21 
@@ -85,7 +87,9 @@ proveStrong loopLim machine book goal indVar = swapEither <$> loop 0 book Nothin
       Right skipOrigin -> (curBook, Left skipOrigin)
       Left (msg, maybeStuckConfig) -> trace ("stuck on:\n" <> show (pretty maybeStuckConfig) <> "\nbecause:\n" <> toString msg) $
         if has _Just mbLastStuck && mbLastStuck == maybeStuckConfig
-        then (curBook, Right $ "got stuck on same thing twice:\n" <> show (pretty mbLastStuck))
+          then (curBook, Right $ "got stuck on same thing twice:\n" <> show (pretty mbLastStuck))
+        else if (thingContainsVar <$> maybeStuckConfig) == Just False
+          then (curBook, Right $ "got stuck on something with no vars:\n" <> show (pretty maybeStuckConfig))
         else case maybeStuckConfig of
           Nothing -> (curBook, Right $ "proveInd failed not due to being stuck:\n" <> msg)
           Just stuckConfig -> let scatter = guessAndProveWhatHappensNext machine curBook stuckConfig (SymbolVar 0) in
@@ -130,7 +134,7 @@ proveInductively limit t book goal indVar = trace ("trying to prove:\n" <> show 
         ans = goalPlusX 1
         msg = "indHyp is:\n" <> show (pretty ans)
       in
-        force $ trace msg 
+        force $ trace msg
         ans
     indGoal :: Skip Count Bit
     indGoal = goalPlusX 2
@@ -219,8 +223,29 @@ proveBySimulating limit t book (Skip start goal _ _ _)
         mbdeInfCount Infinity = Nothing
         mbdeInfCount (NotInfinity c) = Just c
 
+--TODO, it's really dumb we have to "deInfCount here"
+getNextConfigs :: SkipBook Bit -> Config Count Bit -> [Config Count Bit]
+getNextConfigs book curConfig = first deInfCount . view (_2 . resConfig) <$> choices
+ where
+  choices :: [(Skip Count Bit, SkipResult Bit InfCount)]
+  choices = uncurry (getSkipsWhichApply book) (configToET $ first NotInfinity curConfig)
+
+simulateViaDFS :: Int -> Int -> SkipBook Bit -> Skip Count Bit -> Either (Text, Maybe (Config Count Bit)) Count
+simulateViaDFS stepLim depthLim book (Skip startConfig skipEnd _hops _halts _disp) = case res of 
+  Just (Success vs) -> Right $ FinCount $ fromIntegral $ length vs
+  --the problem here is we sort of want some kind of like 'what did the DFS get stuck on' list 
+  --but that's not something we have right now
+  _notSuccess -> undefined
+  where 
+    res = do 
+      endConfig <- preview _EndMiddle skipEnd
+      dfs stepLim depthLim (getNextConfigs book) (== endConfig) startConfig 
+    
 transposeNE :: NonEmpty [a] -> [NonEmpty a]
 transposeNE (x :| xs) = getZipList $ (:|) <$> ZipList x <*> ZipList (transpose xs)
+
+test :: NonEmpty [a] -> [NonEmpty a]
+test = sequenceA 
 
 bitraverseBoth :: (Bitraversable p, Applicative f) => (a -> f b) -> p a a -> f (p b b)
 bitraverseBoth f = bitraverse f f
@@ -449,7 +474,7 @@ guessWhatHappensNext machine startConfig varToGeneralize
     numsToSimulateAt :: NonEmpty Natural
     numsToSimulateAt = 4 :| [5.. 6]
     pairsToSimulateAt :: NonEmpty (Int, Natural)
-    pairsToSimulateAt = (\x -> (fromIntegral $ 1200, x)) <$> numsToSimulateAt
+    pairsToSimulateAt = (\x -> (1200, x)) <$> numsToSimulateAt
     -- the simulation history and the displacement history
     simsAtNums :: NonEmpty ([(Phase, ExpTape Bit Count)], [Int])
     simsAtNums = let
@@ -533,8 +558,9 @@ guessWhatHappensNext machine startConfig varToGeneralize
                 (FinCount 100) False Zero --TODO
 
 
-skipContainsVar :: Skip Count Bit -> Bool
-skipContainsVar = getAny . bifoldMap (Any . countContainsVar) (const mempty) where
+--skipContainsVar :: Skip Count Bit -> Bool
+thingContainsVar :: (Bifoldable p) => p Count b -> Bool
+thingContainsVar = getAny . bifoldMap (Any . countContainsVar) (const mempty) where
     countContainsVar = \case
         FinCount _n -> False
         _notFin -> True
@@ -546,7 +572,7 @@ guessAndProveWhatHappensNext machine book startConfig varToGeneralize
     mapMaybe getProof $ zipExact goodGuesses proofAttempts
   where
     guesses = force $ guessWhatHappensNext machine startConfig varToGeneralize
-    goodGuesses = filter skipContainsVar guesses
+    goodGuesses = filter thingContainsVar guesses
     proofAttempts = force $ (\skip -> force $ proveInductively 100 machine book skip (BoundVar 0)) <$> goodGuesses
     getProof = \case
         (_, Left msg) -> --trace ("induction failed b/c:\n" <> show (pretty msg))

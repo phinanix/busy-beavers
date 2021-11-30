@@ -14,7 +14,5 @@ import Graphs
 import Turing 
 import Skip 
 
-newtype BWNode = BWNode (Turing, Config Natural Bit) deriving (Eq, Ord, Show, Generic)
-
-instance Graph BWNode where 
-  getAdjacent (BWNode (machine, config)) = []
+getAdjacentBW :: Turing -> Config Natural Bit -> [Config Natural Bit]
+getAdjacentBW machine config = []

@@ -10,8 +10,6 @@ import Prettyprinter
 import Data.Either.Combinators
 import Safe.Exact
 
-class (Show v, Ord v) => Graph v where 
-    getAdjacent :: v -> [v] 
 
 --NoSuccess means we explored the whole graph and proved there are no success nodes in it
 --Success v means we found one success, and gives the list of vertices from the start of the 
@@ -21,8 +19,8 @@ data SearchResult v = NoSuccess | Success [v] deriving (Eq, Ord, Show, Generic)
 will search to at most the depthLimit from the start, and will see at most nodeLimit nodes
 searches from the given vertex to try to find "success" nodes. 
 -}
-dfs :: forall v. (Graph v) => Int -> Int -> (v -> Bool) -> v -> Maybe (SearchResult v)
-dfs depthLimit nodeLimit isSuccess startVertex = munge $ loop True Empty [] [(0, startVertex)] where 
+dfs :: forall v. (Ord v) => Int -> Int -> (v -> [v]) -> (v -> Bool) -> v -> Maybe (SearchResult v)
+dfs depthLimit nodeLimit getAdjacent isSuccess startVertex = munge $ loop True Empty [] [(0, startVertex)] where 
   munge :: (Bool, Maybe [v]) -> Maybe (SearchResult v)
   munge = \case 
     (_, Just path) -> Just (Success path)

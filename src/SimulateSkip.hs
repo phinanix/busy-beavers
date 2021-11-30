@@ -74,6 +74,13 @@ data SkipResult s c = Skipped
 $(makeLenses ''SkipResult)
 $(makeLenses ''SimState)
 
+resConfig :: Lens (SkipResult s c) (SkipResult t d) (Config c s) (Config d t)
+resConfig = lens get set where 
+  get skipRes = etToConfig (skipRes ^. newPhase) (skipRes ^. newTape) 
+  set :: SkipResult s c -> Config d t -> SkipResult t d 
+  set (Skipped hops _oldPh _oldTape oldDisp) config = Skipped hops newPh newTape oldDisp where 
+    (newPh, newTape) = configToET config
+
 initExpTape :: s -> ExpTape s InfCount
 initExpTape s = ExpTape [(s, Infinity)] s [(s, Infinity)]
 
@@ -205,22 +212,32 @@ skipFarthest (_, res1) (_, res2) = compare (res1 ^. hopsTaken) (res2 ^. hopsTake
 --or laterphina says the Skipbook maybe should be parameterized by s as well
 skipStep :: Turing -> SkipBook Bit -> Phase -> ExpTape Bit InfCount
   -> PartialStepResult (ExpTape Bit InfCount)
-skipStep (Turing _ trans) book p tape@(ExpTape _ls bit _rs)
-  = case trans ^. at (p, bit) of -- ~
+skipStep (Turing _ trans) book p tape@(ExpTape _ls bit _rs) = case trans ^. at (p, bit) of -- ~
     Nothing -> Unknown (p,bit)
-    Just _ -> let
+    Just _ -> pickBestSkip $ getSkipsWhichApply book p tape
+
+getSkipsWhichApply :: SkipBook Bool
+  -> Phase
+  -> ExpTape Bool InfCount
+  -> [(Skip Count Bit, SkipResult Bit InfCount)] 
+getSkipsWhichApply book p tape@(ExpTape _ls bit _rs)
+  = let
       --just tries applying all the skips. I think this will be ok, but is probably
       --too expensive and should be reworked for efficiency later
       skips = lookupSkips (p, bit) book
       appliedSkips = mapMaybe (\s -> (s,) <$> applySkip s (p, tape)) $ toList skips
-      in
-      case appliedSkips of
-        [] -> MachineStuck --TODO :: can we generate this message somewhere better?
-        _ -> let
-          (bestSkip, Skipped hops newP newT newD) = maximumBy skipFarthest appliedSkips
-          in --trace (toString $ (mconcat $ dispSkip . fst <$> appliedSkips) <> "\n") $
-          if bestSkip ^. halts then Stopped hops newT bestSkip newD
-            else Stepped hops newP newT bestSkip newD
+      in appliedSkips 
+
+pickBestSkip :: [(Skip Count Bit, SkipResult Bit InfCount)] -> PartialStepResult (ExpTape Bit InfCount)
+pickBestSkip = \case 
+  [] -> MachineStuck --TODO :: can we generate this message somewhere better?
+  appliedSkips -> let
+    (bestSkip, Skipped hops newP newT newD) = maximumBy skipFarthest appliedSkips
+    in --trace (toString $ (mconcat $ dispSkip . fst <$> appliedSkips) <> "\n") $
+    if bestSkip ^. halts then Stopped hops newT bestSkip newD
+      else Stepped hops newP newT bestSkip newD
+
+
 type SkipTape = ExpTape Bit InfCount
 
 skipStateFromPhTape :: Turing -> Phase -> ExpTape Bit InfCount  -> SimState 

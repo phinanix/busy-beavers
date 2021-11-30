@@ -37,6 +37,8 @@ data SkipEnd c s = EndSide Phase Dir [(s, c)] | EndMiddle (Config c s)
   deriving (Eq, Ord, Show, Generic, Functor)
 instance (NFData s, NFData c) => NFData (SkipEnd c s)
 
+$(makePrisms ''SkipEnd)
+
 instance Bifunctor SkipEnd where
   bimap f g = \case
     EndSide p d xs -> EndSide p d $ bimap g f <$> xs
@@ -108,10 +110,10 @@ getSkipEndPhase (EndSide p _ _) = p
 getSkipEndPhase (EndMiddle (Config p _ _ _)) = p
 
 -- --TODO: this code is not pretty but it works
-configToET :: Config Count s -> (Phase, ExpTape s Count)
+configToET :: Config c s -> (Phase, ExpTape s c)
 configToET (Config p ls point rs) = (p, ExpTape ls point rs)
 
-etToConfig :: Phase -> ExpTape s Count -> Config Count s
+etToConfig :: Phase -> ExpTape s c -> Config c s
 etToConfig p (ExpTape ls point rs) = Config p ls point rs
 
 -- glomPointConfig :: (Eq s) => Config s -> Config s
