@@ -24,9 +24,8 @@ checkerboardFalseGoal = Skip
     -- 0 >F< T (F, n) T goes to 
     -- 0 (T, n+3) >
     --true for n = 1 but not n = 2
-    (Config (Phase 0) [] False [(True, finiteCount 1), (False, newBoundVar 0), (True, finiteCount 1)])
-    (EndSide (Phase 0) R
-        [(True, finiteCount 3 <> newBoundVar 0)])
+    (Config (Phase 0) [] False [(True, finiteCount 1), (False, newBoundVar 0), (True, finiteCount 2)])
+    (EndMiddle $ Config (Phase 0) [(True, finiteCount 3 <> newBoundVar 0)] True [])
     (finiteCount 0) --obviously this is fake for now 
     False
     Zero --obviously this is fake for now 

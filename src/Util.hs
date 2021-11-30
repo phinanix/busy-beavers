@@ -6,6 +6,8 @@ import Control.Lens
 import Safe.Exact (takeExact, dropExact)
 import Safe.Partial
 import Prettyprinter
+import qualified Data.List.NonEmpty as NE 
+import Control.Exception
 
 type MMap = MonoidalMap
 
@@ -63,3 +65,6 @@ showOnEval x = traceShow x x
 
 putPretty :: (Pretty a) => a -> IO ()
 putPretty = putText . show . pretty
+
+neZipExact :: NonEmpty a -> NonEmpty b -> NonEmpty (a, b)
+neZipExact as bs = assert (length as == length bs) $ NE.zip as bs

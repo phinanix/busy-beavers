@@ -126,7 +126,8 @@ tapeHalfToBitList = flatten . intify . Unsafe.init  where
   flatten :: [(s, Int)] -> [s]
   flatten = foldMap $ uncurry (flip replicate)
 
-data Signature s = Signature [s] s [s] deriving (Eq, Ord, Show)
+data Signature s = Signature [s] s [s] deriving (Eq, Ord, Show, Generic)
+instance (NFData s) => NFData (Signature s)
 
 tapeSignature :: ExpTape s c -> Signature s
 tapeSignature (ExpTape ls p rs) = Signature (fst <$> ls) p  (fst <$> rs)
