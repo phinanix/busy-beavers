@@ -18,7 +18,7 @@ data ExpTape s c = ExpTape
   { left :: [(s, c)]
   , point :: s
   , right :: [(s, c)]
-  } deriving (Eq, Ord, Show, Generic)
+  } deriving (Eq, Ord, Show, Generic, Functor)
 instance (NFData s, NFData c) => NFData (ExpTape s c)
 
 instance Bifunctor ExpTape where

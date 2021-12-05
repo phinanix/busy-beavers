@@ -57,15 +57,14 @@ Shortrange plan to get a thing which can prove the counter machine into main
 --we need the current step for the haltproof
 --we always return the new book
 --we return either a haltproof, or a text saying how we failed
---this reverses the hist and dispHist, so it expects you to give them "straight from" the simstate
-proveInductivelyIMeanIT :: Turing -> SkipBook Bit -> Steps -> [(Phase, ExpTape Bit InfCount)] -> [Int]
+proveInductivelyIMeanIT :: Turing -> SkipBook Bit -> Steps -> TapeHist Bit InfCount -> DispHist
     -> (SkipBook Bit, Either Text HaltProof)
 proveInductivelyIMeanIT machine book curStep hist dispHist
-  = case guessInductionHypothesis (reverse hist) (reverse dispHist) of
+  = case guessInductionHypothesis hist dispHist of
     Left msg -> (book, Left $ "failed to guessIndHyp:\n" <> msg)
     Right indHyp -> let (newBook, tOrOrigin) = proveStrong 5 machine book indHyp (BoundVar 0) in
       case tOrOrigin of
-        Left msg -> (newBook, Left $ "couldn't prove indHyp:\n" <> msg)
+        Left msg -> (newBook, Left $ "couldn't prove indHyp, which was:\n" <> showP indHyp <> "\nbecause:\n" <> msg)
         Right origin -> let finalBook = addSkipToBook indHyp origin newBook
                             mbProof = if skipGoesForever indHyp
                               then Right $ SkippedToInfinity curStep indHyp
@@ -132,7 +131,7 @@ proveInductively limit t book goal indVar = let
     baseCase :: Either (Text, Maybe (Config Count Bit)) Count
     baseCase = proveSimLinearAndTree limit limit t book baseGoal
     baseGoal :: Skip Count Bit
-    baseGoal = replaceVarInSkip goal indVar $ finiteCount 2
+    baseGoal = replaceVarInSkip goal indVar $ finiteCount 1 --TODO, should be 1
     goalPlusX x = replaceVarInSkip goal indVar $ FinCount x <> symbolVarCount newSymbolVar 1
     indCase :: Either (Text, Maybe (Config Count Bit)) Count
     --this doesn't actually add the inductive hypothesis to the book!
@@ -156,13 +155,14 @@ proveInductively limit t book goal indVar = let
 --first int is linear step limit, second int is tree step limit
 proveSimLinearAndTree :: Int -> Int -> Turing -> SkipBook Bit -> Skip Count Bit -> Either (Text, Maybe (Config Count Bit)) Count
 -- simulateViaDFS :: Int -> Int -> SkipBook Bit -> Skip Count Bit -> Either Text Natural 
-proveSimLinearAndTree linStep treeStep machine book skip = force $ case simulateViaDFS linStep treeStep book skip of 
-  --TODO: this blurs the line of what the returned count means, between big steps and small steps
-  Right nat -> Right $ FinCount nat 
-  Left _text -> case proveBySimulating linStep machine book skip of 
-    --works if you comment out this error and return right, but HOW COULD THAT BE TRUE you should never hit this error
-    Right count -> error $ "what " <> showP count <> "\nwe were proving:\n" <> showP skip
-    res@(Left _) -> res 
+proveSimLinearAndTree linStep treeStep machine book skip 
+  = force $ case simulateViaDFS linStep treeStep book skip of 
+    --TODO: this blurs the line of what the returned count means, between big steps and small steps
+    Right nat -> Right $ FinCount nat 
+    Left _text -> case proveBySimulating linStep machine book skip of 
+      --works if you comment out this error and return right, but HOW COULD THAT BE TRUE you should never hit this error
+      Right count -> error $ "what " <> showP count <> "\nwe were proving:\n" <> showP skip
+      res@(Left _) -> res 
 
 -- given a skip, replaces all occurences of a particular BoundVar with a particular Count
 replaceVarInSkip :: Skip Count s -> BoundVar -> Count -> Skip Count s
@@ -256,7 +256,8 @@ getNextConfigs :: SkipBook Bit -> Config Count Bit -> [Config Count Bit]
 getNextConfigs book curConfig = first deInfCount . view (_2 . resConfig) <$> choices
  where
   choices :: [(Skip Count Bit, SkipResult Bit InfCount)]
-  choices = uncurry (getSkipsWhichApply book) (configToET $ first NotInfinity curConfig)
+  --flip since sort gives smallest to largest by default but we want the largest skip first
+  choices = sortBy (flip skipFarthest) $ uncurry (getSkipsWhichApply book) (configToET $ first NotInfinity curConfig)
 
 --the text is why you failed, and the count is how many big steps 
 simulateViaDFS :: Int -> Int -> SkipBook Bit -> Skip Count Bit -> Either Text Natural 
@@ -401,8 +402,8 @@ addZeros (dl, dr) (ls, rs) = (lFunc ls, rFunc rs) where
 generalizeFromExamples :: [(ExpTape Bit Count, ExpTape Bit Count)] -> Maybe (Skip Count Bit)
 generalizeFromExamples slicePairs = undefined
 
-guessInductionHypothesis :: [(Phase, ExpTape Bit InfCount)] -> [Int] -> Either Text (Skip Count Bit)
-guessInductionHypothesis hist disps = do
+guessInductionHypothesis :: TapeHist Bit InfCount -> DispHist -> Either Text (Skip Count Bit)
+guessInductionHypothesis (TapeHist hist) (DispHist disps) = do
   let
     criticalConfig@(criticalPhase, _criticalSignature) = guessCriticalConfiguration hist
     configIndicesAndConfigs = obtainConfigIndices hist criticalConfig
@@ -477,9 +478,9 @@ zipSigToET sig@(Signature b_ls p b_rs) pair@(c_ls, c_rs) = let
 
 --gets the simulation history and the displacement history
 --normally these are output backwards which is of course crazy so we fix them here 
-simForStepNumFromConfig :: Int -> Turing -> Config Count Bit -> ([(Phase, ExpTape Bit Count)], [Int])
+simForStepNumFromConfig :: Int -> Turing -> Config Count Bit -> (TapeHist Bit Count, DispHist)
 simForStepNumFromConfig limit machine startConfig
-    = (reverse $ second deInfCount <$$> finalState ^. s_history, reverse $ finalState ^. s_disp_history)
+    = (second deInfCount $ finalState ^. s_history, finalState ^. s_disp_history)
     where
     (startPh, startTape) = second (second NotInfinity) $ configToET startConfig
     actionList = simulateStepTotalLoop limit :| [liftModifyState recordHist, liftModifyState recordDispHist]
@@ -524,9 +525,9 @@ guessWhatHappensNext machine startConfig varToGeneralize
     -- the simulation history and the displacement history
     simsAtNums :: NonEmpty ([(Phase, ExpTape Bit Count)], [Int])
     simsAtNums = let
-      ans = (\(x,y) -> simForStepNumFromConfig x machine
+      ans = bimap getTapeHist getDispHist <$> ((\(x,y) -> simForStepNumFromConfig x machine
         $ replaceSymbolVarInConfig True startConfig varToGeneralize
-        $ FinCount y) <$> pairsToSimulateAt
+        $ FinCount y) <$> pairsToSimulateAt)
       msg = toString $ T.intercalate "startsim:\n" $ (\x -> "length: " <> show (length x) <> "\n" <> displayHist x) .
         fmap (fmap (second NotInfinity)) . fst <$> toList ans
       in

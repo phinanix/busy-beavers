@@ -38,6 +38,36 @@ instance (NFData s) => NFData (SkipOrigin s)
 --the "Phase, s" is the Phase on start and the "s" that the point is made of
 type SkipBook s = Map (Phase,  s) (Map (Skip Count s) (SkipOrigin s))
 
+--which of these newtypes your history is tracks whether the history is forwards (element 0 is the first thing that happend)
+--or reverse (element 0 is the most recent thing that happened)
+newtype TapeHist s c = TapeHist {_tapeHist :: [(Phase, ExpTape s c)]} deriving (Eq, Ord, Show, Generic, Functor)
+newtype ReverseTapeHist = ReverseTapeHist {_reverseTapeHist :: [(Phase, ExpTape Bit InfCount)]} deriving (Eq, Ord, Show, Generic)
+newtype DispHist = DispHist {_dispHist :: [Int]} deriving (Eq, Ord, Show, Generic)
+newtype ReverseDispHist = ReverseDispHist {_reverseDispHist :: [Int]} deriving (Eq, Ord, Show, Generic)
+
+instance Bifunctor TapeHist where 
+  bimap = bimapDefault 
+  
+instance Bifoldable TapeHist where 
+  bifoldMap = bifoldMapDefault
+
+instance Bitraversable TapeHist where 
+  bitraverse :: forall a b c d f. (Applicative f) => (a -> f c) -> (b -> f d) -> TapeHist a b -> f (TapeHist c d)
+  bitraverse f g (TapeHist hist) = TapeHist <$> go where 
+    go :: f [(Phase, ExpTape c d)]
+    go = traverse (traverse (bitraverse f g)) hist
+
+getTapeHist :: TapeHist s c -> [(Phase, ExpTape s c)]
+getTapeHist = _tapeHist 
+
+getReverseTapeHist :: ReverseTapeHist -> [(Phase, ExpTape Bit InfCount)]
+getReverseTapeHist = _reverseTapeHist
+
+getDispHist :: DispHist -> [Int]
+getDispHist = _dispHist
+getReverseDispHist :: ReverseDispHist -> [Int]
+getReverseDispHist = _reverseDispHist
+
 data SimState = SimState
   { _s_phase :: Phase
   , _s_tape :: ExpTape Bit InfCount
@@ -48,13 +78,13 @@ data SimState = SimState
   --the slice that takes you from step 5 to step 13 is index 5 to index 12 inclusive
   , _s_trace :: [Skip Count Bit]
    --a list of the (phase, tape)s seen so far in order
-  , _s_history :: [(Phase, ExpTape Bit InfCount)]
+  , _s_reverse_history :: ReverseTapeHist
     --a map of the (phase, tape)s seen so far to the step count at which they were seen 
   , _s_history_set :: Map (Phase, ExpTape Bit InfCount) Int
   , _s_counter :: Int --the number of times we have taken a "big step". guaranteed to take on all values between 0 and n
   --the total amount of leftward (negative) or rightward (positive) displacement we have done, starting from 0
   , _s_displacement :: Int
-  , _s_disp_history :: [Int]
+  , _s_reverse_disp_history :: ReverseDispHist
   } deriving (Eq, Ord, Show)
 
 instance (Pretty s) => Pretty (SkipOrigin s) where
@@ -71,8 +101,18 @@ data SkipResult s c = Skipped
   , _resultingDisp :: Displacement InfCount
   } deriving (Eq, Ord, Show, Generic)
 
-$(makeLenses ''SkipResult)
+$(makeLenses ''TapeHist)
+$(makeLenses ''ReverseTapeHist)
+$(makeLenses ''DispHist)
+$(makeLenses ''ReverseDispHist)
 $(makeLenses ''SimState)
+$(makeLenses ''SkipResult)
+
+s_history :: Getter SimState (TapeHist Bit InfCount)
+s_history = to $ TapeHist . reverse . getReverseTapeHist . view s_reverse_history 
+
+s_disp_history :: Getter SimState DispHist 
+s_disp_history = to $ DispHist . reverse . getReverseDispHist . view s_reverse_disp_history 
 
 resConfig :: Lens (SkipResult s c) (SkipResult t d) (Config c s) (Config d t)
 resConfig = lens get set where 
@@ -241,7 +281,7 @@ pickBestSkip = \case
 type SkipTape = ExpTape Bit InfCount
 
 skipStateFromPhTape :: Turing -> Phase -> ExpTape Bit InfCount  -> SimState 
-skipStateFromPhTape t ph tape = SimState ph tape (initBook t) 0 [] [(ph, tape)] Empty 0 0 (pure 0) 
+skipStateFromPhTape t ph tape = SimState ph tape (initBook t) 0 [] (ReverseTapeHist [(ph, tape)]) Empty 0 0 (ReverseDispHist [0])
 
 initSkipState :: Turing -> SimState
 initSkipState t = skipStateFromPhTape t (Phase 0) (initExpTape False)
@@ -257,8 +297,12 @@ simulateOneMachine limit t = \case
     Stopped c newTape skip newDisp -> (skip : trace, Right $ Halted (steps + infCountToInt c) newTape (disp + dispToInt newDisp))
     Stepped c newP newTape skip newDisp -> case c of
       Infinity -> (skip : trace, Right $ ContinueForever (SkippedToInfinity steps skip))
-      c -> simulateOneMachine limit t $ SimState newP newTape book (steps + infCountToInt c) (skip : trace)
-        hist histSet counter (disp + dispToInt newDisp) (disp : dispHist)
+      c -> let newHist = hist & reverseTapeHist %~ ((p, tape) :)
+               newHistSet = histSet & at (p, tape) ?~ steps 
+               newDispHist = dispHist & reverseDispHist %~ (disp :)
+        in 
+        simulateOneMachine limit t $ SimState newP newTape book (steps + infCountToInt c) (skip : trace)
+           newHist newHistSet counter (disp + dispToInt newDisp) newDispHist
 
 simulateOneTotalMachine :: Int -> Turing -> ([Skip Count Bit], SimResult (ExpTape Bit InfCount))
 simulateOneTotalMachine limit machine = (^?! _Right) <$> simulateOneMachine limit machine (initSkipState machine)

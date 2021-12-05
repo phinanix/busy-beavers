@@ -1,6 +1,6 @@
 module MoreSimulationLoops where
 
-import Relude 
+import Relude
 import qualified Relude.Unsafe as Unsafe
 import Control.Lens
 import Prettyprinter
@@ -27,17 +27,17 @@ attemptInductionGuess machine state = case guessInductionHypothesis hist dispHis
         -- then Left (ContinueForever (SkippedToInfinity (state ^. s_steps) skip))
         -- else Right $ state & s_book %~ addSkipToBook skip skipOrigin 
   where
-    hist = reverse (state ^. s_history)
-    dispHist = reverse (state ^. s_disp_history)
+    hist =  state ^. s_history
+    dispHist = state ^. s_disp_history
 
 attemptInductionGuess2 :: Turing -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
-attemptInductionGuess2 machine state = case eTProof of  
-  Left txt -> trace (toString txt) $ Right $ state & s_book .~ newbook 
+attemptInductionGuess2 machine state = case eTProof of
+  Left txt -> trace (toString txt) $ Right $ state & s_book .~ newbook
   Right hp -> Left $ ContinueForever hp
   where
     (newbook, eTProof) = proveInductivelyIMeanIT machine (state ^. s_book) (state ^. s_steps) hist dispHist
-    hist = reverse (state ^. s_history)
-    dispHist = reverse (state ^. s_disp_history)
+    hist = state ^. s_history
+    dispHist =  state ^. s_disp_history
 
 indGuessLoop ::  Int -> Turing -> OneLoopRes
 indGuessLoop limit = simOneFromStartLoop $
@@ -50,6 +50,6 @@ indGuessLoop2 limit = simOneFromStartLoop $
 makeIndGuess :: Int -> Turing -> Either Text (Skip Count Bit)
 makeIndGuess stepCount turing = guessInductionHypothesis histToUse dispHist where
   guessingState = getStateAfterTime stepCount turing
-  histToUse = reverse $ guessingState ^. s_history 
-  dispHist = reverse $ guessingState ^. s_disp_history
+  histToUse = guessingState ^. s_history
+  dispHist = guessingState ^. s_disp_history
 

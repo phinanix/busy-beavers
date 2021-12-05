@@ -140,11 +140,11 @@ gluePreviousTwoSkips state = state & s_book .~ newBook where
       Right gluedSkip -> addSkipToBook gluedSkip (Glued prevSkip skip) book
 
 recordHist :: SimState -> SimState
-recordHist state = state & s_history %~ (histEnt :) where
+recordHist state = state & s_reverse_history . reverseTapeHist %~ (histEnt :) where
   histEnt = (state ^. s_phase, state ^. s_tape)
 
 recordDispHist :: SimState -> SimState
-recordDispHist state = state & s_disp_history %~ (state ^. s_displacement :)
+recordDispHist state = state & s_reverse_disp_history . reverseDispHist %~ (state ^. s_displacement :)
 
 checkSeenBefore :: SimOneAction
 checkSeenBefore _machine state = case state ^. s_history_set . at histEnt of
@@ -155,8 +155,8 @@ checkSeenBefore _machine state = case state ^. s_history_set . at histEnt of
   curStepCount = state ^. s_steps
 
 --applies the skip to everything in the list, checks if any of them have just 
-skipAppliedInHist :: Skip Count Bit -> [(Phase, ExpTape Bit InfCount)] -> Bool
-skipAppliedInHist skip hist = any (has _Just) $ applySkip skip <$> hist
+skipAppliedInHist :: Skip Count Bit -> TapeHist Bit InfCount -> Bool
+skipAppliedInHist skip hist = any (has _Just) $ applySkip skip <$> getTapeHist hist
 
 {-
 A thing I need to be very careful about is the interaction between EndOfTape proof and the skipping parts of evaluation
@@ -176,6 +176,10 @@ How this function works:
 3. finds the maximum rightward displacement over that interval. 
 4. if the leftmost bits of the tape are the same then and now, we have a proof!
 5. (maybe future): check the condition again by brute force simulation
+
+TODO this function is currently confusingly written to be interacting with the 
+reverse histories, but probably should interact with the forward histories
+TODO we currently duplicate the full 20 line function here which is pretty terrible, probably we should . . . not do that
 -}
 attemptEndOfTapeProof :: SimOneAction
 attemptEndOfTapeProof _machine state = assert (atLeftOfTape $ state ^. s_tape) $
@@ -184,10 +188,10 @@ attemptEndOfTapeProof _machine state = assert (atLeftOfTape $ state ^. s_tape) $
   samePhase = (== state ^. s_phase)
   samePoint (ExpTape _ls oldPoint _rs) = oldPoint == point (state ^. s_tape)
   isCandidate (phase, tape) = samePhase phase && atLeftOfTape tape && samePoint tape
-  dispList = Unsafe.tail $ state ^. s_disp_history
+  dispList = Unsafe.tail $ state ^. s_reverse_disp_history . reverseDispHist
   maximumInwardList = fmap maximum $ tail $ inits dispList
   bitsToCheck = uncurry (-) <$> zipExact maximumInwardList dispList
-  candidates = filter (isCandidate . view _2) $ zipExact bitsToCheck $ Unsafe.tail $ state ^. s_history
+  candidates = filter (isCandidate . view _2) $ zipExact bitsToCheck $ Unsafe.tail $ state ^. s_reverse_history . reverseTapeHist 
   -- int is from bitsToCheck
   checkProof :: (Int, (Phase, ExpTape Bit InfCount)) -> Maybe HaltProof
   checkProof (numBitsToCheck, (_ph, oldTape)) = let
@@ -207,10 +211,10 @@ attemptOtherEndOfTapeProof _machine state = assert (atRightOfTape $ state ^. s_t
   samePhase = (== state ^. s_phase)
   samePoint (ExpTape _ls oldPoint _rs) = oldPoint == point (state ^. s_tape)
   isCandidate (phase, tape) = samePhase phase && atRightOfTape tape && samePoint tape
-  dispList = Unsafe.tail $ state ^. s_disp_history
+  dispList = Unsafe.tail $ state ^. s_reverse_disp_history . reverseDispHist
   minimumInwardList = fmap minimum $ tail $ inits dispList
   bitsToCheck = uncurry (-) <$> zipExact dispList minimumInwardList
-  candidates = filter (isCandidate . view _2) $ zipExact bitsToCheck $ Unsafe.tail $ state ^. s_history
+  candidates = filter (isCandidate . view _2) $ zipExact bitsToCheck $ Unsafe.tail $ state ^. s_reverse_history . reverseTapeHist 
   -- int is from bitsToCheck
   checkProof :: (Int, (Phase, ExpTape Bit InfCount)) -> Maybe HaltProof
   checkProof (numBitsToCheck, (_ph, oldTape)) = let
