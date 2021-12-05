@@ -1,7 +1,7 @@
 module Count where
 
 import Turing (Bit, dispBit)
-import Relude hiding (filter)
+import Relude hiding (filter, mapMaybe)
 import qualified Text.Show
 import qualified Relude.Unsafe as Unsafe (head)
 import Control.Lens
@@ -14,6 +14,7 @@ import Witherable
 
 import Util
 import Prettyprinter
+import Safe.Partial
 
 --a variable with logical type positive integer which is "undergoing universal
 -- generalization" - when you step inside the ∀x . Q(x), the x
@@ -197,6 +198,15 @@ unsafeSubNatFromCount c n = case subNatFromCount c n of
   Nothing -> error $ "unsafesubnatfromcount " <> show c 
   Just r -> r
 
+subCountFromCount :: Count -> Count -> Maybe Count 
+--if the second count is fully present in the first count, then there will be no leftovers from the second count
+subCountFromCount c d = case likeTerms c d of 
+  (_, res, Empty) -> Just res 
+  _ -> Nothing 
+
+unsafeSubCountFromCount :: Partial => Count -> Count -> Count 
+unsafeSubCountFromCount = fmap (fmap fromJust) subCountFromCount
+
 --given two counts, returns a count of their like terms and the two leftovers, in that order 
 likeTerms :: Count -> Count -> (Count, Count, Count)
 likeTerms (Count n as xs) (Count m bs ys) = (likes, leftOvers, rightOvers) where
@@ -207,8 +217,10 @@ likeTerms (Count n as xs) (Count m bs ys) = (likes, leftOvers, rightOvers) where
   -- likeXs :: MMap BoundVar (Sum Natural)
   likeXs = intersectionWith combineNats xs ys
   likes = Count likeN likeAs likeXs
-  subMaps :: (Ord k, Num a) => MMap k a -> MMap k a -> MMap k a
-  subMaps = unionWith (-)
+  normMap :: (Monoid m, Eq m) => MMap k m -> MMap k m 
+  normMap = MonoidalMap . mapMaybe (\x -> if x == mempty then Nothing else Just x)  . getMonoidalMap 
+  subMaps :: (Ord k, Num a, Monoid a, Eq a) => MMap k a -> MMap k a -> MMap k a
+  subMaps = fmap (fmap normMap) $ unionWith (-)
   leftOvers = Count (n - likeN) (subMaps as likeAs) (subMaps xs likeXs)
   rightOvers = Count (m - likeN) (subMaps bs likeAs) (subMaps ys likeXs)
 

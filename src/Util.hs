@@ -68,3 +68,6 @@ putPretty = putText . show . pretty
 
 neZipExact :: NonEmpty a -> NonEmpty b -> NonEmpty (a, b)
 neZipExact as bs = assert (length as == length bs) $ NE.zip as bs
+
+showP :: (Pretty a) => a -> String 
+showP = show . pretty 

@@ -34,6 +34,7 @@ import HaltProof
 import Glue
 import Data.Bifoldable (Bifoldable)
 import Graphs
+import Data.Bitraversable
 
 {-
 27 Nov 21 
@@ -258,8 +259,17 @@ simulateViaDFS stepLim depthLim book (Skip startConfig skipEnd _hops _halts _dis
 transposeNE :: NonEmpty [a] -> [NonEmpty a]
 transposeNE (x :| xs) = getZipList $ (:|) <$> ZipList x <*> ZipList (transpose xs)
 
+transposeOverPair :: forall a. NonEmpty ([a], [a]) -> ([NonEmpty a], [NonEmpty a])
+transposeOverPair xs = bimapBoth transposeNE $ NE.unzip xs
+
+transposeOverTwoPairs :: NonEmpty (([a], [a]), ([a], [a])) -> (([NonEmpty a], [NonEmpty a]), ([NonEmpty a], [NonEmpty a]))
+transposeOverTwoPairs xs = bimapBoth (bimapBoth transposeNE) $ bimapBoth NE.unzip $ NE.unzip xs
+
 test :: NonEmpty [a] -> [NonEmpty a]
 test = sequenceA 
+
+bifoldMapBoth :: (Bifoldable p, Monoid m) => (a -> m) -> p a a -> m 
+bifoldMapBoth f = bifoldMap f f
 
 bitraverseBoth :: (Bitraversable p, Applicative f) => (a -> f b) -> p a a -> f (p b b)
 bitraverseBoth f = bitraverse f f
@@ -537,27 +547,48 @@ guessWhatHappensNext machine startConfig varToGeneralize
             ans
         countLists :: NonEmpty (([Count], [Count]), ([Count], [Count]))
         countLists = fmap (bimapBoth getCounts) slicedPairs
-        --genrealizes against the numsToSimulateAt from above 
-        generalizeCL :: NonEmpty Count -> Maybe Count
+        flippedCountLists = transposeOverTwoPairs countLists 
+        --generalizes against the numsToSimulateAt from above 
+        --the outer maybe is in case we fail. the inner maybe is because sometimes we don't generalize against the simnum at all, 
+        --in which case the simnum is irrelevant 
+        generalizeCL :: NonEmpty Count -> Maybe (Maybe Count, Count)
         generalizeCL cl = if list1AllEqual cl
-            then pure $ head cl
+            then Just (Nothing, head cl)
             --the problem with discarding the fst element of this pair, is that if you generalize (3,1) (4,2), then the first
             --the pair is (x + 2, x), but by discarding the first element, you're implcitly assuming it's x, more-or-less, so 
             --that ends up not working 
             else let 
-              mbPair = generalizeFromCounts (neZipExact (FinCount <$> numsToSimulateAt) cl)
-              ans = snd <$> mbPair
-              msg = "generalized:" <> show (pretty cl) <> "\ngot\n" <> show (pretty mbPair)
+              ans = first pure <$> generalizeFromCounts (neZipExact (FinCount <$> numsToSimulateAt) cl)
+              msg = "generalized:" <> show (pretty cl) <> "\ngot\n" <> show (pretty ans)
             in trace msg ans 
-        getAtF f = traverse generalizeCL $ transposeNE (f <$> countLists)
-        --we want to push the outer list all the way to the inside 
-        transposedCountLists :: Maybe (([Count], [Count]), ([Count], [Count]))
-        transposedCountLists = (\x y z w -> ((x, y),(z,w))) <$> getAtF (fst . fst) <*> getAtF (snd . fst) <*> getAtF (fst.snd) <*> getAtF (snd.snd)
-        res = deepseq transposedCountLists $ trace "restime" $ do
+        {-algorithm:
+        first, generalize all the counts to pairs, with the simnum we put in. you might think we're done now, and we just want the 
+        second number of this pair. I also thought this, but that is not correct, because in the two pairs (x, x) (x + 2, x), that
+        second x does not mean the same thing!
+        therefore, the second thing to do is to make a big list of all the first elements of the pairs, and calculate their 
+        "maximum" (smallest thing you can add something to all of them to get). 
+        Third, map across all the pairs again, adding to both elements whatever it takes to get the first element to the maximum, and 
+        then discarding the first element, to leave just the second element. 
+        -}
+        bigTraverse = bitraverseBoth . bitraverseBoth . traverse 
+        bigMap = bimapBoth . bimapBoth . fmap
+        --transposedCountLists = bitraverseBoth (bitraverseBoth (traverse generalizeCL)) flippedCountLists
+        res = trace "restime" $ do
+            countPairLists <- bigTraverse generalizeCL flippedCountLists
+            let listOfFirstElements = (bifoldMapBoth . bifoldMapBoth . foldMap) (maybeToList . fst) countPairLists 
+                --todo does this do the right thing
+                maxFirstElt = maximum listOfFirstElements 
+                resPair = \case 
+                  (Nothing, s) -> s
+                  (Just f, s) -> trace ("about to sub" <> showP maxFirstElt <> " " <> showP f <> " also " <> showP s) $
+                    case unsafeSubCountFromCount maxFirstElt f of 
+                    c@(FinCount _n) -> assert (c <> f == maxFirstElt) (c <> s)
+                    notFin -> error $ "subtracted and got a notFin thing: " <> show (pretty notFin)
+                ((s_cls, s_crs), (e_cls, e_crs)) = bigMap resPair countPairLists 
             --todo, we probably shouldn't get the start counts from the aggregator, because that is kind of bad, compared to 
             --getting them from the startConfig. the problem is, we also need to slice the startConfig somehow, and that's 
             --actually quite hard. 
-            ((s_cls, s_crs), (e_cls, e_crs)) <- transposedCountLists
+            --actually not sure this is right on more consideration
             e_ph <- finalPhase
             let end_points = point . view (_2 . _2) <$> finalIndexAndConfig
             guard $ list1AllEqual end_points
