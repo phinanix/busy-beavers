@@ -57,5 +57,6 @@ spec = do
     it "gets simple like terms" $ do 
       likeTerms (finiteCount 5) (newBoundVar 1 <> finiteCount 2) `shouldBe` (finiteCount 2, finiteCount 3, newBoundVar 1)
     it "satisfies the additive property" $ do 
-      property (\ c d -> case likeTerms c d of 
-        (likes, c', d') -> (likes <> c', likes <> d') `shouldBe` (c, d))
+      property (\ a b -> let (c, d) = (normCount a, normCount b) in
+        case likeTerms c d of 
+          (likes, c', d') -> (likes <> c', likes <> d') `shouldBe` (c, d))

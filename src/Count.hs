@@ -207,6 +207,12 @@ subCountFromCount c d = case likeTerms c d of
 unsafeSubCountFromCount :: Partial => Count -> Count -> Count 
 unsafeSubCountFromCount = fmap (fmap fromJust) subCountFromCount
 
+normMap :: (Monoid m, Eq m) => MMap k m -> MMap k m 
+normMap = MonoidalMap . mapMaybe (\x -> if x == mempty then Nothing else Just x)  . getMonoidalMap 
+
+normCount :: Count -> Count 
+normCount (Count n as xs) = Count n (normMap as) (normMap xs)  
+
 --given two counts, returns a count of their like terms and the two leftovers, in that order 
 likeTerms :: Count -> Count -> (Count, Count, Count)
 likeTerms (Count n as xs) (Count m bs ys) = (likes, leftOvers, rightOvers) where
@@ -217,8 +223,7 @@ likeTerms (Count n as xs) (Count m bs ys) = (likes, leftOvers, rightOvers) where
   -- likeXs :: MMap BoundVar (Sum Natural)
   likeXs = intersectionWith combineNats xs ys
   likes = Count likeN likeAs likeXs
-  normMap :: (Monoid m, Eq m) => MMap k m -> MMap k m 
-  normMap = MonoidalMap . mapMaybe (\x -> if x == mempty then Nothing else Just x)  . getMonoidalMap 
+
   subMaps :: (Ord k, Num a, Monoid a, Eq a) => MMap k a -> MMap k a -> MMap k a
   subMaps = fmap (fmap normMap) $ unionWith (-)
   leftOvers = Count (n - likeN) (subMaps as likeAs) (subMaps xs likeXs)

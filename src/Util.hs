@@ -60,8 +60,8 @@ allEqual :: (Eq s) => [s] -> Bool
 allEqual [] = True 
 allEqual (x : xs) = all (== x) xs 
 
-showOnEval :: Show b => b -> b
-showOnEval x = traceShow x x 
+showOnEval :: (Show b, Pretty b) => b -> b
+showOnEval x = trace (showP x) x 
 
 putPretty :: (Pretty a) => a -> IO ()
 putPretty = putText . show . pretty
@@ -69,5 +69,8 @@ putPretty = putText . show . pretty
 neZipExact :: NonEmpty a -> NonEmpty b -> NonEmpty (a, b)
 neZipExact as bs = assert (length as == length bs) $ NE.zip as bs
 
-showP :: (Pretty a) => a -> String 
+showP :: (Pretty a, IsString s) => a -> s 
 showP = show . pretty 
+
+failMsg :: Text -> Maybe a -> Either Text a 
+failMsg t = maybe (Left t) Right

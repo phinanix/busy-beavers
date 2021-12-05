@@ -17,9 +17,9 @@ import SimulationLoops
 
 attemptInductionGuess :: Turing -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
 attemptInductionGuess machine state = case guessInductionHypothesis hist dispHist of
-  Nothing -> Right state
+  Left _msg -> Right state
   --try to prove the skip by induction 
-  Just skip -> trace ("guessed a skip:\n" <> show (pretty skip)) $
+  Right skip -> trace ("guessed a skip:\n" <> show (pretty skip)) $
     case proveInductively 20 machine (state ^. s_book) skip (BoundVar 0) of
       Left (fail, _config) -> trace (toString fail) $ Right state
       Right skipOrigin -> addSkipToStateOrInf skip skipOrigin state
@@ -47,7 +47,7 @@ indGuessLoop2 ::  Int -> Turing -> OneLoopRes
 indGuessLoop2 limit = simOneFromStartLoop $
   simulateStepTotalLoop limit :| [liftModifyState recordHist, liftModifyState recordDispHist, runAtCount 100 attemptInductionGuess2]
 
-makeIndGuess :: Int -> Turing -> Maybe (Skip Count Bit)
+makeIndGuess :: Int -> Turing -> Either Text (Skip Count Bit)
 makeIndGuess stepCount turing = guessInductionHypothesis histToUse dispHist where
   guessingState = getStateAfterTime stepCount turing
   histToUse = reverse $ guessingState ^. s_history 

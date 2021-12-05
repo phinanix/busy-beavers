@@ -37,6 +37,7 @@ library:
   - QuickCheck
   - hspec
   - either 
+  - quickcheck-instances
     
 executables:
   busy-beavers-exe:

@@ -57,12 +57,13 @@ Shortrange plan to get a thing which can prove the counter machine into main
 --we need the current step for the haltproof
 --we always return the new book
 --we return either a haltproof, or a text saying how we failed
+--this reverses the hist and dispHist, so it expects you to give them "straight from" the simstate
 proveInductivelyIMeanIT :: Turing -> SkipBook Bit -> Steps -> [(Phase, ExpTape Bit InfCount)] -> [Int]
     -> (SkipBook Bit, Either Text HaltProof)
 proveInductivelyIMeanIT machine book curStep hist dispHist
-  = case guessInductionHypothesis hist dispHist of
-    Nothing -> (book, Left "failed to guessIndHyp")
-    Just indHyp -> let (newBook, tOrOrigin) = proveStrong 5 machine book indHyp (BoundVar 0) in
+  = case guessInductionHypothesis (reverse hist) (reverse dispHist) of
+    Left msg -> (book, Left $ "failed to guessIndHyp:\n" <> msg)
+    Right indHyp -> let (newBook, tOrOrigin) = proveStrong 5 machine book indHyp (BoundVar 0) in
       case tOrOrigin of
         Left msg -> (newBook, Left $ "couldn't prove indHyp:\n" <> msg)
         Right origin -> let finalBook = addSkipToBook indHyp origin newBook
@@ -107,8 +108,6 @@ isSameInAsOut (Skip start end _ _ _) = addUp start == addUp end
     addUp :: (Bifoldable b) => b c s -> c 
     addUp = bifoldMap id (const mempty)
   
-  
-
 --goal: make a thing that takes a skip that might apply to a certain machine, 
 --attempts to simulate forward to prove that skip using induction
 -- the first int is the limit on the number of steps to take before giving up 
@@ -126,12 +125,12 @@ proveInductively limit t book goal indVar = let
         Left res -> Left $ first ("failed ind: " <>) res
         Right _ ->  pure origin
   msg = ("trying to prove:\n" <> show (pretty goal)) <> "\ngot res" <> show ans
-    in trace msg $ assert (isSameInAsOut goal) ans 
+    in force $ trace msg $ assert (isSameInAsOut goal) ans 
     where
     origin :: SkipOrigin Bit
     origin = Induction book limit
     baseCase :: Either (Text, Maybe (Config Count Bit)) Count
-    baseCase = proveBySimulating limit t book baseGoal
+    baseCase = proveSimLinearAndTree limit limit t book baseGoal
     baseGoal :: Skip Count Bit
     baseGoal = replaceVarInSkip goal indVar $ finiteCount 2
     goalPlusX x = replaceVarInSkip goal indVar $ FinCount x <> symbolVarCount newSymbolVar 1
@@ -139,7 +138,7 @@ proveInductively limit t book goal indVar = let
     --this doesn't actually add the inductive hypothesis to the book!
     indCase = --trace "\nstarting ind\n" $ 
       deepseq indHyp $
-        proveBySimulating limit t
+        proveSimLinearAndTree limit limit t
          (addSkipToBook (goalPlusX 0) InductionHypothesis $ addSkipToBook indHyp InductionHypothesis book)
          indGoal
     indHyp :: Skip Count Bit
@@ -153,6 +152,17 @@ proveInductively limit t book goal indVar = let
     indGoal = goalPlusX 2
     newSymbolVar :: SymbolVar --TODO: this is obviously incredibly unsafe
     newSymbolVar = SymbolVar 0
+
+--first int is linear step limit, second int is tree step limit
+proveSimLinearAndTree :: Int -> Int -> Turing -> SkipBook Bit -> Skip Count Bit -> Either (Text, Maybe (Config Count Bit)) Count
+-- simulateViaDFS :: Int -> Int -> SkipBook Bit -> Skip Count Bit -> Either Text Natural 
+proveSimLinearAndTree linStep treeStep machine book skip = force $ case simulateViaDFS linStep treeStep book skip of 
+  --TODO: this blurs the line of what the returned count means, between big steps and small steps
+  Right nat -> Right $ FinCount nat 
+  Left _text -> case proveBySimulating linStep machine book skip of 
+    --works if you comment out this error and return right, but HOW COULD THAT BE TRUE you should never hit this error
+    Right count -> error $ "what " <> showP count <> "\nwe were proving:\n" <> showP skip
+    res@(Left _) -> res 
 
 -- given a skip, replaces all occurences of a particular BoundVar with a particular Count
 replaceVarInSkip :: Skip Count s -> BoundVar -> Count -> Skip Count s
@@ -185,13 +195,16 @@ replaceBoundVarInCount varIn countOut (Count num symbolMap boundMap) =
 
 -- input int is limit on number of steps to simulate
 -- output count is the number of steps it actually took 
+-- the text tells you why you failed, and you might have failed via getting "stuck" on something, in which case we return that
+-- this linearly simulates forward, which sometimes gets you into a hole when you prove something that skips ahead, because 
+-- you can end up skipping past the thing you want. to solve this problem, I wrote simulateviadfs
 proveBySimulating :: Int -> Turing -> SkipBook Bit -> Skip Count Bit -> Either (Text, Maybe (Config Count Bit)) Count
-proveBySimulating limit t book (Skip start goal _ _ _)
-    = --force $ trace ("starting pos:\n" <> show (pretty start) <> "\n") $
-    loop 0
-    (start ^. cstate)
-    (second NotInfinity $ configToET start ^. _2)
-    (finiteCount 0)
+proveBySimulating limit t book (Skip start goal _ _ _) = let 
+  ans = loop 0 (start ^. cstate) (second NotInfinity $ configToET start ^. _2) (finiteCount 0)
+  msg = "starting pos:\n" <> show (pretty start) <> "\nsucceeded: " <> show (has _Right ans)
+  in
+    trace msg $
+    force ans 
     where
     -- four conditions: we've taken more steps than the limit,
     -- we've succeeded, stepping fails for some reason, or we continue 
@@ -245,12 +258,13 @@ getNextConfigs book curConfig = first deInfCount . view (_2 . resConfig) <$> cho
   choices :: [(Skip Count Bit, SkipResult Bit InfCount)]
   choices = uncurry (getSkipsWhichApply book) (configToET $ first NotInfinity curConfig)
 
-simulateViaDFS :: Int -> Int -> SkipBook Bit -> Skip Count Bit -> Either (Text, Maybe (Config Count Bit)) Count
+--the text is why you failed, and the count is how many big steps 
+simulateViaDFS :: Int -> Int -> SkipBook Bit -> Skip Count Bit -> Either Text Natural 
 simulateViaDFS stepLim depthLim book (Skip startConfig skipEnd _hops _halts _disp) = case res of 
-  Just (Success vs) -> Right $ FinCount $ fromIntegral $ length vs
+  Just (Success vs) -> Right $ fromIntegral $ length vs
   --the problem here is we sort of want some kind of like 'what did the DFS get stuck on' list 
   --but that's not something we have right now
-  _notSuccess -> undefined
+  _notSuccess -> Left "failed "
   where 
     res = do 
       endConfig <- preview _EndMiddle skipEnd
@@ -359,14 +373,21 @@ getSlicePairC hist = getSlicePair $ (fmap $ fmap $ second NotInfinity) hist
 
 --says whether by dropping one or both the left or the right bits of the start sig, we can reach the end sig
 calcCommonSig :: Signature Bit -> Signature Bit -> Maybe (Bool, Bool)
-calcCommonSig start end = asum $ check <$> tf <*> tf where
+calcCommonSig start end = -- trace ("commonsig-ing " <> show start <> " and " <> show end) $
+  asum $ check <$> tf <*> tf where
     tf = [False, True]
-    check dl dr = let
-      lFunc = if dl then dropLeft else id
-      rFunc = if dr then dropRight else id
-      in if lFunc (rFunc start) == end then Just (dl, dr) else Nothing
-    dropLeft (Signature ls p rs) = Signature (U.init ls) p rs
-    dropRight (Signature ls p rs) = Signature ls p (U.init rs)
+    check dl dr = do 
+      let
+        lFunc = if dl then dropLeft else pure 
+        rFunc = if dr then dropRight else pure 
+      dropped_start <- lFunc =<< rFunc start
+      if dropped_start == end then Just (dl, dr) else Nothing
+    dropLeft (Signature ls p rs) = do 
+      ls' <- viaNonEmpty init ls 
+      pure $ Signature ls' p rs
+    dropRight (Signature ls p rs) = do 
+      rs' <- viaNonEmpty init rs 
+      pure $ Signature ls p rs' 
 
 --if we have to drop one or both of of the end bits of the start signature, then to compensate we will add
 --a zero to the end signature in the places we drop the bits 
@@ -380,23 +401,23 @@ addZeros (dl, dr) (ls, rs) = (lFunc ls, rFunc rs) where
 generalizeFromExamples :: [(ExpTape Bit Count, ExpTape Bit Count)] -> Maybe (Skip Count Bit)
 generalizeFromExamples slicePairs = undefined
 
-guessInductionHypothesis :: [(Phase, ExpTape Bit InfCount)] -> [Int] -> Maybe (Skip Count Bit)
+guessInductionHypothesis :: [(Phase, ExpTape Bit InfCount)] -> [Int] -> Either Text (Skip Count Bit)
 guessInductionHypothesis hist disps = do
   let
     criticalConfig@(criticalPhase, _criticalSignature) = guessCriticalConfiguration hist
     configIndicesAndConfigs = obtainConfigIndices hist criticalConfig
-    configIndices = fst <$> configIndicesAndConfigs
+    configIndices = showOnEval $ fst <$> configIndicesAndConfigs
     indexPairs = zipExact (U.init configIndices) (U.tail configIndices)
     slicePairs = uncurry (getSlicePair hist disps) <$> indexPairs
-    allSigs = fmap (bimapBoth tapeSignature) slicePairs
+    allSigs = showOnEval $ fmap (bimapBoth tapeSignature) slicePairs
   --only proceed from here if all the pairs have the same signature at both the start and the end
-  guard (allEqual allSigs)
+  if allEqual allSigs then Right () else Left "sigs were not all equal"
   --to finish from here, our goal is for each transition start -> end, make a bunch of pairs of counts 
   --and then to generalize those pairs of counts accross all the transitions
   --to do this, we have to find a "common signature" for the start and end - we have allowed them to be 
   --different for the moment
-  (startSig, endSig) <- viaNonEmpty head allSigs
-  toDrop <- calcCommonSig startSig endSig
+  (startSig, endSig) <- failMsg "no sigs" $ viaNonEmpty head allSigs
+  toDrop <- failMsg "failed common sig" $ calcCommonSig startSig endSig
   let
     countListPairPairs :: [(([Count], [Count]), ([Count], [Count]))]
     countListPairPairs = bimapBoth getCounts <$> slicePairs
@@ -412,10 +433,10 @@ guessInductionHypothesis hist disps = do
     -- occurence index that was originally first
     transposePairs :: [([a], [b])] -> ([[a]], [[b]])
     transposePairs pairs = bimap transpose transpose (fst <$> pairs, snd <$> pairs)
-  thingsToGeneralizeList <- bitraverseBoth (traverse nonEmpty) $ transposePairs countPairListList
+  thingsToGeneralizeList <- failMsg "list was empty" $ bitraverseBoth (traverse nonEmpty) $ transposePairs countPairListList
   --the pair here is over left and right, then the list is over the "signature dimension", and the internal
   --pair is over start -> finish
-  allThingsGeneralized <- bitraverseBoth (traverse generalizeFromCounts) thingsToGeneralizeList
+  allThingsGeneralized <- failMsg "failed to generalize"  $ bitraverseBoth (traverse generalizeFromCounts) thingsToGeneralizeList
   --we want to pull the pair from start -> finish out to the front, then have the left right pair, then have the 
   --"signature dimension"
   let startCounts = bimapBoth (fmap fst) allThingsGeneralized
@@ -451,7 +472,8 @@ zipSigToET :: (Partial, Show b, Pretty c) => Signature b -> ([c], [c]) -> ExpTap
 zipSigToET sig@(Signature b_ls p b_rs) pair@(c_ls, c_rs) = let
     ans = ExpTape (zipExact b_ls c_ls) p (zipExact b_rs c_rs)
     in
-    trace ("zipping:\n" <> show (show sig <> "\n" <> pretty pair) <> "\nzipped\n") ans
+    -- trace ("zipping:\n" <> show (show sig <> "\n" <> pretty pair) <> "\nzipped\n") 
+    ans
 
 --gets the simulation history and the displacement history
 --normally these are output backwards which is of course crazy so we fix them here 
@@ -531,7 +553,7 @@ guessWhatHappensNext machine startConfig varToGeneralize
              ans = munge . view _1 <$>  simsAtNums
              msg = "final indices and configs\n" <> toString (T.intercalate "\n" $ toList $ show . pretty <$> ans)
             in
-          trace msg 
+          -- trace msg 
                 ans
         finalIndices = view _1 <$> finalIndexAndConfig
         finalPhases = view (_2 . _1) <$> finalIndexAndConfig
@@ -543,7 +565,7 @@ guessWhatHappensNext machine startConfig varToGeneralize
             neZipExact finalIndices simsAtNums
           msg = "slicedPairs were:\n" <> show (pretty ans)
           in
-          trace msg 
+          -- trace msg 
             ans
         countLists :: NonEmpty (([Count], [Count]), ([Count], [Count]))
         countLists = fmap (bimapBoth getCounts) slicedPairs
@@ -560,7 +582,9 @@ guessWhatHappensNext machine startConfig varToGeneralize
             else let 
               ans = first pure <$> generalizeFromCounts (neZipExact (FinCount <$> numsToSimulateAt) cl)
               msg = "generalized:" <> show (pretty cl) <> "\ngot\n" <> show (pretty ans)
-            in trace msg ans 
+            in 
+              -- trace msg 
+              ans 
         {-algorithm:
         first, generalize all the counts to pairs, with the simnum we put in. you might think we're done now, and we just want the 
         second number of this pair. I also thought this, but that is not correct, because in the two pairs (x, x) (x + 2, x), that
@@ -573,14 +597,15 @@ guessWhatHappensNext machine startConfig varToGeneralize
         bigTraverse = bitraverseBoth . bitraverseBoth . traverse 
         bigMap = bimapBoth . bimapBoth . fmap
         --transposedCountLists = bitraverseBoth (bitraverseBoth (traverse generalizeCL)) flippedCountLists
-        res = trace "restime" $ do
+        res = do
             countPairLists <- bigTraverse generalizeCL flippedCountLists
             let listOfFirstElements = (bifoldMapBoth . bifoldMapBoth . foldMap) (maybeToList . fst) countPairLists 
                 --todo does this do the right thing
                 maxFirstElt = maximum listOfFirstElements 
                 resPair = \case 
                   (Nothing, s) -> s
-                  (Just f, s) -> trace ("about to sub" <> showP maxFirstElt <> " " <> showP f <> " also " <> showP s) $
+                  (Just f, s) -> 
+                    --trace ("about to sub" <> showP maxFirstElt <> " " <> showP f <> " also " <> showP s) $
                     case unsafeSubCountFromCount maxFirstElt f of 
                     c@(FinCount _n) -> assert (c <> f == maxFirstElt) (c <> s)
                     notFin -> error $ "subtracted and got a notFin thing: " <> show (pretty notFin)

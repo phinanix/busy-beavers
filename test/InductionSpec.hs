@@ -12,11 +12,13 @@ import Count
 import TuringExamples
 import SimulateSkip
 import Induction
+import ExpTape
 import Skip
 import SimulationLoops
 import Results
 import HaltProof
 import MoreSimulationLoops
+import Util
 
 
 checkerboardFalseGoal :: Skip Count Bit
@@ -49,8 +51,8 @@ afterReplace = Config (Phase 2) [(False, FinCount 5)] True [(True, One), (False,
 
 c = finiteCount
 
-assertPrettySkip :: (Pretty a1, Pretty a2) => Maybe a1 -> a2 -> Expectation
-assertPrettySkip maybeSkip1 skip2 = (show . pretty <$> maybeSkip1) `shouldBe` Just (show (pretty skip2))
+assertPrettySkip :: (Pretty a1, Pretty a2) => Either Text a1 -> a2 -> Expectation
+assertPrettySkip maybeSkip1 skip2 = (show . pretty <$> maybeSkip1) `shouldBe` Right (show (pretty skip2))
 
 spec :: Spec
 spec = do
@@ -68,8 +70,7 @@ spec = do
       proveInductively 20 checkerboardSweeper (initBook checkerboardSweeper) checkerboardFalseGoal
       (BoundVar 0) `shouldSatisfy` (has _Left)
     xit "proves a guess for the counter machine" $ 
-      let fromJust (Just x) = x 
-          goal = fromJust $ makeIndGuess 100 weird3 in 
+      let goal = fromJust $ either (const Nothing) Just $ makeIndGuess 100 weird3 in 
         proveInductively 20 weird3 (initBook weird3) goal (BoundVar 0) `shouldBe` Left ("", Nothing)
   describe "replaceVarInSkip" $ do
     it "solves a simple case" $ do
@@ -106,7 +107,7 @@ spec = do
       -- at step 176, F (T, 5) F >F<
       -- at step 366, (T, 6)   F >F<
       --both phase 0
-       makeIndGuess 1000 weird3 `assertPrettySkip` Just (Skip
+       makeIndGuess 1000 weird3 `assertPrettySkip` (Skip
         (Config (Phase 2) [(False, c 1)] False [(True, Count 0 Empty (fromList [(BoundVar 0,Sum 1)])), (False, c 1)])
         (EndMiddle (Config (Phase 2) [] False [(True, Count 1 Empty (fromList [(BoundVar 0,Sum 1)])), (False, c 1)]))
         Empty
@@ -116,7 +117,7 @@ spec = do
       -- at step 15, F >F< (T, 3)
       -- at step 24, >F< (T, 4)
       --both phase 0
-      makeIndGuess 1000 simple_sweeper `assertPrettySkip` Just (Skip
+      makeIndGuess 1000 simple_sweeper `assertPrettySkip` (Skip
         (Config (Phase 0) [(False, c 1)] False [(True, Count 0 Empty (fromList [(BoundVar 0, Sum 1)])), (False, c 1)])
         (EndMiddle (Config (Phase 0) [] False [(True, Count 1 Empty (fromList [(BoundVar 0, Sum 1)])), (False, c 1)]))
         Empty False Zero)
@@ -124,7 +125,7 @@ spec = do
       -- at step 6, F (T, 3) >F< F
       -- at step 15, (T, 5) >F<
       -- both phase 1 
-      makeIndGuess 1000 checkerboardSweeper `assertPrettySkip` Just (Skip
+      makeIndGuess 1000 checkerboardSweeper `assertPrettySkip` (Skip
         (Config (Phase 1)
             [(True, Count 0 Empty (fromList [(BoundVar 0, Sum 1)])), (False, c 1)] False [(False, c 1)])
         (EndMiddle (Config (Phase 1)
@@ -134,3 +135,7 @@ spec = do
   describe "replaceSymbolVarInConfig" $ do 
     it "replaces in a simple example" $ do 
       replaceSymbolVarInConfig True beforeReplace (SymbolVar 0) (FinCount 5) `shouldBe` afterReplace
+  describe "calcCommonSig" $ do 
+    it "works on a real example" $ 
+      calcCommonSig (Signature [False] False [True,False]) (Signature [] False [True,False])
+        `shouldBe` Just (True, False)

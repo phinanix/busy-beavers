@@ -119,7 +119,7 @@ getNewFinPoint  ((b, c) : xs) = if c == finiteCount 1
 expTapeToTape :: ExpTape Bit InfCount -> Tape
 expTapeToTape (ExpTape left point right) = Tape (tapeHalfToBitList left) point (tapeHalfToBitList right) where
 
-tapeHalfToBitList :: [(s, InfCount)] -> [s]
+tapeHalfToBitList :: Partial => [(s, InfCount)] -> [s]
 tapeHalfToBitList = flatten . intify . Unsafe.init  where 
   intify :: [(s, InfCount)] -> [(s, Int)]
   intify = fmap $ fmap infCountToInt
@@ -129,6 +129,7 @@ tapeHalfToBitList = flatten . intify . Unsafe.init  where
 data Signature s = Signature [s] s [s] deriving (Eq, Ord, Show, Generic)
 instance (NFData s) => NFData (Signature s)
 
+instance (Show s, Pretty s) => Pretty (Signature s)
 tapeSignature :: ExpTape s c -> Signature s
 tapeSignature (ExpTape ls p rs) = Signature (fst <$> ls) p  (fst <$> rs)
 

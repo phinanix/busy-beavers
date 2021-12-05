@@ -99,7 +99,7 @@ tnfSignature :: Steps -> Turing -> [Edge]
 tnfSignature n t = ordNub duplicateEdgesList where
   stateList = (\steps -> Simple.simulate steps Simple.initState t) <$> [0.. n]
   getEdge :: Simple.SimResult -> Maybe Edge
-  getEdge (Simple.Continue (phase, _, Simple.Tape _ point _)) = Just $ (phase, point)
+  getEdge (Simple.Continue (phase, _, Simple.Tape _ point _)) = Just (phase, point)
   getEdge _ = Nothing
   duplicateEdgesList = (Phase 0, False) : mapMaybe getEdge stateList
 

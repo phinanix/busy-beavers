@@ -255,7 +255,8 @@ glueSkips (Skip startConfig middleSkipEnd c b d) (Skip middleConfig endSkipEnd c
                 (c <> c') 
                 b'
                 (glueDisplacements d d') 
-              
+
+-- TODO I think this is like wrong or broken somehow >>  
 skipGoesForever :: forall s. (Eq s, Show s) => Skip Count s -> Bool 
 skipGoesForever skip = has _Right (glueSkips skip skip) 
 

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 25d201e64bb6cbc05adde8c35a3a5451c8e7f005c2eb59dc7cf4bb9c2b018b33
+-- hash: 7acc5435794fbc3830f2ef6fe72b90a6e5864a44c2c34fd2faae0b949f0ade8d
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -65,6 +65,7 @@ library
     , monoidal-containers
     , mtl
     , prettyprinter
+    , quickcheck-instances
     , relude
     , safe
     , text
