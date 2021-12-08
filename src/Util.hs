@@ -38,6 +38,12 @@ fromJust :: Partial => Maybe a -> a
 fromJust (Just a) = a 
 fromJust Nothing = error "unsafe"
 
+fromLeft :: Partial => Either a b -> a 
+fromLeft (Left a) = a 
+
+fromRight :: Partial => Either a b -> b 
+fromRight (Right b) = b 
+
 unsafeFromLeft :: Partial => Either a b -> a
 unsafeFromLeft (Left a) = a
 unsafeFromLeft (Right _) = error "unsafe"
@@ -74,3 +80,7 @@ showP = show . pretty
 
 failMsg :: Text -> Maybe a -> Either Text a 
 failMsg t = maybe (Left t) Right
+
+guardMsg :: Bool -> Text -> Either Text () 
+guardMsg b msg = if not b then Left msg else Right () 
+

@@ -2,7 +2,7 @@ module Induction where
 
 import Relude
 import Control.Lens
-import Data.Map.Monoidal (assocs)
+import Data.Map.Monoidal (assocs, keysSet)
 import qualified Data.Map as M
 import qualified Data.Text as T (concat, intercalate)
 import qualified Data.Set as S
@@ -737,3 +737,63 @@ generalizeFromInfCounts xs = infinityUnit <|> notInfinityCountPair where
     packageResult :: Either () (Count, Count) -> (InfCount, InfCount)
     packageResult (Left ()) = (Infinity, Infinity)
     packageResult (Right tup) = bimapBoth NotInfinity tup
+
+varNotUsedInSkip :: Skip Count s -> BoundVar 
+varNotUsedInSkip skip = case S.lookupMax allInts of 
+  Nothing -> BoundVar 0
+  Just x -> BoundVar (x + 1)
+  where 
+  allInts = S.map getBoundVar allUsedVars 
+  allUsedVars = bifoldMap countUsedVars (const mempty) skip 
+  countUsedVars (Count _n _as xs) = keysSet xs 
+
+chainArbitrary :: forall s. (Eq s, Pretty s) => Skip Count s -> Either Text (Skip Count s)
+chainArbitrary skip@(Skip start end steps halts disp) = case end of 
+  EndSide _ph _dir _xs -> Left "endside" --TODO we can probably handle this
+  EndMiddle endConfig -> do 
+    (newStart, newEnd) <- matchConfigs start endConfig 
+    pure (Skip newStart (EndMiddle newEnd) Empty False Zero) --TODO handle steps obviously
+  where 
+  newVar :: BoundVar 
+  newVar = varNotUsedInSkip skip 
+  matchConfigs :: Config Count s -> Config Count s -> Either Text (Config Count s, Config Count s)
+  matchConfigs c1@(Config ph ls p rs) c2@(Config ph2 xs q ys) = do 
+    let rom = showP c1 <> " " <> showP c2 
+    guardMsg (ph == ph2 && p == q) $ "phases or points not equal: " <> rom 
+    (newLs, newXs) <- matchLists ls xs 
+    (newRs, newYs) <- matchLists rs ys
+    pure (Config ph newLs p newRs, Config ph newXs p newYs)
+  matchLists :: [(s, Count)] -> [(s, Count)] -> Either Text ([(s, Count)], [(s, Count)])
+  matchLists xs ys = do 
+    --maybeRes :: Either Text [((s, Count), (s, Count))]
+    maybeRes <- traverse (uncurry matchPairs) (zip xs ys) --zip discards longer 
+    let leftover = case remainingLonger xs ys of 
+          Left xs_left -> Start xs_left
+          Right ys_left -> End ys_left
+    applyLeftover (unzip maybeRes, leftover) 
+  applyLeftover :: (([(s, Count)], [(s, Count)]), Leftover s) -> Either Text ([(s, Count)], [(s, Count)])
+  applyLeftover ((starts, ends), lo) = case lo of 
+    Start [] -> Right (starts, ends) 
+    End [] -> Right (starts, ends)
+    Start [(s, FinCount n)] -> Right (starts ++ [(s, boundVarCount newVar n)], ends)
+    End [(s, FinCount n)] -> Right (starts, ends ++ [(s, boundVarCount newVar n)])
+    _ -> Left $ "leftover was not a single finite thing: " <> showP lo 
+  matchPairs :: (s, Count) -> (s, Count) -> Either Text ((s, Count), (s, Count))
+  matchPairs (s, c) (t, d) = do 
+    guardMsg (s == t) "two bits didn't match" 
+    (c', d') <- matchCounts c d 
+    pure ((s, c'), (t, d'))
+  --first one is start, second one is end
+  matchCounts :: Count -> Count -> Either Text (Count, Count)
+  matchCounts c d = let rom = showP c <> " and " <> showP d in -- "rest of message" 
+    if c == d then Right (c,d) else case (c,d) of 
+      --if we have a pair of counts like (x + 2, x + 5), every trip through, we increase the output by 3 (increaseAmt)
+      -- so the total increase is 3 * y, for a "newVar" y, and that is the output below. 
+    (OneVar n as k x, OneVar m bs j y) -> do 
+      guardMsg (x == y) $ "vars didn't match: " <> rom 
+      guardMsg (k == 1 && j == 1) $ "vars weren't both 1: " <> rom
+      increaseAmt <- failMsg "chaining didn't increase" $ subCountFromCount (ZeroVar m bs) (ZeroVar n as) 
+      case increaseAmt of 
+        (FinCount incNat) -> let base =  OneVar n as 1 x in Right (base, base <> boundVarCount newVar incNat)
+        _ -> Left $ "amt of increase was not finite: " <> showP increaseAmt <> "\n" <> rom 
+    _ -> Left $ "couldn't match counts:" <> rom 

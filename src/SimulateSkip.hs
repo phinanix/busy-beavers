@@ -41,7 +41,7 @@ type SkipBook s = Map (Phase,  s) (Map (Skip Count s) (SkipOrigin s))
 --which of these newtypes your history is tracks whether the history is forwards (element 0 is the first thing that happend)
 --or reverse (element 0 is the most recent thing that happened)
 newtype TapeHist s c = TapeHist {_tapeHist :: [(Phase, ExpTape s c)]} deriving (Eq, Ord, Show, Generic, Functor)
-newtype ReverseTapeHist = ReverseTapeHist {_reverseTapeHist :: [(Phase, ExpTape Bit InfCount)]} deriving (Eq, Ord, Show, Generic)
+newtype ReverseTapeHist s c = ReverseTapeHist {_reverseTapeHist :: [(Phase, ExpTape s c)]} deriving (Eq, Ord, Show, Generic, Functor)
 newtype DispHist = DispHist {_dispHist :: [Int]} deriving (Eq, Ord, Show, Generic)
 newtype ReverseDispHist = ReverseDispHist {_reverseDispHist :: [Int]} deriving (Eq, Ord, Show, Generic)
 
@@ -60,7 +60,7 @@ instance Bitraversable TapeHist where
 getTapeHist :: TapeHist s c -> [(Phase, ExpTape s c)]
 getTapeHist = _tapeHist 
 
-getReverseTapeHist :: ReverseTapeHist -> [(Phase, ExpTape Bit InfCount)]
+getReverseTapeHist :: ReverseTapeHist s c -> [(Phase, ExpTape s c)]
 getReverseTapeHist = _reverseTapeHist
 
 getDispHist :: DispHist -> [Int]
@@ -78,7 +78,7 @@ data SimState = SimState
   --the slice that takes you from step 5 to step 13 is index 5 to index 12 inclusive
   , _s_trace :: [Skip Count Bit]
    --a list of the (phase, tape)s seen so far in order
-  , _s_reverse_history :: ReverseTapeHist
+  , _s_reverse_history :: ReverseTapeHist Bit InfCount 
     --a map of the (phase, tape)s seen so far to the step count at which they were seen 
   , _s_history_set :: Map (Phase, ExpTape Bit InfCount) Int
   , _s_counter :: Int --the number of times we have taken a "big step". guaranteed to take on all values between 0 and n

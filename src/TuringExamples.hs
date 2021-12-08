@@ -1,6 +1,6 @@
 module TuringExamples where
 
-import Relude ( IsList(fromList), Bool(True, False) )
+import Relude
 
 import Turing
 import Count
@@ -104,3 +104,8 @@ binaryCounterTFTT = Turing {states = 4, transitions = fromList
   ,((Phase 3,False),Step (Phase 0) True L)
   ,((Phase 3,True),Step (Phase 2) True L)
   ]}
+
+--I think this fails to be self glued basically because it assumes that x_0 is the same as x_0 in a different skip 
+--which is kind of nonsense
+thingWhichShouldBeSelfGlued :: Skip Count Bit 
+thingWhichShouldBeSelfGlued = Skip {_start = Config {_cstate = (Phase 2), _ls = [(False,Count 1 (fromList []) (fromList []))], _c_point = False, _rs = [(True,Count 0 (fromList []) (fromList [(BoundVar 0,Sum {getSum = 1})])),(False,Count 1 (fromList []) (fromList []))]}, _end = EndMiddle (Config {_cstate = (Phase 2), _ls = [], _c_point = False, _rs = [(True,Count 1 (fromList []) (fromList [(BoundVar 0,Sum {getSum = 1})])),(False,Count 1 (fromList []) (fromList []))]}), _hops = Count 0 (fromList []) (fromList []), _halts = False, _displacement = Zero} 

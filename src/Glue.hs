@@ -11,6 +11,7 @@ import Count
 import Skip hiding (HeadMatch(..))
 import ExpTape
 import Turing
+import Prettyprinter
 
 
 
@@ -54,7 +55,7 @@ glueCounts c d = case likeTerms c d of
         pure $ likes <> ZeroVar n as <> ZeroVar m bs 
            <> OneVar 0 Empty (lcm j k) undefined --this needs to be a new variable
   -- TODO :: emit a warning here?
-  _ -> fail "one side had more than one var" 
+  _ -> fail $ "one side had more than one var. gluing: " <> showP c <> " and " <> showP d <> "\ntriple was\n" <> showP (likeTerms c d)
 
 --returns the part of the longer list that is not matched up via zip, 
 --ie returns the longer list with the first (length shortlist) elements dropped 
@@ -91,6 +92,11 @@ data Tails s = Tails [(s, Count)] [(s, Count)] deriving (Eq, Ord, Show)
 --whether you add the list to the start of the skip or you add it to the end of the skip
 data Leftover s = Start [(s, Count)] | End [(s, Count)] deriving (Eq, Ord, Show)
 
+instance (Pretty s) => (Pretty (Leftover s)) where 
+  pretty = \case 
+    Start xs -> "start " <> pretty xs
+    End xs -> "end " <> pretty xs 
+    
 leftoverTails :: (Leftover s, Leftover s) -> (Tails s, Tails s) 
 leftoverTails (ls, rs) 
   = (Tails (getStart ls) (getStart rs), Tails (getEnd ls) (getEnd rs)) 
