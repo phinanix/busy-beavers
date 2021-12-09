@@ -121,6 +121,11 @@ resConfig = lens get set where
   set (Skipped hops _oldPh _oldTape oldDisp) config = Skipped hops newPh newTape oldDisp where 
     (newPh, newTape) = configToET config
 
+--TODO this can be generalized, it would need the exptape instance to be generalized too
+instance Pretty (SkipResult Bit InfCount) where 
+  pretty (Skipped hops phase tape disp) = "took " <> pretty hops <> " disp " <> pretty disp <> " ending in:\n" 
+    <> pretty phase <> " tape: " <> pretty tape 
+
 initExpTape :: s -> ExpTape s InfCount
 initExpTape s = ExpTape [(s, Infinity)] s [(s, Infinity)]
 

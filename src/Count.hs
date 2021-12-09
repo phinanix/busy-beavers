@@ -135,6 +135,9 @@ dispInfCount :: InfCount -> Text
 dispInfCount Infinity = "inf"
 dispInfCount (NotInfinity c) = dispCount c
 
+instance Pretty InfCount where 
+  pretty = pretty . dispInfCount 
+
 infCountToInt :: InfCount -> Int
 infCountToInt Infinity = error "infinity isn't an int"
 infCountToInt (NotInfinity (Count m Empty Empty)) = fromIntegral m

@@ -64,6 +64,12 @@ dispToInt = \case
   BothDirs (NotInfinity (FinCount n)) (NotInfinity (FinCount m)) -> fromIntegral m - fromIntegral n
   other -> error $ "couldn't convert " <> show other <> " to an int"
 
+instance (Pretty c) => Pretty (Displacement c) where 
+  pretty = \case 
+    Zero -> "d Zero"
+    OneDir dir c -> show dir <> " " <> pretty c 
+    BothDirs c c' -> "left " <> pretty c <> " and right " <> pretty c'
+
 data Skip c s = Skip
   { _start :: Config c s
   , _end :: SkipEnd c s

@@ -84,3 +84,7 @@ failMsg t = maybe (Left t) Right
 guardMsg :: Bool -> Text -> Either Text () 
 guardMsg b msg = if not b then Left msg else Right () 
 
+instance (Pretty a, Pretty b) => Pretty (Either a b) where 
+    pretty = \case      
+      Left a -> "Left: " <> pretty a 
+      Right b -> "Right: " <> pretty b 

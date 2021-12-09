@@ -58,7 +58,7 @@ Shortrange plan to get a thing which can prove the counter machine into main
 --we always return the new book
 --we return either a haltproof, or a text saying how we failed
 proveInductivelyIMeanIT :: Turing -> SkipBook Bit -> Steps -> TapeHist Bit InfCount -> DispHist
-    -> (SkipBook Bit, Either Text HaltProof)
+    -> (SkipBook Bit, Either Text (Skip Count Bit))
 proveInductivelyIMeanIT machine book curStep hist dispHist
   = case guessInductionHypothesis hist dispHist of
     Left msg -> (book, Left $ "failed to guessIndHyp:\n" <> msg)
@@ -66,10 +66,7 @@ proveInductivelyIMeanIT machine book curStep hist dispHist
       case tOrOrigin of
         Left msg -> (newBook, Left $ "couldn't prove indHyp, which was:\n" <> showP indHyp <> "\nbecause:\n" <> msg)
         Right origin -> let finalBook = addSkipToBook indHyp origin newBook
-                            mbProof = if skipGoesForever indHyp
-                              then Right $ SkippedToInfinity curStep indHyp
-                              else Left $ "indhyp doesn't go forever:\n" <> show (pretty indHyp)
-         in (finalBook, mbProof)
+         in (finalBook, Right indHyp)
 
 
 --the function that does most of the work alternates two functions:

@@ -91,10 +91,14 @@ liftModifyStateMulti :: (SimState -> SimState) -> SimMultiAction
 liftModifyStateMulti = liftOneToMulti . liftModifyState
 
 runIfCond :: (SimState -> Bool) -> SimOneAction -> SimOneAction
-runIfCond cond act machine state = if cond state then act machine state else pure state
+runIfCond cond act machine state = if cond state 
+  then act machine state 
+  else pure state
 
 runAtCount :: Int -> SimOneAction -> SimOneAction
-runAtCount n = runIfCond (\state -> state ^. s_counter == n)
+runAtCount n = runIfCond (\state -> 
+  --trace ("goal:" <> show n <> " actual: " <> show (state ^. s_counter))
+  (state ^. s_counter == n))
 
 addSkipToStateOrInf :: Skip Count Bit -> SkipOrigin Bit -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
 addSkipToStateOrInf skip origin state = if skipGoesForever skip && skipAppliedInHist skip (state ^. s_history)
@@ -103,15 +107,16 @@ addSkipToStateOrInf skip origin state = if skipGoesForever skip && skipAppliedIn
 
 --this is pretty copied from "simulateOneMachine"
 simulateStepTotalLoop :: Int -> Turing -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
-simulateStepTotalLoop limit machine (SimState ph tape book steps trace hist histSet counter curDisp dispHist) = if steps > limit
+simulateStepTotalLoop limit machine (SimState ph tape book steps skipTrace hist histSet counter curDisp dispHist) = if steps > limit
   then Left $ Continue steps ph tape curDisp
-  else case skipStep machine book ph tape of
+  else --trace ("counter:" <> show counter) $ 
+  case skipStep machine book ph tape of
   Unknown e -> error $ "edge undefined" <> show e
   MachineStuck -> Left MachineStuckRes
   Stopped c newTape _skipUsed newDisp -> Left $ Halted (steps + infCountToInt c) newTape (curDisp + dispToInt newDisp)
   Stepped c newPh newTape skipUsed newDisp -> case c of
     Infinity -> Left $ ContinueForever (SkippedToInfinity steps skipUsed)
-    c -> Right $ SimState newPh newTape book (steps + infCountToInt c) (skipUsed : trace)
+    c -> Right $ SimState newPh newTape book (steps + infCountToInt c) (skipUsed : skipTrace)
       hist histSet (counter + 1) (curDisp + dispToInt newDisp) dispHist
 
 --this is pretty copied from "simulateOneMachine"
@@ -158,6 +163,23 @@ checkSeenBefore _machine state = case state ^. s_history_set . at histEnt of
 skipAppliedInHist :: Skip Count Bit -> TapeHist Bit InfCount -> Bool
 skipAppliedInHist skip hist = any (has _Just) $ applySkip skip <$> getTapeHist hist
 
+--checks whether we've put an infinity in some place on the tape that is not the two ends
+--this is a hacky workaround to fix the fact that we currently don't know how to tell how 
+--many steps an induction takes since it is an alternate way to tell whether a skip goes 
+--forever 
+tapePostInfinity :: ExpTape s InfCount -> Bool 
+tapePostInfinity (ExpTape ls _p rs) = elem Infinity cs where 
+  cs = snd <$> Unsafe.init ls ++ Unsafe.init rs
+
+skipAppliesForeverInHist :: Skip Count Bit -> TapeHist Bit InfCount -> Either Text HaltProof
+skipAppliesForeverInHist skip hist = case forevers of 
+  [] -> Left "did not apply forever"
+  (idx, _res) : _xs -> Right $ SkippedToInfinity idx skip 
+  where 
+  apps = let ans = mapMaybe (\(i, entry) -> (i,) <$> applySkip skip entry) (zip [0,1 ..] $ getTapeHist hist) in 
+    trace ("apps len " <> show (length ans)) ans 
+  forevers = filter (\(_i, res) -> trace ("skipRes" <> showP (res)) $ 
+    view hopsTaken res == Infinity || tapePostInfinity (view newTape res)) apps 
 {-
 A thing I need to be very careful about is the interaction between EndOfTape proof and the skipping parts of evaluation
 If we skip over part of the evaluation that involves the maximum inward displacement, then we could assume we had a 
