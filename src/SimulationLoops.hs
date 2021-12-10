@@ -21,6 +21,7 @@ import Util
 import Control.Exception (assert)
 import Relude.Unsafe ((!!))
 import Display
+import Safe.Partial
 
 
 type SimOneAction = Turing -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
@@ -61,8 +62,8 @@ simOneFromStartLoop :: NonEmpty SimOneAction -> Turing -> OneLoopRes
 simOneFromStartLoop updateFuncs startMachine 
   = simulateOneMachineOuterLoop updateFuncs startMachine (initSkipState startMachine) 
 
-simulateManyMachinesOuterLoop :: NonEmpty SimMultiAction -> Turing -> [(Turing, SimResult (ExpTape Bit InfCount))]
-simulateManyMachinesOuterLoop updateFuncs startMachine = loop (startMachine, startState) [] [] where
+simulateManyMachinesOuterLoop :: (Turing -> Maybe HaltProof) -> NonEmpty SimMultiAction -> Turing -> [(Turing, SimResult (ExpTape Bit InfCount))]
+simulateManyMachinesOuterLoop staticAnal updateFuncs startMachine = loop (startMachine, startState) [] [] where
   startState :: SimState
   startState = initSkipState startMachine
   bigUpdateFunc :: Turing -> SimState -> MultiResult SimState
@@ -72,7 +73,15 @@ simulateManyMachinesOuterLoop updateFuncs startMachine = loop (startMachine, sta
   loop cur@(curMachine, curState) todo !prevRes = case uncurry bigUpdateFunc cur of
     NewState newState -> loop (curMachine, newState) todo prevRes
     Result result -> recurse todo ((curMachine, result) : prevRes)
-    UnknownEdge e -> recurse ((makeNewState e curState <$> branchOnEdge e curMachine) <> todo) prevRes
+    UnknownEdge e -> let 
+        candidateMachines = branchOnEdge e curMachine
+        mbProofs = staticAnal <$> candidateMachines
+        makeRes m = \case 
+          Nothing -> Left m 
+          (Just hp) -> Right (m, ContinueForever hp)
+        (newMachines, reses) = partitionEithers $ uncurry makeRes <$> zip candidateMachines mbProofs 
+      in
+        recurse ((makeNewState e curState <$> newMachines) <> todo) (reses <> prevRes)
   makeNewState :: Edge -> SimState -> Turing -> (Turing, SimState)
   makeNewState edge state machine = (machine, state & s_book %~ updateBook edge machine)
   recurse :: [(Turing, SimState)] -> [(Turing, SimResult (ExpTape Bit InfCount))] -> [(Turing, SimResult (ExpTape Bit InfCount))]
@@ -105,19 +114,30 @@ addSkipToStateOrInf skip origin state = if skipGoesForever skip && skipAppliedIn
   then Left (ContinueForever (SkippedToInfinity (state ^. s_steps) skip))
   else Right $ state & s_book %~ addSkipToBook skip origin
 
---this is pretty copied from "simulateOneMachine"
-simulateStepTotalLoop :: Int -> Turing -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
-simulateStepTotalLoop limit machine (SimState ph tape book steps skipTrace hist histSet counter curDisp dispHist) = if steps > limit
+--this is something for simulating one machine where you tell me how to handle an unknown edge
+--and I do that
+simulateStepOneMachine :: Partial => (Edge -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState) 
+  -> Int -> Turing -> SimState 
+  -> Either (SimResult (ExpTape Bit InfCount)) SimState
+simulateStepOneMachine handleUnknown limit machine state@(SimState ph tape book steps skipTrace hist histSet counter curDisp dispHist) = if steps > limit
   then Left $ Continue steps ph tape curDisp
   else --trace ("counter:" <> show counter) $ 
   case skipStep machine book ph tape of
-  Unknown e -> error $ "edge undefined" <> show e
+  Unknown e -> handleUnknown e state 
   MachineStuck -> Left MachineStuckRes
   Stopped c newTape _skipUsed newDisp -> Left $ Halted (steps + infCountToInt c) newTape (curDisp + dispToInt newDisp)
   Stepped c newPh newTape skipUsed newDisp -> case c of
     Infinity -> Left $ ContinueForever (SkippedToInfinity steps skipUsed)
     c -> Right $ SimState newPh newTape book (steps + infCountToInt c) (skipUsed : skipTrace)
       hist histSet (counter + 1) (curDisp + dispToInt newDisp) dispHist
+
+--this one essentially asserts there is no unknown edge, or otherwise crashes
+simulateStepTotalLoop :: Partial => Int -> Turing -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
+simulateStepTotalLoop = simulateStepOneMachine (\e _state -> error $ "edge undefined" <> show e)
+
+simulateStepUntilUnknown :: Partial => Int -> Turing -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
+simulateStepUntilUnknown = simulateStepOneMachine handle where 
+  handle _e state = Left $ Continue (state ^. s_steps) (state ^. s_phase) (state ^. s_tape) (state ^. s_displacement)
 
 --this is pretty copied from "simulateOneMachine"
 simulateStepPartial :: Int -> SimMultiAction
@@ -253,7 +273,7 @@ loopSimulateSkip :: Int -> Turing -> OneLoopRes
 loopSimulateSkip limit = simOneFromStartLoop $ pure $ simulateStepTotalLoop limit
 
 simulateManyBasicLoop :: Int -> Turing -> [_]
-simulateManyBasicLoop limit = simulateManyMachinesOuterLoop $ simulateStepPartial limit
+simulateManyBasicLoop limit = simulateManyMachinesOuterLoop (const Nothing) $ simulateStepPartial limit
   :| (liftOneToMulti <$> [checkSeenBefore, liftModifyState recordHist, liftModifyState recordDispHist,
   runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof,
   runIfCond (atRightOfTape . view s_tape) attemptOtherEndOfTapeProof
@@ -263,9 +283,9 @@ loopForEndOfTapeGlue :: Int -> Turing -> OneLoopRes
 loopForEndOfTapeGlue limit = simOneFromStartLoop $
     simulateStepTotalLoop limit :| [liftModifyState recordHist, liftModifyState recordDispHist, runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof]
 
-simulateForTime :: Int -> Turing -> OneLoopRes
+simulateForTime :: Partial => Int -> Turing -> OneLoopRes
 simulateForTime time = simOneFromStartLoop actionList where
   actionList = simulateStepTotalLoop (time + 1) :| [liftModifyState recordHist, liftModifyState recordDispHist]
 
-getStateAfterTime :: Int -> Turing -> SimState
+getStateAfterTime :: Partial => Int -> Turing -> SimState
 getStateAfterTime time turing = last $ simulateForTime time turing ^. _2

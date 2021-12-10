@@ -307,7 +307,8 @@ showTapePhaseList :: [(Phase, ExpTape Bit InfCount)] -> String
 showTapePhaseList tapes = toString $ T.concat $ (\(p, x) -> dispPhase p <> " " <> dispExpTapeIC x <> "\n") <$> tapes
 
 possibleSignatures :: [(Phase, ExpTape Bit InfCount)] -> [(Phase, Signature Bit)]
-possibleSignatures hist = filter (\s -> sigFreqs ^?! ix s >= 3) tapeSignatures where
+possibleSignatures hist = filter (\s -> --let msg = ("ixing: " <> showP s <> "\n in map:\n" <> show (sigFreqs)) in trace msg $
+  sigFreqs ^?! ix s >= 3) tapeSignatures where
     tapeSignatures :: [(Phase, Signature Bit)]
     tapeSignatures = tapeSignature <$$> hist
     sigFreqs :: Map (Phase, Signature Bit) Int
@@ -320,8 +321,10 @@ simplestNSigs n hist = take (fromIntegral n) $
 
 --given a history, guesses a "critical configuration" 
 -- a simple tape appearance the machine repeatedly returns to
-guessCriticalConfiguration :: [(Phase, ExpTape Bit InfCount)] -> (Phase, Signature Bit)
-guessCriticalConfiguration = minimumBy (compare `on` signatureComplexity . snd) . possibleSignatures
+guessCriticalConfiguration :: [(Phase, ExpTape Bit InfCount)] -> Either Text (Phase, Signature Bit)
+guessCriticalConfiguration hist = case possibleSignatures hist of 
+  [] -> Left "no possible criticalconfigs"
+  xs -> Right $ minimumBy (compare `on` signatureComplexity . snd) xs
 
 -- given a particular config, return the list of times that config occurred, plus the integer position in the original list
 obtainConfigIndices :: [(Phase, ExpTape Bit InfCount)] -> (Phase, Signature Bit)
@@ -401,8 +404,8 @@ generalizeFromExamples slicePairs = undefined
 
 guessInductionHypothesis :: TapeHist Bit InfCount -> DispHist -> Either Text (Skip Count Bit)
 guessInductionHypothesis (TapeHist hist) (DispHist disps) = do
+  criticalConfig@(criticalPhase, _criticalSignature) <- guessCriticalConfiguration hist
   let
-    criticalConfig@(criticalPhase, _criticalSignature) = guessCriticalConfiguration hist
     configIndicesAndConfigs = obtainConfigIndices hist criticalConfig
     configIndices = showOnEval $ fst <$> configIndicesAndConfigs
     indexPairs = zipExact (U.init configIndices) (U.tail configIndices)
@@ -475,12 +478,12 @@ zipSigToET sig@(Signature b_ls p b_rs) pair@(c_ls, c_rs) = let
 
 --gets the simulation history and the displacement history
 --normally these are output backwards which is of course crazy so we fix them here 
-simForStepNumFromConfig :: Int -> Turing -> Config Count Bit -> (TapeHist Bit Count, DispHist)
+simForStepNumFromConfig :: Partial => Int -> Turing -> Config Count Bit -> (TapeHist Bit Count, DispHist)
 simForStepNumFromConfig limit machine startConfig
     = (second deInfCount $ finalState ^. s_history, finalState ^. s_disp_history)
     where
     (startPh, startTape) = second (second NotInfinity) $ configToET startConfig
-    actionList = simulateStepTotalLoop limit :| [liftModifyState recordHist, liftModifyState recordDispHist]
+    actionList = simulateStepUntilUnknown limit :| [liftModifyState recordHist, liftModifyState recordDispHist]
     res = simulateOneMachineOuterLoop actionList machine (skipStateFromPhTape machine startPh startTape)
     finalState = last $ snd res
 

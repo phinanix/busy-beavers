@@ -164,7 +164,7 @@ simProgram display results = do
 
 main :: IO ()
 main = do
-  let results = Simulate.simulate 1000 $ startMachine1 5
+  let results = Simulate.simulate 200 $ startMachine1 4
   simProgram dispTape results
   
   -- let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] =  simulateManyBasicLoop 40 $ startMachine1 3

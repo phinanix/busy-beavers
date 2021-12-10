@@ -13,7 +13,7 @@ import Skip
 
 
 -- the type var here is the type of tape 
-data SimResult a = Halted Steps a Int --these two ints are the total displacement
+data SimResult a = Halted Steps a Int --this is steps taken and int is the total displacement
                | Continue Steps Phase a Int 
                | ContinueForever HaltProof
                | MachineStuckRes

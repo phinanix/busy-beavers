@@ -15,6 +15,7 @@ import Control.Exception (assert)
 import Induction 
 import SimulationLoops
 import Util
+import HaltProof
 
 attemptInductionGuess :: Turing -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
 attemptInductionGuess machine state = case guessInductionHypothesis hist dispHist of
@@ -73,7 +74,7 @@ indProveLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
   ]
 
 indProveLoopMany :: Int -> Turing -> [_]
-indProveLoopMany limit = simulateManyMachinesOuterLoop $ simulateStepPartial limit
+indProveLoopMany limit = simulateManyMachinesOuterLoop backwardSearch $ simulateStepPartial limit
   :| (liftOneToMulti <$> [checkSeenBefore, liftModifyState recordHist, liftModifyState recordDispHist,
   runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof,
   runIfCond (atRightOfTape . view s_tape) attemptOtherEndOfTapeProof,
