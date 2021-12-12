@@ -18,6 +18,7 @@ import Simulate
 import SimulateSkip
 import Display
 import SimulationLoops (simulateManyBasicLoop)
+import MoreSimulationLoops
 
 -- num = finiteCount
 --
@@ -164,11 +165,11 @@ simProgram display results = do
 
 main :: IO ()
 main = do
-  let results = Simulate.simulate 200 $ startMachine1 4
-  simProgram dispTape results
+  -- let results = Simulate.simulate 100 $ startMachine1 4
+  -- simProgram dispTape results
   
-  -- let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] =  simulateManyBasicLoop 40 $ startMachine1 3
-  -- simProgram dispExpTape $ foldr (uncurry addResult) Empty resultList 
+  let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] =  indProveLoopMany 200 $ startMachine1 4
+  simProgram dispExpTapeIC $ foldr (uncurry addResult) Empty resultList 
 
   -- let skipResults = simulateWithSkips 1000 $ startMachine1 5
   -- simProgram dispExpTape skipResults

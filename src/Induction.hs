@@ -286,9 +286,6 @@ bifoldMapBoth f = bifoldMap f f
 bitraverseBoth :: (Bitraversable p, Applicative f) => (a -> f b) -> p a a -> f (p b b)
 bitraverseBoth f = bitraverse f f
 
-list1AllEqual :: (Ord a) => NonEmpty a -> Bool
-list1AllEqual (x :| rest) = all (== x) rest
-
 boolToMaybe :: Bool -> Maybe ()
 boolToMaybe True = Just ()
 boolToMaybe False = Nothing
@@ -560,28 +557,22 @@ guessWhatHappensNext machine startConfig varToGeneralize
         finalPhases = view (_2 . _1) <$> finalIndexAndConfig
         finalPhase :: Maybe Phase
         finalPhase = guard (list1AllEqual finalPhases) $> head finalPhases
-        slicedPairs :: NonEmpty (ExpTape Bit Count, ExpTape Bit Count)
-        slicedPairs = let
-          ans = (\(i, (hist, disps)) -> getSlicePairC hist disps 0 i) <$>
-            neZipExact finalIndices simsAtNums
-          msg = "slicedPairs were:\n" <> show (pretty ans)
-          in
-          -- trace msg 
-            ans
-        countLists :: NonEmpty (([Count], [Count]), ([Count], [Count]))
-        countLists = fmap (bimapBoth getCounts) slicedPairs
-        flippedCountLists = transposeOverTwoPairs countLists 
+        --the problem is these slicedpairs may not all have the same signature as the original thing 
+        --which we are trying to generalize
         --generalizes against the numsToSimulateAt from above 
         --the outer maybe is in case we fail. the inner maybe is because sometimes we don't generalize against the simnum at all, 
         --in which case the simnum is irrelevant 
-        generalizeCL :: NonEmpty Count -> Maybe (Maybe Count, Count)
+        generalizeCL :: Partial => NonEmpty Count -> Maybe (Maybe Count, Count)
         generalizeCL cl = if list1AllEqual cl
             then Just (Nothing, head cl)
             --the problem with discarding the fst element of this pair, is that if you generalize (3,1) (4,2), then the first
             --the pair is (x + 2, x), but by discarding the first element, you're implcitly assuming it's x, more-or-less, so 
             --that ends up not working 
             else let 
-              ans = first pure <$> generalizeFromCounts (neZipExact (FinCount <$> numsToSimulateAt) cl)
+              f = (FinCount <$> numsToSimulateAt) 
+              s = cl
+              m1 = "zipping:" <> showP f <> " " <> showP s
+              ans = trace m1 $ first pure <$> generalizeFromCounts (neZipExact f s)
               msg = "generalized:" <> show (pretty cl) <> "\ngot\n" <> show (pretty ans)
             in 
               -- trace msg 
@@ -599,7 +590,21 @@ guessWhatHappensNext machine startConfig varToGeneralize
         bigMap = bimapBoth . bimapBoth . fmap
         --transposedCountLists = bitraverseBoth (bitraverseBoth (traverse generalizeCL)) flippedCountLists
         res = do
-            countPairLists <- bigTraverse generalizeCL flippedCountLists
+            let slicedPairs :: NonEmpty (ExpTape Bit Count, ExpTape Bit Count)
+                slicedPairs = let
+                  ans = (\(i, (hist, disps)) -> getSlicePairC hist disps 0 i) <$>
+                    neZipExact finalIndices simsAtNums
+                  msg = "slicedPairs were:\n" <> show (pretty ans)
+                  in
+                  trace msg 
+                    ans
+                countLists :: NonEmpty (([Count], [Count]), ([Count], [Count]))
+                countLists = fmap (bimapBoth getCounts) slicedPairs
+                flippedCountLists = transposeOverTwoPairs countLists 
+            --after you slice them, they may no longer all be the same signature
+            --for now, lets just assume they are
+            guard $ list1AllEqual $ fmap (bimapBoth tapeSignature) slicedPairs
+            countPairLists <- trace ("flipcountls" <> showP flippedCountLists) bigTraverse generalizeCL flippedCountLists
             let listOfFirstElements = (bifoldMapBoth . bifoldMapBoth . foldMap) (maybeToList . fst) countPairLists 
                 --todo does this do the right thing
                 maxFirstElt = maximum listOfFirstElements 
@@ -614,8 +619,8 @@ guessWhatHappensNext machine startConfig varToGeneralize
             --todo, we probably shouldn't get the start counts from the aggregator, because that is kind of bad, compared to 
             --getting them from the startConfig. the problem is, we also need to slice the startConfig somehow, and that's 
             --actually quite hard. 
-            --actually not sure this is right on more consideration
-            e_ph <- finalPhase
+            --actually not sure this is right on more consideration            
+            e_ph :: Phase <- finalPhase
             let end_points = point . view (_2 . _2) <$> finalIndexAndConfig
             guard $ list1AllEqual end_points
             let startSignatures = tapeSignature . fst <$> slicedPairs
@@ -674,7 +679,7 @@ generalizeFromCounts xs = force $ allEqualPair <|> additivePair <|> affinePair w
         ans = traverse (bitraverse countToMaybeNat countToMaybeNat) xs
         msg = "attempting to generalize these pairs:\n" <> show ans
      in
-        --trace msg ans
+        trace msg 
         ans
     subNats :: Natural -> Natural -> Int
     subNats = (-) `on` fromIntegral
@@ -711,11 +716,15 @@ generalizeFromCounts xs = force $ allEqualPair <|> additivePair <|> affinePair w
         (_pair :| []) -> Nothing
         --going for x -> m * x + b - we assume m > 0 but b can be any integer
         -- does not handle x -> m * (x + a) + b - but probably could somehow?
+        -- fails on (3,2), (4,1)
         pairs@((x1, y1) :| (x2, y2) : _rest) -> do
-            m <- if y2 >= y1
-                    --TODO :: this crashes if x1 == x2
-                    then (y2 - y1) `maybeDiv` (x2 - x1)
-                    else (y1 - y2) `maybeDiv` (x1 - x2)
+          --the idea here is we're going to subtract x1 from x2, and then divide by it, so it has to be strictly positive
+          --while we're going to subtract y1 from y2 but not divide by it so it just has to be at least 0
+            m <- if (x2 > x1) && (y2 >= y1)
+                then (y2 - y1) `maybeDiv` (x2 - x1)
+                else if (x1 > x2) && (y1 >= y2) 
+                  then (y1 - y2) `maybeDiv` (x1 - x2)
+                  else Nothing 
             let b :: Int = fromIntegral y1 - fromIntegral m * fromIntegral x1
             guard $ all (conformsToAffine m b) pairs
             pure $ generalizeMulDiff m b
