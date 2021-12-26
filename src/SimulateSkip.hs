@@ -44,6 +44,10 @@ newtype TapeHist s c = TapeHist {_tapeHist :: [(Phase, ExpTape s c)]} deriving (
 newtype ReverseTapeHist s c = ReverseTapeHist {_reverseTapeHist :: [(Phase, ExpTape s c)]} deriving (Eq, Ord, Show, Generic, Functor)
 newtype DispHist = DispHist {_dispHist :: [Int]} deriving (Eq, Ord, Show, Generic)
 newtype ReverseDispHist = ReverseDispHist {_reverseDispHist :: [Int]} deriving (Eq, Ord, Show, Generic)
+instance (NFData s, NFData c) => NFData (TapeHist s c)
+instance (NFData s, NFData c) => NFData (ReverseTapeHist s c)
+instance NFData DispHist
+instance NFData ReverseDispHist
 
 instance Bifunctor TapeHist where 
   bimap = bimapDefault 
@@ -85,7 +89,8 @@ data SimState = SimState
   --the total amount of leftward (negative) or rightward (positive) displacement we have done, starting from 0
   , _s_displacement :: Int
   , _s_reverse_disp_history :: ReverseDispHist
-  } deriving (Eq, Ord, Show)
+  } deriving (Eq, Ord, Show, Generic)
+instance NFData SimState
 
 instance (Pretty s) => Pretty (SkipOrigin s) where
   pretty Initial = "an initial skip"

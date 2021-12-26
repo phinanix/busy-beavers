@@ -50,7 +50,8 @@ then we write a function which runs proveInd, if it succeeds uses chainArbitrary
 and then checks whether the skip runs forever
 -}
 proveByInd :: SimOneAction 
-proveByInd machine state = trace "proveByInd" $ case eTProof of 
+proveByInd machine state = force $ trace ("proveByInd on:\n" <> showP machine)
+ $ case eTProof of 
   Left _msg -> Right newState 
   Right hp -> Left $ ContinueForever hp
   where 

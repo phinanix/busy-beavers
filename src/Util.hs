@@ -27,6 +27,10 @@ mfailGuard False = fail
 (<$$>) = fmap . fmap
 infixl 4 <$$>
 
+(<$$$>) :: (Functor f, Functor g, Functor h) => (a -> b) -> f (g (h a)) -> f (g (h b))
+(<$$$>) = fmap . fmap . fmap
+infixl 4 <$$$>
+
 (<**>) :: (Applicative f, Applicative g) => f (g (a -> b)) -> f (g a) -> f (g b)
 (<**>) = liftA2 (liftA2 ($))
 

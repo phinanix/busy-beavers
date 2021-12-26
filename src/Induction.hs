@@ -400,14 +400,16 @@ generalizeFromExamples :: [(ExpTape Bit Count, ExpTape Bit Count)] -> Maybe (Ski
 generalizeFromExamples slicePairs = undefined
 
 guessInductionHypothesis :: TapeHist Bit InfCount -> DispHist -> Either Text (Skip Count Bit)
-guessInductionHypothesis (TapeHist hist) (DispHist disps) = do
+guessInductionHypothesis (TapeHist hist) (DispHist disps) = force $ trace "begin guessIndHyp" $ do
   criticalConfig@(criticalPhase, _criticalSignature) <- guessCriticalConfiguration hist
   let
     configIndicesAndConfigs = obtainConfigIndices hist criticalConfig
-    configIndices = showOnEval $ fst <$> configIndicesAndConfigs
+    configIndices = let ans = fst <$> configIndicesAndConfigs in 
+      trace ("configIndices were: " <> showP ans) ans 
     indexPairs = zipExact (U.init configIndices) (U.tail configIndices)
     slicePairs = uncurry (getSlicePair hist disps) <$> indexPairs
-    allSigs = showOnEval $ fmap (bimapBoth tapeSignature) slicePairs
+    allSigs = let ans = fmap (bimapBoth tapeSignature) slicePairs in 
+      trace ("allsigs were: " <> showP ans) ans
   --only proceed from here if all the pairs have the same signature at both the start and the end
   if allEqual allSigs then Right () else Left "sigs were not all equal"
   --to finish from here, our goal is for each transition start -> end, make a bunch of pairs of counts 
@@ -431,17 +433,21 @@ guessInductionHypothesis (TapeHist hist) (DispHist disps) = do
     -- occurence index that was originally first
     transposePairs :: [([a], [b])] -> ([[a]], [[b]])
     transposePairs pairs = bimap transpose transpose (fst <$> pairs, snd <$> pairs)
-  thingsToGeneralizeList <- failMsg "list was empty" $ bitraverseBoth (traverse nonEmpty) $ transposePairs countPairListList
+  thingsToGeneralizeList <- failMsg "list was empty" $ 
+    bitraverseBoth (traverse nonEmpty) $ transposePairs countPairListList
   --the pair here is over left and right, then the list is over the "signature dimension", and the internal
   --pair is over start -> finish
-  allThingsGeneralized <- failMsg "failed to generalize"  $ bitraverseBoth (traverse generalizeFromCounts) thingsToGeneralizeList
+  allThingsGeneralized <- failMsg "failed to generalize"  $ 
+    bitraverseBoth (traverse generalizeFromCounts) thingsToGeneralizeList
   --we want to pull the pair from start -> finish out to the front, then have the left right pair, then have the 
   --"signature dimension"
   let startCounts = bimapBoth (fmap fst) allThingsGeneralized
       endCounts =  bimapBoth (fmap snd) allThingsGeneralized
       startConfig = combineIntoConfig criticalPhase startCounts startSig
       endConfig = combineIntoConfig criticalPhase endCounts endSig
-  pure $ Skip startConfig (EndMiddle endConfig) Empty False Zero
+      ans = Skip startConfig (EndMiddle endConfig) Empty False Zero
+      msg = "guessed " <> showP ans
+  force $ trace msg $ assert (isSameInAsOut ans) $ pure ans
   --finishing from here is just munging - we have the common signature (almost), we have the common count 
   --pairlists, we just need to assemble them all into the skip of our dreams
   where
@@ -587,7 +593,7 @@ guessWhatHappensNext machine startConfig varToGeneralize
         then discarding the first element, to leave just the second element. 
         -}
         bigTraverse = bitraverseBoth . bitraverseBoth . traverse 
-        bigMap = bimapBoth . bimapBoth . fmap
+        --bigMap = bimapBoth . bimapBoth . fmap
         --transposedCountLists = bitraverseBoth (bitraverseBoth (traverse generalizeCL)) flippedCountLists
         res = do
             let slicedPairs :: NonEmpty (ExpTape Bit Count, ExpTape Bit Count)
@@ -607,15 +613,10 @@ guessWhatHappensNext machine startConfig varToGeneralize
             countPairLists <- trace ("flipcountls" <> showP flippedCountLists) bigTraverse generalizeCL flippedCountLists
             let listOfFirstElements = (bifoldMapBoth . bifoldMapBoth . foldMap) (maybeToList . fst) countPairLists 
                 --todo does this do the right thing
-                maxFirstElt = maximum listOfFirstElements 
-                resPair = \case 
-                  (Nothing, s) -> s
-                  (Just f, s) -> 
-                    --trace ("about to sub" <> showP maxFirstElt <> " " <> showP f <> " also " <> showP s) $
-                    case unsafeSubCountFromCount maxFirstElt f of 
-                    c@(FinCount _n) -> assert (c <> f == maxFirstElt) (c <> s)
-                    notFin -> error $ "subtracted and got a notFin thing: " <> show (pretty notFin)
-                ((s_cls, s_crs), (e_cls, e_crs)) = bigMap resPair countPairLists 
+                maxFirstElt = case listOfFirstElements of 
+                  [] -> error "empty list of first elements"
+                  (x : xs) -> maximum listOfFirstElements 
+            ((s_cls, s_crs), (e_cls, e_crs)) <- bigTraverse (resolveCountPair maxFirstElt) countPairLists 
             --todo, we probably shouldn't get the start counts from the aggregator, because that is kind of bad, compared to 
             --getting them from the startConfig. the problem is, we also need to slice the startConfig somehow, and that's 
             --actually quite hard. 
@@ -629,15 +630,39 @@ guessWhatHappensNext machine startConfig varToGeneralize
             let startSig = head startSignatures
                 endSig = head endSignatures
                 guessedStartConfig = etToConfig (startConfig ^. cstate) $ zipSigToET startSig (s_cls, s_crs)
+                skipOut = Skip
+                  (replaceSymbolVarInConfig False guessedStartConfig varToGeneralize (boundVarCount (BoundVar 0) 1))
+                  -- we have the e_cls and the e_crs, and we have psb which is the final phase 
+                  --and signature we're trying to generalize across, so we just need to write 
+                  -- Signature Bit -> ([Count], [Count]) -> ExpTape Bit Count with zipExact
+                  (EndMiddle $ etToConfig e_ph $ zipSigToET endSig (e_cls, e_crs))
+                  (FinCount 100) False Zero --TODO
+                msg = "guessedWhatsNext " <> showP skipOut 
             assert (endSig `isSubSignatureOf` sigToGeneralize) $
-              pure $ Skip
-                (replaceSymbolVarInConfig False guessedStartConfig varToGeneralize (boundVarCount (BoundVar 0) 1))
-                -- we have the e_cls and the e_crs, and we have psb which is the final phase 
-                --and signature we're trying to generalize across, so we just need to write 
-                -- Signature Bit -> ([Count], [Count]) -> ExpTape Bit Count with zipExact
-                (EndMiddle $ etToConfig e_ph $ zipSigToET endSig (e_cls, e_crs))
-                (FinCount 100) False Zero --TODO
+              force $ trace msg $ assert (isSameInAsOut skipOut) $
+              pure skipOut 
 
+{- We're trying to get the first element of the pair to be target, which will require modifying 
+the second element, which we then return. if the first element is Nothing, it can be whatever and
+thus we can just return the second element. 
+To make the first element be equal to the target, we're going to try to substitute one variable 
+in the first element to be equal to some of the second variable 
+-}
+resolveCountPair :: Count -> (Maybe Count, Count) -> Maybe Count 
+resolveCountPair target = \case
+  (Nothing, s) -> Just s
+  (Just f@(OneVar n as k x), s) -> do
+    let (Count m bs ys) = target --we're casing down here so we're lazy in target
+        (_likes, _rL, remRight) = likeTerms (ZeroVar n as) (ZeroVar m bs)
+    countToMapTo <- (remRight <> Count 0 Empty ys) `divCount` k 
+    let updateMap = one (x, countToMapTo)
+        updatedF = updateCount updateMap f 
+        updatedS = updateCount updateMap s
+        msg = "updated " <> showP (f, s) 
+          <> " to match " <> showP target 
+          <> " getting " <> showP (updatedF, updatedS)
+    trace msg $ assert (updatedF == target) $ pure updatedS
+  (Just f, s) -> if f == target then Just s else error ("failed to resolve: " <> showP (target, f, s))
 
 --skipContainsVar :: Skip Count Bit -> Bool
 thingContainsVar :: (Bifoldable p) => p Count b -> Bool
@@ -710,7 +735,17 @@ generalizeFromCounts xs = force $ allEqualPair <|> additivePair <|> affinePair w
     generalizeMulDiff :: Natural -> Int -> (Count, Count)
     generalizeMulDiff m b =  if b >= 0
         then (newBoundVarBad, m `nTimes` newBoundVarBad <> finiteCount (fromIntegral b))
-        else (newBoundVarBad <> finiteCount (fromIntegral $ -1 * b), m `nTimes` newBoundVarBad)
+        --this is the line we need to change
+        --note: x -> 2x - 1 is not the same as x + 1 -> 2x !!
+        --so given 2x - 1 we compute the smallest multiple of 2 bigger than 1 (1), called toMul
+        -- and then x + toMul is like subtracting 2 * toMul, so we have to add that back on the 
+        --other side, except for the b we are actually supposed to subtract
+        else let 
+          toMul = 1 + fromIntegral (-b) `div` m
+          --do subtraction in int space and then go back to natural space
+          c = fromIntegral (fromIntegral (toMul * m) + b) 
+          in 
+          (newBoundVarBad <> finiteCount toMul, m `nTimes` newBoundVarBad <> finiteCount c)
     affinePair :: Maybe (Count, Count)
     affinePair = naturalPairs >>= \case
         (_pair :| []) -> Nothing

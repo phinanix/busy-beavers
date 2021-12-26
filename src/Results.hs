@@ -17,8 +17,8 @@ data SimResult a = Halted Steps a Int --this is steps taken and int is the total
                | Continue Steps Phase a Int 
                | ContinueForever HaltProof
                | MachineStuckRes
-               deriving (Eq, Ord, Show, Functor)
-
+               deriving (Eq, Ord, Show, Functor, Generic)
+instance (NFData a) => (NFData (SimResult a))
 $(makePrisms ''SimResult)
 
 dispResult :: (a -> Text) -> SimResult a -> Doc ann
