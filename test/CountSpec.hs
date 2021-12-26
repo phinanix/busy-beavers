@@ -7,7 +7,6 @@ import Data.Map.Monoidal (MonoidalMap(..))
 
 import Test.Hspec
 import Test.QuickCheck
-import Control.Exception (evaluate)
 import Test.QuickCheck.Instances
 
 import Count

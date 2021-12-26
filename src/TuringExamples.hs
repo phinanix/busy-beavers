@@ -5,6 +5,7 @@ import Relude
 import Turing
 import Count
 import Skip
+import Test.QuickCheck
 
 --woah, this is a counting machine !!!
 weird3 :: Turing
@@ -109,3 +110,10 @@ binaryCounterTFTT = Turing {states = 4, transitions = fromList
 --which is kind of nonsense
 thingWhichShouldBeSelfGlued :: Skip Count Bit 
 thingWhichShouldBeSelfGlued = Skip {_start = Config {_cstate = (Phase 2), _ls = [(False,Count 1 (fromList []) (fromList []))], _c_point = False, _rs = [(True,Count 0 (fromList []) (fromList [(BoundVar 0,Sum {getSum = 1})])),(False,Count 1 (fromList []) (fromList []))]}, _end = EndMiddle (Config {_cstate = (Phase 2), _ls = [], _c_point = False, _rs = [(True,Count 1 (fromList []) (fromList [(BoundVar 0,Sum {getSum = 1})])),(False,Count 1 (fromList []) (fromList []))]}), _hops = Count 0 (fromList []) (fromList []), _halts = False, _displacement = Zero} 
+
+machineList :: [Turing]
+machineList = [weird3, almostweird3, fullsim_not_halt3, bb3, simple_sweeper, 
+  checkerboardSweeper, goesLeftForever, binaryCounterTFTT]
+
+instance Arbitrary Turing where 
+  arbitrary = elements machineList 

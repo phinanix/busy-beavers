@@ -44,6 +44,7 @@ newtype TapeHist s c = TapeHist {_tapeHist :: [(Phase, ExpTape s c)]} deriving (
 newtype ReverseTapeHist s c = ReverseTapeHist {_reverseTapeHist :: [(Phase, ExpTape s c)]} deriving (Eq, Ord, Show, Generic, Functor)
 newtype DispHist = DispHist {_dispHist :: [Int]} deriving (Eq, Ord, Show, Generic)
 newtype ReverseDispHist = ReverseDispHist {_reverseDispHist :: [Int]} deriving (Eq, Ord, Show, Generic)
+
 instance (NFData s, NFData c) => NFData (TapeHist s c)
 instance (NFData s, NFData c) => NFData (ReverseTapeHist s c)
 instance NFData DispHist
@@ -220,6 +221,7 @@ infiniteSkip (p, b) c R = Skip
 
 initTransSkip :: Edge -> Trans -> Set (Skip Count Bit)
 --we need to modify this skip so that it's halt question is true
+--a halting machine is assumed to write True and go left
 initTransSkip e@(p, _b) Halt = one $ oneStepSkip e p True L & halts .~ True
 initTransSkip e@(p, _b) (Step q c d) | p == q = fromList
   [ oneStepSkip e q c d
