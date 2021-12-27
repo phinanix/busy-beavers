@@ -5,13 +5,10 @@ import qualified Relude.Unsafe as U
 import Control.Lens
 import Data.Char 
 import qualified Data.Text as T
+import Prettyprinter
 
 import Turing
 import Util
-import Count
-import Skip
-import Control.Exception
-
 {-
 The goal of this file is to define functions which convert between in memory 
 Turing machines and a compact, easy to parse string representation. Each 
@@ -98,3 +95,12 @@ notationToMachine inp =
       transes <- toList <$> traverse parseTrans neChunks 
       let map = fromList $ catMaybes $ sequenceA <$> zip (edgesOfLen numPh) transes
       pure $ Turing numPh map
+
+nm :: Text -> Either Text Turing
+nm = notationToMachine
+
+dispTuring :: Turing -> Text
+dispTuring m@(Turing _ transitions) = ifoldMap dispET transitions <> machineToNotation m <> "\n"
+
+instance Pretty Turing where 
+  pretty = pretty . dispTuring 

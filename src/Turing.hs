@@ -73,11 +73,6 @@ dispTrans (Step p b d) = dispPhase p <> " " <> show b <> " " <> show d
 dispET :: Edge -> Trans -> Text
 dispET e t = dispEdge e <> " | " <> dispTrans t <> "\n"
 
-dispTuring :: Turing -> Text
-dispTuring (Turing _ transitions) = ifoldMap dispET transitions
-
-instance Pretty Turing where 
-  pretty = pretty . dispTuring 
   
 --crashes if the Int is not >0, which is true of much of the program
 uniPhase :: Int -> NonEmpty Phase

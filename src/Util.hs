@@ -42,12 +42,6 @@ fromJust :: Partial => Maybe a -> a
 fromJust (Just a) = a 
 fromJust Nothing = error "unsafe"
 
-fromLeft :: Partial => Either a b -> a 
-fromLeft (Left a) = a 
-
-fromRight :: Partial => Either a b -> b 
-fromRight (Right b) = b 
-
 unsafeFromLeft :: Partial => Either a b -> a
 unsafeFromLeft (Left a) = a
 unsafeFromLeft (Right _) = error "unsafe"

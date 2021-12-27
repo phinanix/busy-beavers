@@ -6,7 +6,7 @@ import qualified Data.Text as T
 import Prettyprinter
 
 import Turing
-import Tape
+import Notation 
 import ExpTape
 import Results
 import Skip

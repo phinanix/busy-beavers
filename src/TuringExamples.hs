@@ -6,6 +6,8 @@ import Turing
 import Count
 import Skip
 import Test.QuickCheck
+import Notation
+import Util
 
 --woah, this is a counting machine !!!
 weird3 :: Turing
@@ -106,6 +108,33 @@ binaryCounterTFTT = Turing {states = 4, transitions = fromList
   ,((Phase 3,True),Step (Phase 2) True L)
   ]}
 
+{-
+as written on 27 Dec 2021, this machine broke guessInductionHypothesis 
+it's a mildly complicated but not insane machine which has 4 phases:
+1) scan all the way to the left of the block of trues, add a T to the block (phase 0)
+2) inch your way right across the block of trues, dragging a single false along 
+  with you (phases 0, 1, 3)
+3) either, 
+    arrive on the rightmost True in phase 0 or 1, 
+      in which case don't add anything to the block and go to 1)
+    arrive on the rightmost True in phase 3, in which case do some complicated end effect, 
+      which uses phase 2 (and 0,1,3) and adds 3 T to the block 
+which phase you arrive at the right of the block in presumably depends on some modular 
+fact about the current length of the block
+3T -> P1 
+4T -> P3
+8T -> P3
+12T -> P3
+so actually you are in a cycle after step 22 once the block grows to size 4
+The interesting thing about this machine, is it adds symbols in blocks of 4, but not in a 
+grid-aligned way; if you start out with eg 3 blocks of 4 (12), it adds 4 more trues, but 
+1 on the left and 3 on the right. so dealing with this machine would either have to be 
+somehow not requiring symbols to be grid aligned, or it would require the program to have a 
+"grid shift" operation, which does seem possible to support. 
+-}
+machineBreaksIndGuess :: Turing 
+machineBreaksIndGuess = unsafeFromRight $ nm "TR1TL0FR2TR3TR3___FL0FR0"
+
 --I think this fails to be self glued basically because it assumes that x_0 is the same as x_0 in a different skip 
 --which is kind of nonsense
 thingWhichShouldBeSelfGlued :: Skip Count Bit 
@@ -113,7 +142,7 @@ thingWhichShouldBeSelfGlued = Skip {_start = Config {_cstate = (Phase 2), _ls = 
 
 machineList :: [Turing]
 machineList = [weird3, almostweird3, fullsim_not_halt3, bb3, simple_sweeper, 
-  checkerboardSweeper, goesLeftForever, binaryCounterTFTT]
+  checkerboardSweeper, goesLeftForever, binaryCounterTFTT, machineBreaksIndGuess]
 
 instance Arbitrary Turing where 
   arbitrary = elements machineList 

@@ -9,6 +9,7 @@ import Turing
 import Simple.Tape
 import Simple.Simulate
 import Util
+import Notation 
 
 dispSimState :: SimState -> Text
 dispSimState (phase, steps, tape) = "step: " <> showInt3Wide steps

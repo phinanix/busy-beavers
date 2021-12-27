@@ -2,7 +2,7 @@ module InductionSpec where
 
 import Relude
 import Control.Lens
-import Prettyprinter ( Pretty(pretty) )
+import Prettyprinter
 
 import Test.Hspec
 import Test.QuickCheck
@@ -92,9 +92,14 @@ spec = do
       generalizeFromCounts ((c 5, c 3) :| [(c 10, c 8), (c 4, c 2)])
         `shouldBe` Just (newBoundVar 0 <> finiteCount 2, newBoundVar 0)
     it "generalizes a multiplicative function" $ do -- 3x - 2
+      --3x - 2 is not implemented by (x-2, 3x) !! that is 3x - 6 (eg 5-2 = 3, times 3 = 9 != 13)
+      --(x-1, 3x + 1) should implement this eg 
+      --  5-1 = 4 * 3 + 1 = 13
+      --  10-1 = 9 * 3 + 1 = 28
+      --  2-1 = 1 * 3 + 1 = 4
       generalizeFromCounts ((c 5, c 13) :| [(c 10, c 28), (c 2, c 4)])
-        `shouldBe` Just (newBoundVar 0 <> finiteCount 2, nTimes 3 $ newBoundVar 0)
-    it "fails to generalize when it isn't a pattern" $ do -- 3x - 2
+        `shouldBe` Just (newBoundVar 0 <> finiteCount 1, nTimes 3 (newBoundVar 0) <> finiteCount 1)
+    it "fails to generalize when it isn't a pattern" $ do
       generalizeFromCounts ((c 5, c 13) :| [(c 10, c 42), (c 2, c 4)])
         `shouldBe` Nothing
     it "fails to generalize when the third doesn't match the first two " $ do -- 3x - 2

@@ -3,7 +3,7 @@ module Main where
 import Relude
 
 import Control.Lens
-import Data.Text as T (length)
+import qualified Data.Text as T (length)
 import Data.Text.Read
 import System.IO (hSetBuffering, stdout, BufferMode(..))
 
