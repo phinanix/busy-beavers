@@ -19,6 +19,8 @@ import HaltProof
 import Results
 import Glue
 import Simulate (initSimState)
+import Control.Exception
+import Safe.Partial
 
 
 data PartialStepResult a = Unknown Edge
@@ -138,7 +140,7 @@ initExpTape s = ExpTape [(s, Infinity)] s [(s, Infinity)]
 dispSkipResult :: SkipResult Bit InfCount -> Text
 dispSkipResult (Skipped c p tape disp)
   = "skipped to phase: " <> dispPhase p
-  <> " and tape " <> dispExpTapeIC tape
+  <> " and tape " <> dispExpTape tape
   <> " in " <> dispInfCount c <> " hops\ndisplacement was:" <> show disp
 
 instance (Ord s, Pretty s) => Pretty (SkipBook s) where
@@ -148,26 +150,32 @@ instance (Ord s, Pretty s) => Pretty (SkipBook s) where
               $ assocs skipPile
 
 --returns nothing if the skip is inapplicable, else returns a new tape
-applySkip :: forall s. (Eq s) => Skip Count s -> (Phase, ExpTape s InfCount)
+applySkip :: forall s. (Eq s, Pretty s, Partial) => Skip Count s -> (Phase, ExpTape s InfCount)
   -> Maybe (SkipResult s InfCount)
 applySkip skip@(Skip s _ _ _ _) (p, tape)
   = guard (s^.cstate == p) >> either (const Nothing) Just
-      (packageResult skip =<< runEquations (matchSkipTape skip tape))
+      (packageResult skip tape =<< runEquations (matchSkipTape skip tape))
 
-packageResult :: forall s. (Eq s) => Skip Count s
+packageResult :: forall s. (Eq s, Pretty s, Partial) => Skip Count s
+  -> ExpTape s InfCount
   -> (Map BoundVar InfCount, ([(s, InfCount)], [(s, InfCount)]))
   -> Either Text (SkipResult s InfCount)
-packageResult (Skip _ e hopCount _ displacement) (boundVs, (newLs, newRs)) = (Skipped
+packageResult skip@(Skip _ e hopCount _ displacement) tape (boundVs, (newLs, newRs)) = (Skipped
   (updateCountToInf boundVs hopCount)
   (getSkipEndPhase e)
   <$> getFinalET e (newLs, newRs)) ??
   (simplifyInfDisplacement $ updateCountToInf boundVs <$> displacement)
   where
-    getFinalET :: SkipEnd Count s -> ([(s, InfCount)], [(s, InfCount)]) -> Either Text (ExpTape s InfCount)
-    getFinalET (EndMiddle c) (remLs, remRs) = pure $ ExpTape
-      (finalizeList (c^.ls) `etApp` remLs)
-      (c ^. c_point)
-      (finalizeList (c^.rs) `etApp` remRs)
+    getFinalET :: Partial => SkipEnd Count s -> ([(s, InfCount)], [(s, InfCount)]) -> Either Text (ExpTape s InfCount)
+    getFinalET (EndMiddle c) (remLs, remRs) = let 
+      ans = ExpTape
+        (finalizeList (c^.ls) `etApp` remLs)
+        (c ^. c_point)
+        (finalizeList (c^.rs) `etApp` remRs)
+      assertCond = etSatisfiesInvariant ans
+      msg = "we were applying: " <> showP skip <> "\nto tape:\n" <> showP tape
+      in 
+        (if not assertCond then trace msg else id) assert assertCond (Right ans)
       --TODO, this can fail if you are trying to prove an induction on a finite span of tape
       -- you can also hit this if you try to shift one point to the left but there is a 
       --symbolvar on the tape there 
@@ -278,7 +286,8 @@ getSkipsWhichApply book p tape@(ExpTape _ls bit _rs)
       --too expensive and should be reworked for efficiency later
       skips = lookupSkips (p, bit) book
       appliedSkips = mapMaybe (\s -> (s,) <$> applySkip s (p, tape)) $ toList skips
-      in appliedSkips 
+      msg = "tape: " <> showP tape <> "\nskips which applied:\n" <> showP appliedSkips 
+      in trace msg $ appliedSkips 
 
 pickBestSkip :: [(Skip Count Bit, SkipResult Bit InfCount)] -> PartialStepResult (ExpTape Bit InfCount)
 pickBestSkip = \case 

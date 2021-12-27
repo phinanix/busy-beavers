@@ -161,7 +161,7 @@ initState = (Phase 0, 0, Tape [] False [])
 
 dispStartState :: SimState
 dispStartState = (Phase 0, 0, Tape falses False falses) where
-  falses = take 12 $ repeat False
+  falses = take 18 $ repeat False
 
 simStepWithDir :: Turing -> SimState -> (TotalStepResult, Dir)
 simStepWithDir (Turing _ trans ) (i, steps, (Tape ls bit rs))

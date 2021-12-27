@@ -70,7 +70,7 @@ simulateManyMachinesOuterLoop staticAnal updateFuncs startMachine = loop (startM
   bigUpdateFunc machine = foldl1 (>=>) ((&) machine <$> updateFuncs)
   loop :: (Turing, SimState) -> [(Turing, SimState)]
     -> [(Turing, SimResult (ExpTape Bit InfCount))] -> [(Turing, SimResult (ExpTape Bit InfCount))]
-  loop cur@(curMachine, curState) todo !prevRes = case uncurry bigUpdateFunc cur of
+  loop cur@(curMachine, curState) todo !prevRes = force $ case uncurry bigUpdateFunc cur of
     NewState newState -> loop (curMachine, newState) todo prevRes
     Result result -> recurse todo ((curMachine, result) : prevRes)
     UnknownEdge e -> let 
@@ -140,17 +140,17 @@ simulateStepUntilUnknown = simulateStepOneMachine handle where
   handle _e state = Left $ Continue (state ^. s_steps) (state ^. s_phase) (state ^. s_tape) (state ^. s_displacement)
 
 --this is pretty copied from "simulateOneMachine"
-simulateStepPartial :: Int -> SimMultiAction
-simulateStepPartial limit machine (SimState ph tape book steps trace hist histSet counter curDisp dispHist) = if steps > limit
+simulateStepPartial :: Partial => Int -> SimMultiAction
+simulateStepPartial limit machine (SimState ph tape book steps skipTrace hist histSet counter curDisp dispHist) = if steps > limit
   then Result $ Continue steps ph tape curDisp
-  else case skipStep machine book ph tape of
-  Unknown e -> UnknownEdge e
-  MachineStuck -> error "machinestuck "
-  Stopped c newTape _skipUsed newDisp -> Result $ Halted (steps + infCountToInt c) newTape (curDisp + dispToInt newDisp)
-  Stepped c newPh newTape skipUsed newDisp -> case c of
-    Infinity -> Result $ ContinueForever (SkippedToInfinity steps skipUsed)
-    c -> NewState $ SimState newPh newTape book (steps + infCountToInt c) (skipUsed : trace)
-      hist histSet (counter + 1) (curDisp + dispToInt newDisp) dispHist
+  else trace ("stepping " <> showP machine) $ case skipStep machine book ph tape of
+    Unknown e -> UnknownEdge e
+    MachineStuck -> error "machinestuck "
+    Stopped c newTape _skipUsed newDisp -> Result $ Halted (steps + infCountToInt c) newTape (curDisp + dispToInt newDisp)
+    Stepped c newPh newTape skipUsed newDisp -> case c of
+      Infinity -> Result $ ContinueForever (SkippedToInfinity steps skipUsed)
+      c -> NewState $ SimState newPh newTape book (steps + infCountToInt c) (skipUsed : skipTrace)
+        hist histSet (counter + 1) (curDisp + dispToInt newDisp) dispHist
 
 gluePreviousTwoSkips :: SimState -> SimState
 gluePreviousTwoSkips state = state & s_book .~ newBook where

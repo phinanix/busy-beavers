@@ -16,7 +16,7 @@ instance Show Phase where
   show (Phase i) = "(Phase " <> show i <> ")"
 
 data Dir = L | R deriving (Eq, Ord, Show, Generic)
-type Bit = Bool
+type Bit = Bool --deriving (Eq, Ord, Show, Generic)
 type Edge = (Phase, Bit)
 data Trans = Halt | Step Phase Bit Dir deriving (Eq, Ord, Show, Generic)
 

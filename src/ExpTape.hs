@@ -49,6 +49,19 @@ invariantifyList ((s, c) : (t, d) : xs) | s == t = invariantifyList ((s, c <> d)
 invariantifyList (x : xs) = x : invariantifyList xs
 invariantifyList [] =  []
 
+listSatisfiesInvariant :: (Eq s, Monoid c, Ord c) => [(s, c)] -> Bool 
+listSatisfiesInvariant inp = allPositive && allDiff where 
+  allPositive = all (> mempty) (snd <$> inp)
+  allDiff = case inp of 
+    [] -> True
+    x : xs -> let 
+      neInp = x :| xs 
+      pairs = zip (init neInp) (tail neInp)
+      in 
+        not $ any (uncurry (==)) pairs
+
+etSatisfiesInvariant :: (Eq s, Monoid c, Ord c) => ExpTape s c -> Bool 
+etSatisfiesInvariant (ExpTape ls p rs) = listSatisfiesInvariant ls && listSatisfiesInvariant rs
 -- glomPointLeft :: (Eq s, Countable c) => ExpTape s c -> ExpTape s c
 -- glomPointLeft (ExpTape ((s_l, c_l):ls) (s_p, One) rs) | s_l == s_p =
 --   ExpTape ls (s_p, Side (unit <> c_l) R) rs
@@ -68,11 +81,14 @@ invariantifyList [] =  []
 -- glomPoint :: (Eq s, Countable c) => ExpTape s c -> ExpTape s c
 -- glomPoint = glomPointLeft . glomPointRight
 
-dispBitCount :: (Pretty s) => (s, Count) -> Text
-dispBitCount (b, c) = "(" <> show (pretty b) <> ", " <> dispCount c <> ") "
+-- dispBitCount :: (Pretty s) => (s, Count) -> Text
+-- dispBitCount (b, c) = "(" <> showP b <> ", " <> showP c <> ") "
 
-dispBitICount :: (Bit, InfCount) -> Text
-dispBitICount (b, c) = "(" <> dispBit b <> ", " <> dispInfCount c <> ") "
+-- dispBitICount :: (Bit, InfCount) -> Text
+-- dispBitICount (b, c) = "(" <> dispBit b <> ", " <> dispInfCount c <> ") "
+
+dispETPair :: (Pretty c) => (Bit, c) -> Text
+dispETPair (b, c) = "(" <> dispBit b <> ", " <> showP c <> ") "
 
 dispPoint :: (Pretty s) => s -> Text
 dispPoint bit = "|>" <> show (pretty bit) <> "<|"
@@ -80,20 +96,15 @@ dispPoint bit = "|>" <> show (pretty bit) <> "<|"
 dispETPoint :: Bit -> Text 
 dispETPoint bit = "|>" <> dispBit bit <> "<|  "
 
-dispExpTape :: ((Bit,c) -> Text) -> ExpTape Bit c -> Text
-dispExpTape dispPair (ExpTape ls point rs)
-  = mconcat (dispPair <$> reverse ls)
+dispExpTape :: (Pretty c) => ExpTape Bit c -> Text
+dispExpTape (ExpTape ls point rs)
+  = mconcat (dispETPair <$> reverse ls)
   <> dispETPoint point
-  <> mconcat (dispPair <$> rs)
+  <> mconcat (dispETPair <$> rs) 
+  <> "\n"
 
-dispExpTapeIC :: ExpTape Bit InfCount -> Text
-dispExpTapeIC = dispExpTape dispBitICount
-
-instance Pretty (ExpTape Bit InfCount) where 
-  pretty = pretty . dispExpTape dispBitICount
-
-instance Pretty (ExpTape Bit Count) where 
-  pretty = pretty . dispExpTape dispBitCount 
+instance (Pretty c) => Pretty (ExpTape Bit c) where 
+  pretty = pretty . dispExpTape 
 
 instance Tapeable (ExpTape Bit InfCount) where
   ones (ExpTape ls point rs) = countPoint point + countList ls + countList rs where

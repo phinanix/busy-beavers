@@ -60,7 +60,7 @@ Shortrange plan to get a thing which can prove the counter machine into main
 proveInductivelyIMeanIT :: Turing -> SkipBook Bit -> Steps -> TapeHist Bit InfCount -> DispHist
     -> (SkipBook Bit, Either Text (Skip Count Bit))
 proveInductivelyIMeanIT machine book curStep hist dispHist
-  = case guessInductionHypothesis hist dispHist of
+  = force $ case guessInductionHypothesis hist dispHist of
     Left msg -> (book, Left $ "failed to guessIndHyp:\n" <> msg)
     Right indHyp -> let (newBook, tOrOrigin) = proveStrong 5 machine book indHyp (BoundVar 0) in
       case tOrOrigin of
@@ -747,7 +747,10 @@ generalizeFromCounts xs = force $ allEqualPair <|> additivePair <|> affinePair w
           in 
           (newBoundVarBad <> finiteCount toMul, m `nTimes` newBoundVarBad <> finiteCount c)
     affinePair :: Maybe (Count, Count)
-    affinePair = naturalPairs >>= \case
+    affinePair = do 
+      nps <- naturalPairs
+      guard (length nps >= 3) 
+      case nps of
         (_pair :| []) -> Nothing
         --going for x -> m * x + b - we assume m > 0 but b can be any integer
         -- does not handle x -> m * (x + a) + b - but probably could somehow?

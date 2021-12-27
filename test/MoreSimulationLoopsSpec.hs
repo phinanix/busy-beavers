@@ -25,6 +25,8 @@ spec = do
   describe "indProveLoop" $ do
     it "works on a machine which tripped it up" $
       fst (indProveLoop 200 machineBreaksIndGuess) `shouldSatisfy` has _ContinueForever
+    it "does not produce machinestuck" $ do
+      fst (indProveLoop 200 machineStuckMachine) `shouldSatisfy` has _ContinueForever 
   describe "indProveLoopMany" $ do 
     it "works on machines of size 3" $ 
       length (indProveLoopMany 200 (startMachine1 3)) `shouldBe` 4052

@@ -135,6 +135,20 @@ somehow not requiring symbols to be grid aligned, or it would require the progra
 machineBreaksIndGuess :: Turing 
 machineBreaksIndGuess = unsafeFromRight $ nm "TR1TL0FR2TR3TR3___FL0FR0"
 
+{-
+for some reason this machine gets the result "machineStuck" when run alone in indProveLoop which
+makes no sense
+the general deal with this machine is it is Lin recurrent but has a fairly long cycle time 
+(249 -> 379) (add 130)
+predict 379 -> 509 (check)
+predict-maybe 119 -> 249 (check)
+with the pattern being (T, 9) F >F< 
+producing (F, 2) (T, 4) of garbage to the right each time
+Lin recurrence: check every 20, 100, 500 -> x5 each time?
+-}
+machineStuckMachine :: Turing
+machineStuckMachine = unsafeFromRight $ nm "TR1FL0FR2___TL2TL3FR0TL0"
+
 --I think this fails to be self glued basically because it assumes that x_0 is the same as x_0 in a different skip 
 --which is kind of nonsense
 thingWhichShouldBeSelfGlued :: Skip Count Bit 
