@@ -34,8 +34,8 @@ mirrorHaltProof h = h
 --          first      current      to explore next, seen
 dfsToHalt :: Turing -> Phase -> Phase -> State ([Phase], Set Phase) (Maybe HaltProof)
 dfsToHalt t@(Turing _ transitions) first current = do
-  b1 <- try current False
-  b2 <- try current True
+  b1 <- try current (Bit False)
+  b2 <- try current (Bit True)
   if b1 || b2
     then pure Nothing --they found halt, so we have no proof
     else do
@@ -48,7 +48,7 @@ dfsToHalt t@(Turing _ transitions) first current = do
           dfsToHalt t first newPhase
   where
   --returns true if it has proven halt is reachable, else false
-  try :: Phase -> Bool -> State ([Phase], Set Phase) Bool
+  try :: Phase -> Bit -> State ([Phase], Set Phase) Bool
   try phase bit = case transitions ^. at (phase, bit) of
     --if the current state leads to an unknown edge, that unknown edge could
     --be assigned to halt, thus halt is reachable
@@ -66,10 +66,10 @@ dfsToHalt t@(Turing _ transitions) first current = do
 
 simpleInfiniteLeft :: SimState -> Turing -> Maybe HaltProof
 --suppse we are all the way at the left side of the tape, looking at a False
-simpleInfiniteLeft (phase, steps, Tape [] False _) (Turing{transitions = trans}) =
+simpleInfiniteLeft (phase, steps, Tape [] (Bit False) _) (Turing{transitions = trans}) =
   --and when we transition from this phase and a false, we step left, and stay in the
   --same phase (doesn't matter what we write)
-  case trans ^. at (phase,False) of
+  case trans ^. at (phase, Bit False) of
     --then this pattern repeats forever and we never halt
     --TODO :: this phase name overwrites the previous phase
     Just (Step (((==) phase) -> True) _ L) -> Just $ OffToInfinitySimple steps L
@@ -96,7 +96,7 @@ infiniteCycle s t = infiniteRight s t <|> infiniteLeft s t
 --then the machine will repeat those i steps forever, falling off the RHS of the tape
 --infinitely
 infiniteRight :: SimState -> Turing -> Maybe HaltProof
-infiniteRight startState@(startPhase, originalSteps, Tape startLs False []) t
+infiniteRight startState@(startPhase, originalSteps, Tape startLs (Bit False) []) t
   = step 0 0 0 startState where
   -- first arg counts number of steps taken in this halting proof
   -- second arg counts distance left or right from our starting point,
@@ -109,7 +109,7 @@ infiniteRight startState@(startPhase, originalSteps, Tape startLs False []) t
   step steps dist@((\d -> d <= 0) -> True) maxL s = stepRecurse steps dist maxL s
   --here, distance is positive, so we have a chance to fulfull the conditions
   --to prove infinite rightward movement
-  step steps dist maxL s@(((==) startPhase) -> True, _, Tape ls False []) =
+  step steps dist maxL s@(((==) startPhase) -> True, _, Tape ls (Bit False) []) =
     if take maxL ls == take maxL startLs then Just $ OffToInfinityN originalSteps R
     else stepRecurse steps dist maxL s
   step steps dist maxL s = stepRecurse steps dist maxL s
@@ -157,11 +157,11 @@ stepRtoSimR (Stopped steps tape) = Halted steps tape
 stepRtoSimR (Stepped s) = Continue s
 
 initState :: SimState
-initState = (Phase 0, 0, Tape [] False [])
+initState = (Phase 0, 0, Tape [] (Bit False) [])
 
 dispStartState :: SimState
-dispStartState = (Phase 0, 0, Tape falses False falses) where
-  falses = take 18 $ repeat False
+dispStartState = (Phase 0, 0, Tape falses (Bit False) falses) where
+  falses = take 18 $ repeat (Bit False)
 
 simStepWithDir :: Turing -> SimState -> (TotalStepResult, Dir)
 simStepWithDir (Turing _ trans ) (i, steps, (Tape ls bit rs))
@@ -169,7 +169,7 @@ simStepWithDir (Turing _ trans ) (i, steps, (Tape ls bit rs))
     Nothing -> error "Total Turing machine wasn't total"
     --we assume WLOG that the machine goes left and writes True when it halts
     Just Halt ->
-      (Stopped (steps + 1) $ tapeLeft $ Tape ls True rs, L)
+      (Stopped (steps + 1) $ tapeLeft $ Tape ls (Bit True) rs, L)
     Just (Step j newBit L) ->
       (Stepped (j, steps + 1, tapeLeft $ Tape ls newBit rs), L)
     Just (Step j newBit R) ->

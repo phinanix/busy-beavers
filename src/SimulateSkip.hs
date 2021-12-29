@@ -230,7 +230,7 @@ infiniteSkip (p, b) c R = Skip
 initTransSkip :: Edge -> Trans -> Set (Skip Count Bit)
 --we need to modify this skip so that it's halt question is true
 --a halting machine is assumed to write True and go left
-initTransSkip e@(p, _b) Halt = one $ oneStepSkip e p True L & halts .~ True
+initTransSkip e@(p, _b) Halt = one $ oneStepSkip e p (Bit True) L & halts .~ True
 initTransSkip e@(p, _b) (Step q c d) | p == q = fromList
   [ oneStepSkip e q c d
   , infiniteSkip e c d
@@ -276,9 +276,9 @@ skipStep (Turing _ trans) book p tape@(ExpTape _ls bit _rs) = case trans ^. at (
     Nothing -> Unknown (p,bit)
     Just _ -> pickBestSkip $ getSkipsWhichApply book p tape
 
-getSkipsWhichApply :: SkipBook Bool
+getSkipsWhichApply :: SkipBook Bit
   -> Phase
-  -> ExpTape Bool InfCount
+  -> ExpTape Bit InfCount
   -> [(Skip Count Bit, SkipResult Bit InfCount)] 
 getSkipsWhichApply book p tape@(ExpTape _ls bit _rs)
   = let
@@ -305,7 +305,7 @@ skipStateFromPhTape :: Turing -> Phase -> ExpTape Bit InfCount  -> SimState
 skipStateFromPhTape t ph tape = SimState ph tape (initBook t) 0 [] (ReverseTapeHist [(ph, tape)]) Empty 0 0 (ReverseDispHist [0])
 
 initSkipState :: Turing -> SimState
-initSkipState t = skipStateFromPhTape t (Phase 0) (initExpTape False)
+initSkipState t = skipStateFromPhTape t (Phase 0) (initExpTape (Bit False))
 
 simulateOneMachine :: Int -> Turing -> SimState
   -> ([Skip Count Bit], Either Edge (SimResult SkipTape))
@@ -407,9 +407,9 @@ weird3Goal :: Skip Count Bit
 weird3Goal = Skip
     -- 0 F (T, n) >T< F goes to 
     -- 0 (T, n+1) >T< F
-    (Config (Phase 0) [(True, newBoundVar 0), (False, finiteCount 1)] True [(False, finiteCount 1)])
+    (Config (Phase 0) [(Bit True, newBoundVar 0), (Bit False, finiteCount 1)] (Bit True) [(Bit False, finiteCount 1)])
     (EndMiddle $ Config (Phase 0)
-        [(True, finiteCount 1 <> newBoundVar 0)] True [(False, finiteCount 1)])
+        [(Bit True, finiteCount 1 <> newBoundVar 0)] (Bit True) [(Bit False, finiteCount 1)])
     (finiteCount 0) --obviously this is fake for now 
     False
     Zero --obviously this is fake for now 

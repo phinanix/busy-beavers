@@ -87,19 +87,16 @@ dispBitCount (b, c) = "(" <> showP b <> ", " <> showP c <> ") "
 -- dispBitICount :: (Bit, InfCount) -> Text
 -- dispBitICount (b, c) = "(" <> dispBit b <> ", " <> dispInfCount c <> ") "
 
-dispETPair :: (Pretty c) => (Bit, c) -> Text
-dispETPair (b, c) = "(" <> dispBit b <> ", " <> showP c <> ") "
+dispETPair :: (Pretty b, Pretty c) => (b, c) -> Text
+dispETPair (b, c) = "(" <> showP b <> ", " <> showP c <> ") "
 
 dispPoint :: (Pretty s) => s -> Text
 dispPoint bit = "|>" <> show (pretty bit) <> "<|"
 
-dispETPoint :: Bit -> Text 
-dispETPoint bit = "|>" <> dispBit bit <> "<|  "
-
 dispExpTape :: (Pretty c) => ExpTape Bit c -> Text
 dispExpTape (ExpTape ls point rs)
   = mconcat (dispETPair <$> reverse ls)
-  <> dispETPoint point
+  <> dispPoint point
   <> mconcat (dispETPair <$> rs) 
   <> "\n"
 
@@ -107,10 +104,10 @@ instance (Pretty c) => Pretty (ExpTape Bit c) where
   pretty = pretty . dispExpTape 
 
 instance Tapeable (ExpTape Bit InfCount) where
-  ones (ExpTape ls point rs) = countPoint point + countList ls + countList rs where
+  ones (ExpTape ls (Bit point) rs) = countPoint point + countList ls + countList rs where
     countPoint b = if b then 1 else 0
     countList :: [(Bit, InfCount)] -> Int
-    countList = getSum . foldMap Sum . mapMaybe (\(bit, c) -> guard bit $> infCountToInt c)
+    countList = getSum . foldMap Sum . mapMaybe (\(Bit bit, c) -> guard bit $> infCountToInt c)
 
 getNewPoint :: [(s, InfCount)] -> Either Text (s, [(s, InfCount)])
 getNewPoint [] = Left "tape Empty"

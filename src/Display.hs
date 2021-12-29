@@ -101,7 +101,7 @@ tnfSignature n t = ordNub duplicateEdgesList where
   getEdge :: Simple.SimResult -> Maybe Edge
   getEdge (Simple.Continue (phase, _, Simple.Tape _ point _)) = Just (phase, point)
   getEdge _ = Nothing
-  duplicateEdgesList = (Phase 0, False) : mapMaybe getEdge stateList
+  duplicateEdgesList = (Phase 0, Bit False) : mapMaybe getEdge stateList
 
 tnfPrecursors :: Steps -> Turing -> [Turing]
 tnfPrecursors steps t@(Turing n trans) = Turing n <$> restrictKeys trans <$> edgeSets where

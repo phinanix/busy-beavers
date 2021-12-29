@@ -97,13 +97,13 @@ prettyText = pretty
 
 instance Pretty s => Pretty (Config Count s) where
   pretty (Config p ls point rs) = pretty $ "phase: " <> dispPhase p <> "  "
-    <> mconcat (dispBitCount <$> reverse ls)
+    <> mconcat (dispETPair <$> reverse ls)
     <> dispPoint point
-    <> mconcat (dispBitCount <$> rs)
+    <> mconcat (dispETPair <$> rs)
 
 instance Pretty s => Pretty (SkipEnd Count s) where
-  pretty (EndSide p L ls) =  pretty $ "phase: " <> dispPhase p <> "  <|" <> mconcat (dispBitCount <$> ls)
-  pretty (EndSide p R ls) =  pretty $ "phase: " <> dispPhase p <> " " <> mconcat (dispBitCount <$> ls) <> "|>"
+  pretty (EndSide p L ls) =  pretty $ "phase: " <> dispPhase p <> "  <|" <> mconcat (dispETPair <$> ls)
+  pretty (EndSide p R ls) =  pretty $ "phase: " <> dispPhase p <> " " <> mconcat (dispETPair <$> ls) <> "|>"
   pretty (EndMiddle c) = pretty c
 
 instance Pretty s => Pretty (Skip Count s) where

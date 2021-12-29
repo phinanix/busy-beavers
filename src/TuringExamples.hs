@@ -19,7 +19,7 @@ counterIndHyp :: Config Count Bit
 -- the thing we hope it goes to is
 -- 0 (T, n) >T< T F 
 -- eg @ step 170
-counterIndHyp = Config (Phase 2) [(False, symbolVarCount (SymbolVar 0) 1)] True [(True, One), (False, One)]
+counterIndHyp = Config (Phase 2) [(Bit False, symbolVarCount (SymbolVar 0) 1)] (Bit True) [(Bit True, One), (Bit False, One)]
 
 counterIndHypReal :: Config Count Bit 
 -- 2 F T (F, n) >T< T F 
@@ -29,7 +29,7 @@ counterIndHypReal :: Config Count Bit
 -- 0 (T, n) >T< T F 
 -- eg @ step 170
 --note that it needs to ignore the stuff that "doesn't matter"
-counterIndHypReal = Config (Phase 2) [(False, symbolVarCount (SymbolVar 0) 1), (True, One), (False, One)] True [(True, One), (False, One)]
+counterIndHypReal = Config (Phase 2) [(Bit False, symbolVarCount (SymbolVar 0) 1), (Bit True, One), (Bit False, One)] (Bit True) [(Bit True, One), (Bit False, One)]
 
 almostweird3 :: Turing
 almostweird3 = unm "FL2FR0TL2TLHTR0TL2" 
@@ -99,7 +99,7 @@ machineStuckMachine = unsafeFromRight $ nm "TR1FL0FR2___TL2TL3FR0TL0"
 --I think this fails to be self glued basically because it assumes that x_0 is the same as x_0 in a different skip 
 --which is kind of nonsense
 thingWhichShouldBeSelfGlued :: Skip Count Bit 
-thingWhichShouldBeSelfGlued = Skip {_start = Config {_cstate = (Phase 2), _ls = [(False,Count 1 (fromList []) (fromList []))], _c_point = False, _rs = [(True,Count 0 (fromList []) (fromList [(BoundVar 0,Sum {getSum = 1})])),(False,Count 1 (fromList []) (fromList []))]}, _end = EndMiddle (Config {_cstate = (Phase 2), _ls = [], _c_point = False, _rs = [(True,Count 1 (fromList []) (fromList [(BoundVar 0,Sum {getSum = 1})])),(False,Count 1 (fromList []) (fromList []))]}), _hops = Count 0 (fromList []) (fromList []), _halts = False, _displacement = Zero} 
+thingWhichShouldBeSelfGlued = Skip {_start = Config {_cstate = (Phase 2), _ls = [(Bit False,One)], _c_point = Bit False, _rs = [(Bit True,Count 0 (fromList []) (fromList [(BoundVar 0,Sum {getSum = 1})])),(Bit False,Count 1 (fromList []) (fromList []))]}, _end = EndMiddle (Config {_cstate = (Phase 2), _ls = [], _c_point = Bit False, _rs = [(Bit True,Count 1 (fromList []) (fromList [(BoundVar 0,Sum {getSum = 1})])),(Bit False,Count 1 (fromList []) (fromList []))]}), _hops = Count 0 (fromList []) (fromList []), _halts = False, _displacement = Zero} 
 
 machineList :: [Turing]
 machineList = [weird3, almostweird3, fullsim_not_halt3, bb3, simple_sweeper, 

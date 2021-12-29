@@ -23,7 +23,7 @@ data TMState a = TMState { _phase :: Phase, _tape :: a} deriving (Eq, Ord, Show,
 instance NFData a => NFData (TMState a)
 
 initTMState :: TMState Tape
-initTMState = TMState (Phase 0) (Tape [] False [])
+initTMState = TMState (Phase 0) (Tape [] (Bit False) [])
 
 data PartialStepResult a = Unknown Edge | Stopped Dir a | Stepped Dir (TMState a)
 
@@ -46,7 +46,7 @@ simStep (Turing _ trans ) (TMState p (Tape ls bit rs))
     Nothing -> Unknown (p,bit)
     --we assume WLOG that the machine goes left and writes True when it halts
     Just Halt ->
-      Stopped L $ tapeLeft $ Tape ls True rs
+      Stopped L $ tapeLeft $ Tape ls (Bit True) rs
     Just (Step q newBit L) ->
       Stepped L (TMState q $ tapeLeft $ Tape ls newBit rs)
     Just (Step q newBit R) ->
@@ -119,7 +119,7 @@ infiniteCycle :: Int -> Turing -> SimState Tape -> Maybe HaltProof
 infiniteCycle limit t s = infiniteRight limit t s <|> infiniteLeft limit t s
 
 infiniteRight :: Int -> Turing -> SimState Tape -> Maybe HaltProof
-infiniteRight limit t (SimState originalSteps _ mState@(TMState startPhase (Tape startLs False [])))
+infiniteRight limit t (SimState originalSteps _ mState@(TMState startPhase (Tape startLs (Bit False) [])))
   = step 0 0 0 mState where
   -- first arg counts number of steps taken in this halting proof
   -- second arg counts distance left or right from our starting point,
@@ -132,7 +132,7 @@ infiniteRight limit t (SimState originalSteps _ mState@(TMState startPhase (Tape
   step steps dist@((<= 0) -> True) maxL s = stepRecurse steps dist maxL s
   --here, distance is positive, so we have a chance to fulfull the conditions
   --to prove infinite rightward movement
-  step steps dist maxL s@(TMState ((startPhase ==) -> True) (Tape ls False [])) =
+  step steps dist maxL s@(TMState ((startPhase ==) -> True) (Tape ls (Bit False) [])) =
     if take maxL ls == take maxL startLs then Just $ OffToInfinityN originalSteps R
     else stepRecurse steps dist maxL s
   step steps dist maxL s = stepRecurse steps dist maxL s

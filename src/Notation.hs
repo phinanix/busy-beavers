@@ -38,7 +38,7 @@ transToNotation = \case
     Just (Step ph b dir) -> dispBit b <> show dir <> show (unPhase ph)
 
 edgesOfLen :: Int -> [Edge] 
-edgesOfLen n = bind (\x -> (x,) <$> [False, True]) (Phase <$> [0.. n-1])
+edgesOfLen n = bind (\x -> (x,) <$> [Bit False, Bit True]) (Phase <$> [0.. n-1])
 
 machineToNotation :: Turing -> Text
 machineToNotation (Turing n trans) = T.concat $ transToNotation <$> transes where
@@ -46,8 +46,8 @@ machineToNotation (Turing n trans) = T.concat $ transToNotation <$> transes wher
 
 parseBit :: Char -> Either Text Bit
 parseBit = \case 
-  'T' -> Right True 
-  'F' -> Right False 
+  'T' -> Right $ Bit True 
+  'F' -> Right $ Bit False 
   other -> Left $ "got " <> show other <> " for bit"
 
 parseDir :: Char -> Either Text Dir 

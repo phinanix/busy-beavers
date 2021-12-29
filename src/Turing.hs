@@ -16,7 +16,7 @@ instance Show Phase where
   show (Phase i) = "(Phase " <> show i <> ")"
 
 data Dir = L | R deriving (Eq, Ord, Show, Generic)
-type Bit = Bool --deriving (Eq, Ord, Show, Generic)
+newtype Bit = Bit Bool deriving (Eq, Ord, Show, Generic)
 type Edge = (Phase, Bit)
 data Trans = Halt | Step Phase Bit Dir deriving (Eq, Ord, Show, Generic)
 
@@ -26,6 +26,7 @@ data Turing = Turing
   , transitions :: Map Edge Trans
   } deriving (Eq, Ord, Show, Generic)
 
+instance NFData Bit
 instance NFData Phase
 instance NFData Dir
 instance NFData Trans
@@ -51,12 +52,15 @@ uniDir :: NonEmpty Dir
 uniDir = L :| [R]
 
 uniBit :: NonEmpty Bit
-uniBit = False :| [True]
+uniBit = Bit False :| [Bit True]
 
 dispBit :: Bit -> Text
-dispBit False = "F"
-dispBit True = "T"
+dispBit (Bit False) = "F"
+dispBit (Bit True) = "T"
 
+instance Pretty Bit where 
+  pretty = pretty . dispBit 
+  
 dispPhase :: Phase -> Text
 dispPhase (Phase i) = show i
 
@@ -144,15 +148,15 @@ branchOnEdge e@(Phase newPhase, _) (Turing n m) = --if elem bb3test out then (tr
   --and the NonEmpty is nice
   usedStates = 0 :| filter used [1.. (n-1)]
   --a state is used if either transition is
-  used i = is _Just (m ^. at (Phase i, False))
-        || is _Just (m ^. at (Phase i, True))
+  used i = is _Just (m ^. at (Phase i, Bit False))
+        || is _Just (m ^. at (Phase i, Bit True))
         || i == newPhase
   equalJusts (Just a) (Just b) = a == b
   equalJusts _ _ = False
   equalStates m i j =
-    (m ^. at (i, False)) `equalJusts` (m ^. at (j, False))
+    (m ^. at (i, Bit False)) `equalJusts` (m ^. at (j, Bit False))
     &&
-    (m ^. at (i, True)) `equalJusts` (m ^. at (j, True))
+    (m ^. at (i, Bit True)) `equalJusts` (m ^. at (j, Bit True))
   isSmallerMachine (Turing s m) = any (uncurry (equalStates m)) $
     bimapBoth Phase <$> allpairs s
   --j can't equal i because that would produce (i,i), but of course state i is always the same as
@@ -165,10 +169,10 @@ branchOnEdge e@(Phase newPhase, _) (Turing n m) = --if elem bb3test out then (tr
 --not valid for n=1, where the machine must halt immediately, or run forever.
 startMachine0 :: Int -> Turing
 startMachine0 1 = uni1Machine
-startMachine0 n = Turing n $ one ((Phase 0, False), Step (Phase 1) False R)
+startMachine0 n = Turing n $ one ((Phase 0, Bit False), Step (Phase 1) (Bit False) R)
 startMachine1 :: Int -> Turing
 startMachine1 1 = uni1Machine
-startMachine1 n = Turing n $ one ((Phase 0, False), Step (Phase 1) True R)
+startMachine1 n = Turing n $ one ((Phase 0, Bit False), Step (Phase 1) (Bit True) R)
 --for n=1 if you don't halt right away, you are doomed to loop forever
 uni1Machine :: Turing
-uni1Machine = Turing 1 $ one ((Phase 0, False), Halt)
+uni1Machine = Turing 1 $ one ((Phase 0, Bit False), Halt)

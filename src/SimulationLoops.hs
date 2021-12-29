@@ -205,11 +205,11 @@ A thing I need to be very careful about is the interaction between EndOfTape pro
 If we skip over part of the evaluation that involves the maximum inward displacement, then we could assume we had a 
 successful proof when we actually don't, and this is hard to catch. 
 -}
-atLeftOfTape :: ExpTape Bool InfCount -> Bool
-atLeftOfTape (ExpTape ls _p _rs) = ls == [(False, Infinity)]
+atLeftOfTape :: ExpTape Bit InfCount -> Bool
+atLeftOfTape (ExpTape ls _p _rs) = ls == [(Bit False, Infinity)]
 
-atRightOfTape :: ExpTape Bool InfCount -> Bool
-atRightOfTape (ExpTape _ls _p rs) = rs == [(False, Infinity)]
+atRightOfTape :: ExpTape Bit InfCount -> Bool
+atRightOfTape (ExpTape _ls _p rs) = rs == [(Bit False, Infinity)]
 
 {-
 How this function works: 
@@ -237,7 +237,7 @@ attemptEndOfTapeProof _machine state = assert (atLeftOfTape $ state ^. s_tape) $
   -- int is from bitsToCheck
   checkProof :: (Int, (Phase, ExpTape Bit InfCount)) -> Maybe HaltProof
   checkProof (numBitsToCheck, (_ph, oldTape)) = let
-    getBits tapeHalf = takeExact numBitsToCheck $ tapeHalfToBitList tapeHalf <> repeat False
+    getBits tapeHalf = takeExact numBitsToCheck $ tapeHalfToBitList tapeHalf <> repeat (Bit False)
     in
     if getBits (right oldTape) == getBits (right $ state ^. s_tape)
       then Just $ OffToInfinityN (state ^. s_steps) L
@@ -260,7 +260,7 @@ attemptOtherEndOfTapeProof _machine state = assert (atRightOfTape $ state ^. s_t
   -- int is from bitsToCheck
   checkProof :: (Int, (Phase, ExpTape Bit InfCount)) -> Maybe HaltProof
   checkProof (numBitsToCheck, (_ph, oldTape)) = let
-    getBits tapeHalf = takeExact numBitsToCheck $ tapeHalfToBitList tapeHalf <> repeat False
+    getBits tapeHalf = takeExact numBitsToCheck $ tapeHalfToBitList tapeHalf <> repeat (Bit False)
     in
     if getBits (left oldTape) == getBits (left $ state ^. s_tape)
       then Just $ OffToInfinityN (state ^. s_steps) R
