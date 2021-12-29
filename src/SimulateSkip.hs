@@ -173,7 +173,7 @@ packageResult skip@(Skip _ e hopCount _ displacement) tape (boundVs, (newLs, new
         (c ^. c_point)
         (finalizeList (c^.rs) `etApp` remRs)
       assertCond = etSatisfiesInvariant ans
-      msg = "we were applying: " <> showP skip <> "\nto tape:\n" <> showP tape
+      msg = "" --"we were applying: " <> showP skip <> "\nto tape:\n" <> showP tape
       in 
         (if not assertCond then trace msg else id) assert assertCond (Right ans)
       --TODO, this can fail if you are trying to prove an induction on a finite span of tape

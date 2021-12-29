@@ -81,8 +81,8 @@ etSatisfiesInvariant (ExpTape ls p rs) = listSatisfiesInvariant ls && listSatisf
 -- glomPoint :: (Eq s, Countable c) => ExpTape s c -> ExpTape s c
 -- glomPoint = glomPointLeft . glomPointRight
 
--- dispBitCount :: (Pretty s) => (s, Count) -> Text
--- dispBitCount (b, c) = "(" <> showP b <> ", " <> showP c <> ") "
+dispBitCount :: (Pretty s) => (s, Count) -> Text
+dispBitCount (b, c) = "(" <> showP b <> ", " <> showP c <> ") "
 
 -- dispBitICount :: (Bit, InfCount) -> Text
 -- dispBitICount (b, c) = "(" <> dispBit b <> ", " <> dispInfCount c <> ") "

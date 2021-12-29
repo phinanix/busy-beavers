@@ -99,6 +99,12 @@ notationToMachine inp =
 nm :: Text -> Either Text Turing
 nm = notationToMachine
 
+unsafeNotationToMachine :: Text -> Turing
+unsafeNotationToMachine = unsafeFromRight . notationToMachine 
+
+unm :: Text -> Turing
+unm = unsafeNotationToMachine
+
 dispTuring :: Turing -> Text
 dispTuring m@(Turing _ transitions) = ifoldMap dispET transitions <> machineToNotation m <> "\n"
 

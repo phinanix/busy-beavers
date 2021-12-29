@@ -26,13 +26,13 @@ showOneMachine t n =
   [0.. n]
 
 dispPhaseET :: (Phase, ExpTape Bit InfCount) -> Text
-dispPhaseET (ph, et) = "" <> dispPhase  ph <> ", " <> dispExpTapeIC et <> "\n"
+dispPhaseET (ph, et) = "" <> dispPhase  ph <> ", " <> dispExpTape et <> "\n"
 
 displayHist :: [(Phase, ExpTape Bit InfCount)] -> Text
 displayHist hist = T.concat $ dispPhaseET <$> hist
 
 displaySkipSimStep :: Turing -> Steps -> Doc ann
-displaySkipSimStep t steps = dispResult dispExpTapeIC $ SimulateSkip.simulateOneTotalMachine steps t ^. _2
+displaySkipSimStep t steps = dispResult dispExpTape $ SimulateSkip.simulateOneTotalMachine steps t ^. _2
 
 displaySkipSimulation :: Turing -> Steps -> Doc ann
 displaySkipSimulation t limit =
@@ -40,7 +40,7 @@ displaySkipSimulation t limit =
 
 displaySkipStepAndSkip :: Turing -> Steps -> Doc ann
 displaySkipStepAndSkip t limit = case SimulateSkip.simulateOneTotalMachine limit t of
-  (lastSkip : _, res) -> dispResult dispExpTapeIC res <> "\nresulted from the skip:" <> show (pretty lastSkip)
+  (lastSkip : _, res) -> dispResult dispExpTape res <> "\nresulted from the skip:" <> show (pretty lastSkip)
   ([], res) -> error ("there were no skips for some reason, res:\n" <> show res)
 
 displaySkipSimulationWithSkips :: Turing -> Steps -> Doc ann

@@ -207,7 +207,7 @@ proveBySimulating limit t book (Skip start goal _ _ _) = let
     -- we've succeeded, stepping fails for some reason, or we continue 
     loop :: Int -> Phase -> ExpTape Bit InfCount -> Count -> Either (Text, Maybe (Config Count Bit)) Count
     loop numSteps p tape curCount
-     | trace (toString $ "p:" <> dispPhase p <> " tape is: " <> dispExpTapeIC tape) False = undefined
+     | trace (toString $ "p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
       |indMatch p tape goal = pure curCount
       | numSteps > limit = Left ("exceeded limit while simulating", Nothing)
       | otherwise = case skipStep t book p tape of
@@ -217,7 +217,7 @@ proveBySimulating limit t book (Skip start goal _ _ _) = let
                 stuckConfig = etToConfig p $ second deInfCount tape
                 msg = "machine stuck on step: " <> show numSteps
                   <> " in phase:" <> show p
-                  <> "\ngoal:" <> show (pretty goal) <> "\ncur tape:" <> dispExpTapeIC tape
+                  <> "\ngoal:" <> show (pretty goal) <> "\ncur tape:" <> dispExpTape tape
                 in
                 Left (msg, Just stuckConfig)
             Stepped Infinity _ _ _ _ -> Left ("hopped to infinity", Nothing)
@@ -301,7 +301,7 @@ showEvalN :: Show a => String -> a -> a
 showEvalN t x = trace (t <> "\n" <> show x) x
 
 showTapePhaseList :: [(Phase, ExpTape Bit InfCount)] -> String
-showTapePhaseList tapes = toString $ T.concat $ (\(p, x) -> dispPhase p <> " " <> dispExpTapeIC x <> "\n") <$> tapes
+showTapePhaseList tapes = toString $ T.concat $ (\(p, x) -> dispPhase p <> " " <> dispExpTape x <> "\n") <$> tapes
 
 possibleSignatures :: [(Phase, ExpTape Bit InfCount)] -> [(Phase, Signature Bit)]
 possibleSignatures hist = filter (\s -> --let msg = ("ixing: " <> showP s <> "\n in map:\n" <> show (sigFreqs)) in trace msg $
