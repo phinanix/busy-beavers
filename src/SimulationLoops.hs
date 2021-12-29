@@ -143,7 +143,7 @@ simulateStepUntilUnknown = simulateStepOneMachine handle where
 simulateStepPartial :: Partial => Int -> SimMultiAction
 simulateStepPartial limit machine (SimState ph tape book steps skipTrace hist histSet counter curDisp dispHist) = if steps > limit
   then Result $ Continue steps ph tape curDisp
-  else trace ("stepping " <> showP machine) $ case skipStep machine book ph tape of
+  else case skipStep machine book ph tape of
     Unknown e -> UnknownEdge e
     MachineStuck -> error "machinestuck "
     Stopped c newTape _skipUsed newDisp -> Result $ Halted (steps + infCountToInt c) newTape (curDisp + dispToInt newDisp)

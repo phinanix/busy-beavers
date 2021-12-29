@@ -173,7 +173,7 @@ packageResult skip@(Skip _ e hopCount _ displacement) tape (boundVs, (newLs, new
         (c ^. c_point)
         (finalizeList (c^.rs) `etApp` remRs)
       assertCond = etSatisfiesInvariant ans
-      msg = "" --"we were applying: " <> showP skip <> "\nto tape:\n" <> showP tape
+      msg = "we were applying: " <> showP skip <> "\nto tape:\n" <> showP tape <> "\nresulting in:\n" <> showP ans
       in 
         (if not assertCond then trace msg else id) assert assertCond (Right ans)
       --TODO, this can fail if you are trying to prove an induction on a finite span of tape
@@ -287,7 +287,8 @@ getSkipsWhichApply book p tape@(ExpTape _ls bit _rs)
       skips = lookupSkips (p, bit) book
       appliedSkips = mapMaybe (\s -> (s,) <$> applySkip s (p, tape)) $ toList skips
       msg = "tape: " <> showP tape <> "\nskips which applied:\n" <> showP appliedSkips 
-      in trace msg $ appliedSkips 
+      in --trace msg 
+        appliedSkips 
 
 pickBestSkip :: [(Skip Count Bit, SkipResult Bit InfCount)] -> PartialStepResult (ExpTape Bit InfCount)
 pickBestSkip = \case 

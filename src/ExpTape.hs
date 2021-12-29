@@ -93,14 +93,14 @@ dispETPair (b, c) = "(" <> showP b <> ", " <> showP c <> ") "
 dispPoint :: (Pretty s) => s -> Text
 dispPoint bit = "|>" <> show (pretty bit) <> "<|"
 
-dispExpTape :: (Pretty c) => ExpTape Bit c -> Text
+dispExpTape :: (Pretty b, Pretty c) => ExpTape b c -> Text
 dispExpTape (ExpTape ls point rs)
   = mconcat (dispETPair <$> reverse ls)
   <> dispPoint point
   <> mconcat (dispETPair <$> rs) 
   <> "\n"
 
-instance (Pretty c) => Pretty (ExpTape Bit c) where 
+instance (Pretty b, Pretty c) => Pretty (ExpTape b c) where 
   pretty = pretty . dispExpTape 
 
 instance Tapeable (ExpTape Bit InfCount) where

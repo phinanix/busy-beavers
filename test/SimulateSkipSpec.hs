@@ -53,8 +53,41 @@ simulatesSameForAll func limit t = for_ [0.. limit]
 skipIsCorrect :: Int -> Turing -> Skip Count Bit -> Expectation 
 skipIsCorrect limit t skip = undefined 
 
+{-
+we were applying: in 100 steps we turn
+phase: 3  (F, 1) (T, 1 + 1*x_0 ) |>T<|
+into:
+phase: 1  (T, 1) |>F<|(F, 0 + 1*x_0 ) (T, 1)
+ displacement of: Zero
+
+to tape:
+(F, inf) (T, 1) |>T<|(T, 7) (F, inf)
+
+resulting in:
+(F, inf) (T, 1) |>F<|(F, 0) (T, 8) (F, inf)
+the above is wrong, because that skip does not apply in this situation, but at the time of 
+  writing this comment (29 Dec 2021) the code did apply the above skip resulting in an exptape
+  which does not satisfy its no-zeros invariant
+-}
+
+{- in 100 steps we turn
+phase: 3  (F, 1) (T, 1 + 1*x_0 ) |>T<|
+into:
+phase: 1  (T, 1) |>F<|(F, 0 + 1*x_0 ) (T, 1)
+ displacement of: Zero -}
+skipEx = undefined
+--(F, inf) (T, 1) |>T<|(T, 7) (F, inf)
+tapeEx = (Phase 3,
+  ExpTape [(Bit True, NotInfinity One), (Bit False, Infinity)] 
+    (Bit True) 
+    [(Bit True, NotInfinity $ finiteCount 7), (Bit False, Infinity)]
+  )
+
 spec :: Spec 
 spec = do
+  describe "applySkip" $ do 
+    it "does not apply a skip which would set a variable to zero" $ do 
+      applySkip skipEx tapeEx `shouldBe` Nothing 
   -- the goal of this test is to make sure that simulating the machine with skips outputs the same thing 
   -- as simulating a machine without skips
   -- describe "simulateWithSkips" $ do 
