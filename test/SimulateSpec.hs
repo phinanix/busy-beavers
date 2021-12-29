@@ -24,71 +24,71 @@ num = finiteCount
 
 simpleTape :: ExpTape Bit InfCount
 simpleTape = ExpTape
-  [(False, inum 9), (True, inum 1)]
-  False
-  [(True, inum 3), (False, newInfBoundVar 0)]
+  [(Bit False, inum 9), (Bit True, inum 1)]
+  (Bit False)
+  [(Bit True, inum 3), (Bit False, newInfBoundVar 0)]
 
 simpleSkip :: Skip Count Bit
 simpleSkip = Skip
-  (Config (Phase 0) [(False, num 1)] False [])
+  (Config (Phase 0) [(Bit False, num 1)] (Bit False) [])
   (EndMiddle (Config (Phase 1)
-    [(True, num 3)]
-    False
-    [(False, num 3), (True, num 5)]))
+    [(Bit True, num 3)]
+    (Bit False)
+    [(Bit False, num 3), (Bit True, num 5)]))
   (num 5) False (OneDir L $ num 3)
 
 simpleResult :: ExpTape Bit InfCount
 simpleResult = ExpTape
-  [(True, inum 3), (False, inum 8), (True, inum 1)]
-  False
-  [(False, inum 3), (True, inum 8), (False, newInfBoundVar 0)]
+  [(Bit True, inum 3), (Bit False, inum 8), (Bit True, inum 1)]
+  (Bit False)
+  [(Bit False, inum 3), (Bit True, inum 8), (Bit False, newInfBoundVar 0)]
 
 
 exampleSkip :: Skip Count Bit
 exampleSkip = Skip
-  (Config (Phase 0) [(True, One)]
-    True
-    [(False, num 2), (True, num 1)])
+  (Config (Phase 0) [(Bit True, One)]
+    (Bit True)
+    [(Bit False, num 2), (Bit True, num 1)])
   (EndMiddle (Config (Phase 1)
-    [(True, num 3)]
-    False
-    [(False, num 3), (True, num 5)]))
+    [(Bit True, num 3)]
+    (Bit False)
+    [(Bit False, num 3), (Bit True, num 5)]))
   (num 10) False (OneDir L $ num 8)
 
 exampleTape :: ExpTape Bit InfCount
 exampleTape = ExpTape
-  [(True, inum 7), (False, inum 3), (True, inum 1)]
-  True
-  [(False, inum 2), (True, inum 3), (False, newInfBoundVar 0)]
+  [(Bit True, inum 7), (Bit False, inum 3), (Bit True, inum 1)]
+  (Bit True)
+  [(Bit False, inum 2), (Bit True, inum 3), (Bit False, newInfBoundVar 0)]
 
 exampleResult :: ExpTape Bit InfCount
 exampleResult = ExpTape
-  [(True, inum 9), (False, inum 3), (True, inum 1)]
-  False
-  [(False, inum 3), (True, inum 7), (False, newInfBoundVar 0)]
+  [(Bit True, inum 9), (Bit False, inum 3), (Bit True, inum 1)]
+  (Bit False)
+  [(Bit False, inum 3), (Bit True, inum 7), (Bit False, newInfBoundVar 0)]
 
 varSkip :: Skip Count Bit
 varSkip = Skip
-  (Config (Phase 0) [(True, One)]
-    True
-    [(False, One <> newBoundVar 0), (True, num 1)])
+  (Config (Phase 0) [(Bit True, One)]
+    (Bit True)
+    [(Bit False, One <> newBoundVar 0), (Bit True, num 1)])
   (EndMiddle (Config (Phase 1)
-    [(False, newBoundVar 0), (True, One <> newBoundVar 0)]
-    False []))
+    [(Bit False, newBoundVar 0), (Bit True, One <> newBoundVar 0)]
+    (Bit False) []))
   (Count 11 Empty (fromList [(BoundVar 0, Sum 3)]))
   False (OneDir L $ Count 1 Empty (fromList [(BoundVar 0, Sum 1)]))
 
 varTape :: ExpTape Bit InfCount
 varTape = ExpTape
-  [(True, IOne), (True, inum 3)]
-  True
-  [(False, inum 8), (True, inum 2)]
+  [(Bit True, IOne), (Bit True, inum 3)]
+  (Bit True)
+  [(Bit False, inum 8), (Bit True, inum 2)]
 
 varResult :: ExpTape Bit InfCount
 varResult = ExpTape
-  [(False, inum 7), (True, inum 11)]
-  False
-  [(True, inum 1)]
+  [(Bit False, inum 7), (Bit True, inum 11)]
+  (Bit False)
+  [(Bit True, inum 1)]
 
 getContinueSteps :: SimResult a -> Maybe Steps
 getContinueSteps = \case
@@ -100,7 +100,7 @@ spec = do
   describe "applySkip" $ do
     it "matches the left half of the skip" $
       getEquations (matchTape (simpleSkip^.start.ls) (left simpleTape))
-      `shouldBe` Just (TapeLeft $ (False, inum 8) :| [(True, inum 1)])
+      `shouldBe` Just (TapeLeft $ (Bit False, inum 8) :| [(Bit True, inum 1)])
     it "matches the right half of the skip" $
       getEquations (matchTape (simpleSkip^.start.rs) (right simpleTape))
       `shouldBe` Just (TapeLeft $ fromList (right simpleTape))

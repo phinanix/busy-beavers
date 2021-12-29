@@ -29,7 +29,7 @@ spec = do
     it "does not prove a machine that doesn't halt in this way" $ do 
       fst (loopForEndOfTapeGlue 100 weird3) `shouldBe`  
         Continue 101 (Phase 2) 
-          (ExpTape [(False,NotInfinity (c 2)),(True,NotInfinity (c 1)),(False,Infinity)] 
-           False 
-           [(True,NotInfinity (c 2)),(False,Infinity)])
+          (ExpTape [(Bit False,NotInfinity (c 2)),(Bit True,NotInfinity (c 1)),(Bit False,Infinity)] 
+           (Bit False)
+           [(Bit True,NotInfinity (c 2)),(Bit False,Infinity)])
            (-3)

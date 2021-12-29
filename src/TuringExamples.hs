@@ -101,9 +101,28 @@ machineStuckMachine = unsafeFromRight $ nm "TR1FL0FR2___TL2TL3FR0TL0"
 thingWhichShouldBeSelfGlued :: Skip Count Bit 
 thingWhichShouldBeSelfGlued = Skip {_start = Config {_cstate = (Phase 2), _ls = [(Bit False,One)], _c_point = Bit False, _rs = [(Bit True,Count 0 (fromList []) (fromList [(BoundVar 0,Sum {getSum = 1})])),(Bit False,Count 1 (fromList []) (fromList []))]}, _end = EndMiddle (Config {_cstate = (Phase 2), _ls = [], _c_point = Bit False, _rs = [(Bit True,Count 1 (fromList []) (fromList [(BoundVar 0,Sum {getSum = 1})])),(Bit False,Count 1 (fromList []) (fromList []))]}), _hops = Count 0 (fromList []) (fromList []), _halts = False, _displacement = Zero} 
 
+bb2 :: Turing
+bb2 = unm "TL1TR1TR0TLH"
+
+--steps left then right forever between state 0 and 1
+loop2 :: Turing
+loop2 = unm "FL1TLHFR0TLH"
+
+
+jumps_to_end :: Turing
+jumps_to_end = unm "TR1___FR1___"
+
+--this was proven not to halt after a bit more time to simulate the OffToInfinityN proof
+not_halt3 :: Turing
+not_halt3 = unm "FL1TLHTR0FL2TR1TL0"
+
+false_backward_search :: Turing
+false_backward_search = unm "TR1___FR2_________"
+
 machineList :: [Turing]
 machineList = [weird3, almostweird3, fullsim_not_halt3, bb3, simple_sweeper, 
-  checkerboardSweeper, goesLeftForever, binaryCounterTFTT, machineBreaksIndGuess]
+  checkerboardSweeper, goesLeftForever, binaryCounterTFTT, machineBreaksIndGuess, 
+  false_backward_search, not_halt3, jumps_to_end, loop2, bb2]
 
 instance Arbitrary Turing where 
   arbitrary = elements machineList 

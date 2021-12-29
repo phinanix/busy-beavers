@@ -53,6 +53,10 @@ instance Bitraversable SkipEnd where
     EndMiddle c -> EndMiddle <$> bitraverse f g c
 
 --Zero and OneDir as they say, BothDirs goes the first count steps left and the second count steps right 
+--here's a problem with displacement. it lets you track where the machine ended up, but not which symbols 
+--it read to end up there, which is required to detect Lin recurrence. However I guess that's fine as long 
+--as machines only depend on the literal things read by a skip? In fact, if that is true, not clear we even 
+--need to track displacement. (it might also be trivially derivable from a skip?)
 data Displacement c = Zero | OneDir Dir c | BothDirs c c deriving (Eq, Ord, Show, Generic, Functor, Foldable, Traversable)
 instance (NFData c) => NFData (Displacement c)
 

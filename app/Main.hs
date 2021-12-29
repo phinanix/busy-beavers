@@ -21,62 +21,6 @@ import Display
 import SimulationLoops (simulateManyBasicLoop)
 import MoreSimulationLoops
 
--- num = finiteCount
---
--- varSkip :: Skip Bit
--- varSkip = Skip
---   (Config (Phase 0) [] (True, finiteCount 2, R) [(False, newBoundVar 0), (True, finiteCount 1)])
---   (Config (Phase 1) [(True, newBoundVar 0)] (False, newBoundVar 0, R) [] )
---
--- varTape :: ExpTape Bit Count
--- varTape = ExpTape
---   ([(True, num 3)])
---   (True, num 2, R)
---   ([(False, num 8), (True, num 2)])
---
--- varResult :: ExpTape Bit Count
--- varResult = ExpTape
---   ([(True, num 11)])
---   (False, num 8, R)
---   ([(True, num 1)])
-
-bb2 :: Turing
-bb2 = unm "TL1TR1TR0TLH"
-
---steps left then right forever between state 0 and 1
-loop2 :: Turing
-loop2 = unm "FL1TLHFR0TLH"
-
-
-jumps_to_end :: Turing
-jumps_to_end = unm "TR1___FR1___"
-
---this was proven not to halt after a bit more time to simulate the OffToInfinityN proof
-not_halt3 :: Turing
-not_halt3 = unm "FL1TLHTR0FL2TR1TL0"
-
-false_backward_search :: Turing
-false_backward_search = unm "TR1___FR2_________"
-
-mlist :: [Turing]
-mlist = [false_backward_search, not_halt3, jumps_to_end, loop2, bb2]
--- the most ones was Just 6, performed by
--- 0 False | 1 True R
--- 0 True | Halt
--- 1 False | 2 False R
--- 1 True | 1 True R
--- 2 False | 2 True L
--- 2 True | 0 True L
--- final tape:Just "1>1<1 1 1 1"
-
-
---the most ones was Just 5
--- 0 False | 1 True R
--- 0 True | Halt
--- 1 False | 1 True L
--- 1 True | 2 False L
--- 2 False | 0 True R
--- 2 True | 2 True R
 
 simProgram :: (a -> Text) -> Results a -> IO ()
 simProgram display results = do

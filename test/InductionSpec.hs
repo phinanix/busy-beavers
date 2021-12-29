@@ -26,8 +26,8 @@ checkerboardFalseGoal = Skip
     -- 0 >F< T (F, n) T goes to 
     -- 0 (T, n+3) >
     --true for n = 1 but not n = 2
-    (Config (Phase 0) [] False [(True, finiteCount 1), (False, newBoundVar 0), (True, finiteCount 2)])
-    (EndMiddle $ Config (Phase 0) [(True, finiteCount 3 <> newBoundVar 0)] True [])
+    (Config (Phase 0) [] (Bit False) [(Bit True, finiteCount 1), (Bit False, newBoundVar 0), (Bit True, finiteCount 2)])
+    (EndMiddle $ Config (Phase 0) [(Bit True, finiteCount 3 <> newBoundVar 0)] (Bit True) [])
     (finiteCount 0) --obviously this is fake for now 
     False
     Zero --obviously this is fake for now 
@@ -36,18 +36,18 @@ simple_sweeperGoal :: Skip Count Bit
 simple_sweeperGoal = Skip
   --  F >T< (T, n) F goes to 
   -- >T< (T, n+1)  F 
-  (Config (Phase 2) [(False, finiteCount 1)] True [(True, newBoundVar 0), (False, finiteCount 1)])
+  (Config (Phase 2) [(Bit False, finiteCount 1)] (Bit True) [(Bit True, newBoundVar 0), (Bit False, finiteCount 1)])
   (EndMiddle $ Config (Phase 2)
-      [] True [(True, finiteCount 1 <> newBoundVar 0), (False, finiteCount 1)])
+      [] (Bit True) [(Bit True, finiteCount 1 <> newBoundVar 0), (Bit False, finiteCount 1)])
   (finiteCount 0) --obviously this is fake for now 
   False
   Zero --obviously this is fake for now 
 
 beforeReplace :: Config Count Bit 
-beforeReplace = Config (Phase 2) [(False, symbolVarCount (SymbolVar 0) 1)] True [(True, One), (False, One)]
+beforeReplace = Config (Phase 2) [(Bit False, symbolVarCount (SymbolVar 0) 1)] (Bit True) [(Bit True, One), (Bit False, One)]
 
 afterReplace :: Config Count Bit
-afterReplace = Config (Phase 2) [(False, FinCount 5)] True [(True, One), (False, One)]
+afterReplace = Config (Phase 2) [(Bit False, FinCount 5)] (Bit True) [(Bit True, One), (Bit False, One)]
 
 c = finiteCount
 
@@ -142,5 +142,5 @@ spec = do
       replaceSymbolVarInConfig True beforeReplace (SymbolVar 0) (FinCount 5) `shouldBe` afterReplace
   describe "calcCommonSig" $ do 
     it "works on a real example" $ 
-      calcCommonSig (Signature [False] False [True,False]) (Signature [] False [True,False])
+      calcCommonSig (Signature [Bit False] (Bit False) [Bit True,Bit False]) (Signature [] (Bit False) [Bit True,Bit False])
         `shouldBe` Just (True, False)

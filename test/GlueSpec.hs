@@ -14,16 +14,16 @@ import SimulateSkip
 
 skipA :: Skip Count Bit 
 skipA = Skip 
-    (Config (Phase 0) [] False [])
-    (EndSide (Phase 1) L [(False, One)])
+    (Config (Phase 0) [] (Bit False) [])
+    (EndSide (Phase 1) L [(Bit False, One)])
     One
     False 
     (OneDir L One)
 
 skipB :: Skip Count Bit 
 skipB = Skip 
-    (Config (Phase 1) [] False [])
-    (EndSide (Phase 2) L [(True, One)]) 
+    (Config (Phase 1) [] (Bit False) [])
+    (EndSide (Phase 2) L [(Bit True, One)]) 
     One
     False 
     (OneDir L One) 
@@ -31,24 +31,24 @@ skipB = Skip
 skipAB :: Skip Count Bit 
 skipAB = Skip 
     -- (Config (Phase 0) [] (False, Side (finiteCount 2) R) [])
-    (Config (Phase 0) [(False, One)] False [])
-    (EndSide (Phase 2) L [(True, One), (False, One)])
+    (Config (Phase 0) [(Bit False, One)] (Bit False) [])
+    (EndSide (Phase 2) L [(Bit True, One), (Bit False, One)])
     (finiteCount 2) 
     False
     (OneDir L $ finiteCount 2)
 
 selfGlueSkip :: Skip Count Bit 
 selfGlueSkip = Skip 
-  (Config (Phase 1) [(True, One), (False, One)] False [])
-  (EndMiddle $ Config (Phase 1) [(True, One)] False [(False, One)])
+  (Config (Phase 1) [(Bit True, One), (Bit False, One)] (Bit False) [])
+  (EndMiddle $ Config (Phase 1) [(Bit True, One)] (Bit False) [(Bit False, One)])
   (finiteCount 3) 
   False
   (OneDir L One)
 
 twoSelfGlueSkip :: Skip Count Bit 
 twoSelfGlueSkip = Skip 
-  (Config (Phase 1) [(True, One), (False, finiteCount 2)] False [])
-  (EndMiddle $ Config (Phase 1) [(True, One)] False [(False, finiteCount 2)]) 
+  (Config (Phase 1) [(Bit True, One), (Bit False, finiteCount 2)] (Bit False) [])
+  (EndMiddle $ Config (Phase 1) [(Bit True, One)] (Bit False) [(Bit False, finiteCount 2)]) 
   (finiteCount 6)
   False
   (OneDir L $ finiteCount 2)
@@ -59,10 +59,10 @@ twoSelfGlueSkip = Skip
 -- output <|(T, 1 + x)
 -- which is not even legal in the first place (due to x being unbound in the input)
 case2SkipA :: Skip Count Bit 
-case2SkipA = oneStepSkip (Phase 1, False) (Phase 2) False R 
+case2SkipA = oneStepSkip (Phase 1, Bit False) (Phase 2) (Bit False) R 
 
 case2SkipB :: Skip Count Bit 
-case2SkipB = infiniteSkip (Phase 2, False) True L 
+case2SkipB = infiniteSkip (Phase 2, Bit False) (Bit True) L 
 
 -- calculated by hand, this is the "correct" output in this situation. there's actually a 
 -- different correct output that preserves the x that I think might be better to output but 
@@ -70,8 +70,8 @@ case2SkipB = infiniteSkip (Phase 2, False) True L
 -- anything that is not wrong and then I can determine what makes sense as the best possible output
 case2CorrectOutput :: Skip Count Bit 
 case2CorrectOutput = Skip 
-  (Config (Phase 1) [] False [(False, One)])
-  (EndSide (Phase 2) L [(True, finiteCount 2)])
+  (Config (Phase 1) [] (Bit False) [(Bit False, One)])
+  (EndSide (Phase 2) L [(Bit True, finiteCount 2)])
   (finiteCount 3) 
   False
   (OneDir L One)
