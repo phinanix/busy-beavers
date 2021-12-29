@@ -9,6 +9,7 @@ import System.IO (hSetBuffering, stdout, BufferMode(..))
 
 import Turing
 import TuringExamples
+import Notation
 import Count hiding (num)
 import Skip
 import Tape (dispTape)
@@ -40,44 +41,25 @@ import MoreSimulationLoops
 --   ([(True, num 1)])
 
 bb2 :: Turing
-bb2 = Turing {states = 2, transitions = fromList
-  [((Phase 0, False), Step (Phase 1) True L)
-  ,((Phase 0, True), Step (Phase 1) True R)
-  ,((Phase 1, False), Step (Phase 0) True R)
-  ,((Phase 1, True), Halt)
-  ]}
+bb2 = unm "TL1TR1TR0TLH"
 
+--steps left then right forever between state 0 and 1
 loop2 :: Turing
-loop2 = Turing {states = 2, transitions = fromList
-  --should step left and right forever
-  [((Phase {unPhase = 0},False),Step (Phase {unPhase = 1}) False L)
-  ,((Phase {unPhase = 1},False),Step (Phase {unPhase = 0}) False R)
-  --these two don't matter
-  ,((Phase {unPhase = 0},True),Halt) --Step (Phase {unPhase = 0}) True R)
-  ,((Phase {unPhase = 1},True),Halt)
-  ]}
+loop2 = unm "FL1TLHFR0TLH"
 
---
+
 jumps_to_end :: Turing
-jumps_to_end = Turing {states = 2, transitions = fromList
-  [((Phase 0,False),Step (Phase 1) True  R)
-  ,((Phase 1,False),Step (Phase 1) False R)
-  ]}
+jumps_to_end = unm "TR1___FR1___"
 
---this halted after a bit more time to simulate the OffToInfinityN proof
+--this was proven not to halt after a bit more time to simulate the OffToInfinityN proof
 not_halt3 :: Turing
-not_halt3 = Turing {states = 3, transitions = fromList [((Phase {unPhase = 0},False),Step (Phase {unPhase = 1}) False L),((Phase {unPhase = 0},True),Halt),((Phase {unPhase = 1},False),Step (Phase {unPhase = 0}) True R),((Phase {unPhase = 1},True),Step (Phase {unPhase = 2}) False L),((Phase {unPhase = 2},False),Step (Phase {unPhase = 1}) True R),((Phase {unPhase = 2},True),Step (Phase {unPhase = 0}) True L)]}
+not_halt3 = unm "FL1TLHTR0FL2TR1TL0"
 
 false_backward_search :: Turing
-false_backward_search = Turing {states = 3, transitions = fromList
-  [((Phase 0, False), Step (Phase 1) True R)
-  -- ,((Phase 0, True ), Halt)
-  ,((Phase 1, False), Step (Phase 2) False R)
-  -- ,((Phase 1, True ), Step (Phase 1) True  R)
-  -- ,((Phase 2, False), Step (Phase 2) True  L)
-  -- ,((Phase 2, True ), Step (Phase 0) True  L)
-  ]}
+false_backward_search = unm "TR1___FR2_________"
 
+mlist :: [Turing]
+mlist = [false_backward_search, not_halt3, jumps_to_end, loop2, bb2]
 -- the most ones was Just 6, performed by
 -- 0 False | 1 True R
 -- 0 True | Halt
