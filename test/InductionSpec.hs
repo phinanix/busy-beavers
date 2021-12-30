@@ -113,8 +113,8 @@ spec = do
       -- at step 366, (T, 6)   F >F<
       --both phase 0
        makeIndGuess 1000 weird3 `assertPrettySkip` (Skip
-        (Config (Phase 2) [(False, c 1)] False [(True, Count 0 Empty (fromList [(BoundVar 0,Sum 1)])), (False, c 1)])
-        (EndMiddle (Config (Phase 2) [] False [(True, Count 1 Empty (fromList [(BoundVar 0,Sum 1)])), (False, c 1)]))
+        (Config (Phase 2) [(Bit False, c 1)] (Bit False) [(Bit True, Count 0 Empty (fromList [(BoundVar 0,Sum 1)])), (Bit False, c 1)])
+        (EndMiddle (Config (Phase 2) [] (Bit False) [(Bit True, Count 1 Empty (fromList [(BoundVar 0,Sum 1)])), (Bit False, c 1)]))
         Empty
         False Zero)
         --this is of course only one reasonable guess, others would also be fine 
@@ -123,8 +123,8 @@ spec = do
       -- at step 24, >F< (T, 4)
       --both phase 0
       makeIndGuess 1000 simple_sweeper `assertPrettySkip` (Skip
-        (Config (Phase 0) [(False, c 1)] False [(True, Count 0 Empty (fromList [(BoundVar 0, Sum 1)])), (False, c 1)])
-        (EndMiddle (Config (Phase 0) [] False [(True, Count 1 Empty (fromList [(BoundVar 0, Sum 1)])), (False, c 1)]))
+        (Config (Phase 0) [(Bit False, c 1)] (Bit False) [(Bit True, Count 0 Empty (fromList [(BoundVar 0, Sum 1)])), (Bit False, c 1)])
+        (EndMiddle (Config (Phase 0) [] (Bit False) [(Bit True, Count 1 Empty (fromList [(BoundVar 0, Sum 1)])), (Bit False, c 1)]))
         Empty False Zero)
     it "guesses for a second sweeper" $ do
       -- at step 6, F (T, 3) >F< F
@@ -132,10 +132,9 @@ spec = do
       -- both phase 1 
       makeIndGuess 1000 checkerboardSweeper `assertPrettySkip` (Skip
         (Config (Phase 1)
-            [(True, Count 0 Empty (fromList [(BoundVar 0, Sum 1)])), (False, c 1)] False [(False, c 1)])
+            [(Bit True, Count 0 Empty (fromList [(BoundVar 0, Sum 1)])), (Bit False, c 1)] (Bit False) [(Bit False, c 1)])
         (EndMiddle (Config (Phase 1)
-
-             [(True, Count 2 Empty (fromList [(BoundVar 0, Sum 1)]))] False []))
+             [(Bit True, Count 2 Empty (fromList [(BoundVar 0, Sum 1)]))] (Bit False) []))
         Empty False Zero)
   describe "replaceSymbolVarInConfig" $ do 
     it "replaces in a simple example" $ do 

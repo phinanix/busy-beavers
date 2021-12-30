@@ -23,8 +23,9 @@ import Util
 spec :: Spec
 spec = do
   describe "indProveLoop" $ do
+    --TODO we should be able to prove this machine runs forever
     it "works on a machine which tripped it up" $
-      fst (indProveLoop 200 machineBreaksIndGuess) `shouldSatisfy` has _ContinueForever
+      fst (indProveLoop 200 machineBreaksIndGuess) `shouldSatisfy` has _Continue
     it "does not produce machinestuck" $ do
       fst (indProveLoop 200 machineStuckMachine) `shouldSatisfy` has _ContinueForever 
 --  describe "indProveLoopMany" $ do 

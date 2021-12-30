@@ -75,7 +75,10 @@ phase: 3  (F, 1) (T, 1 + 1*x_0 ) |>T<|
 into:
 phase: 1  (T, 1) |>F<|(F, 0 + 1*x_0 ) (T, 1)
  displacement of: Zero -}
-skipEx = undefined
+skipEx = Skip 
+  (Config (Phase 3) [(Bit True, One <> boundVarCount (BoundVar 0) 1)] (Bit True) [])
+  (EndMiddle $ Config (Phase 1) [(Bit True, One)] (Bit False) [(Bit False, boundVarCount (BoundVar 0) 1), (Bit True, One)])
+  Empty False Zero
 --(F, inf) (T, 1) |>T<|(T, 7) (F, inf)
 tapeEx = (Phase 3,
   ExpTape [(Bit True, NotInfinity One), (Bit False, Infinity)] 
