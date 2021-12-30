@@ -26,7 +26,8 @@ import Safe.Partial
 data PartialStepResult a = Unknown Edge
                          | Stopped InfCount a (Skip Count Bit) (Displacement InfCount)
                          | Stepped InfCount Phase a (Skip Count Bit) (Displacement InfCount)
-                         | MachineStuck
+                         | MachineStuck 
+                         deriving (Eq, Ord, Show, Generic)
 
 data SkipOrigin s = Initial --from an atomic transition of the machine 
                   | Glued (Skip Count s) (Skip Count s) --from gluing together the two skips in question in order
@@ -272,9 +273,13 @@ skipFarthest (_, res1) (_, res2) = compare (res1 ^. hopsTaken) (res2 ^. hopsTake
 --or laterphina says the Skipbook maybe should be parameterized by s as well
 skipStep :: Turing -> SkipBook Bit -> Phase -> ExpTape Bit InfCount
   -> PartialStepResult (ExpTape Bit InfCount)
-skipStep (Turing _ trans) book p tape@(ExpTape _ls bit _rs) = case trans ^. at (p, bit) of -- ~
+skipStep (Turing _ trans) book p tape@(ExpTape _ls bit _rs) = trace "entered skipStep" $
+  case trans ^. at (p, bit) of -- ~
     Nothing -> Unknown (p,bit)
-    Just _ -> pickBestSkip $ getSkipsWhichApply book p tape
+    Just _ -> let ans = pickBestSkip $ getSkipsWhichApply book p tape
+      in 
+        trace ("ans was: " <> show ans)
+        ans
 
 getSkipsWhichApply :: SkipBook Bit
   -> Phase
@@ -287,15 +292,15 @@ getSkipsWhichApply book p tape@(ExpTape _ls bit _rs)
       skips = lookupSkips (p, bit) book
       appliedSkips = mapMaybe (\s -> (s,) <$> applySkip s (p, tape)) $ toList skips
       msg = "tape: " <> showP tape <> "\nskips which applied:\n" <> showP appliedSkips 
-      in --trace msg 
+      in trace msg 
         appliedSkips 
 
 pickBestSkip :: [(Skip Count Bit, SkipResult Bit InfCount)] -> PartialStepResult (ExpTape Bit InfCount)
-pickBestSkip = \case 
+pickBestSkip = trace ("pickingBestSkip") $ \case 
   [] -> MachineStuck --TODO :: can we generate this message somewhere better?
   appliedSkips -> let
     (bestSkip, Skipped hops newP newT newD) = maximumBy skipFarthest appliedSkips
-    in --trace (toString $ (mconcat $ dispSkip . fst <$> appliedSkips) <> "\n") $
+    in trace ("bestskip was:" <> showP bestSkip) $
     if bestSkip ^. halts then Stopped hops newT bestSkip newD
       else Stepped hops newP newT bestSkip newD
 

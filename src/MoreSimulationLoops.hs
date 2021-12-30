@@ -50,20 +50,24 @@ then we write a function which runs proveInd, if it succeeds uses chainArbitrary
 and then checks whether the skip runs forever
 -}
 proveByInd :: SimOneAction 
-proveByInd machine state = force $ trace ("proveByInd on:\n" <> showP machine)
- $ case eTProof of 
+proveByInd machine state = force $ --trace ("proveByInd on:\n" <> showP machine) $ 
+ case eTProof of 
   Left _msg -> Right newState 
   Right hp -> Left $ ContinueForever hp
   where 
   hist = state ^. s_history
   dispHist =  state ^. s_disp_history
   (newbook, eTSkip) = let ans = proveInductivelyIMeanIT machine (state ^. s_book) (state ^. s_steps) hist dispHist
-    in trace ("etskip:\n" <> showP (ans ^. _2)) ans
+    in 
+      --trace ("etskip:\n" <> showP (ans ^. _2)) 
+      ans
   newState = state & s_book .~ newbook 
   eTArbSkip = let ans = chainArbitrary =<< eTSkip in 
-    trace ("etarbskip:\n" <> showP ans) ans 
+    --trace ("etarbskip:\n" <> showP ans) 
+    ans 
   eTProof = let ans = flip skipAppliesForeverInHist hist =<< eTArbSkip in 
-    trace ("etproof:\n" <> show ans) ans 
+    --trace ("etproof:\n" <> show ans) 
+    ans 
   
 --todo run at count being measured in big steps while limit is measured in small steps is bad
 indProveLoop :: Int -> Turing -> OneLoopRes

@@ -243,8 +243,10 @@ matchCount (Count 0 Empty xs) c@(Count m bs ys) = case assocs xs of
   --of the count of that var, and there's only one way to match
   [(x, Sum d)] -> case divCount c d of
     Nothing -> nothingES "tried to divCount 1 var and vailed"
+    Just Empty -> nothingES "cannot send a variable to zero"
     Just reducedC -> addEquation (x, NotInfinity reducedC) $ pure Empty
   xs -> case containsOne xs of
+    --TODO, we might send a variable to zero in here
     (maybeX1, xs') -> foldrM matchVar (eitherKeys bs ys, []) xs' >>= \case
       --now we've matched all the vars we can against other vars, so we proceed
       --assuming the only way for the match to succeed is if the remaining vars

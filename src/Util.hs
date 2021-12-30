@@ -89,3 +89,11 @@ instance (Pretty a, Pretty b) => Pretty (Either a b) where
     pretty = \case      
       Left a -> "Left: " <> pretty a 
       Right b -> "Right: " <> pretty b 
+
+myLength :: [a] -> Integer
+myLength = myRecLength 0
+
+myRecLength :: Integer -> [a] -> Integer 
+myRecLength counter = \case 
+  [] -> undefined  --trace (show counter) counter 
+  (x : xs) -> undefined --trace (show counter) $ myRecLength (counter + 1) xs 

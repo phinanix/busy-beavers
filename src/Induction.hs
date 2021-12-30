@@ -80,11 +80,11 @@ proveStrong loopLim machine book goal indVar = swapEither <$> loop 0 book Nothin
   -- the skiporigin is one for specifically the goal 
   -- the text is "we failed"
   loop :: Int -> SkipBook Bit -> Maybe (Config Count Bit) -> (SkipBook Bit, Either (SkipOrigin Bit) Text)
-  loop idx curBook mbLastStuck = trace ("provestrong loop " <> show idx <> "\n") $
+  loop idx curBook mbLastStuck = --trace ("provestrong loop " <> show idx <> "\n") $
     if idx > loopLim then error "wow we exceeded looplim!" -- Right "limit exceeded" 
     else case proveInductively 100 machine curBook goal indVar of
       Right skipOrigin -> (curBook, Left skipOrigin)
-      Left (msg, maybeStuckConfig) -> trace ("stuck on:\n" <> show (pretty maybeStuckConfig) <> "\nbecause:\n" <> toString msg) $
+      Left (msg, maybeStuckConfig) -> --trace ("stuck on:\n" <> show (pretty maybeStuckConfig) <> "\nbecause:\n" <> toString msg) $
         if has _Just mbLastStuck && mbLastStuck == maybeStuckConfig
           then (curBook, Right $ "got stuck on same thing twice:\n" <> show (pretty mbLastStuck))
         else if (thingContainsVar <$> maybeStuckConfig) == Just False
@@ -121,7 +121,9 @@ proveInductively limit t book goal indVar = let
         Left res -> Left $ first ("failed ind: " <>) res
         Right _ ->  pure origin
   msg = ("trying to prove:\n" <> show (pretty goal)) <> "\ngot res" <> show ans
-    in force $ trace msg $ assert (isSameInAsOut goal) ans 
+    in force 
+      -- $ trace msg 
+      $ assert (isSameInAsOut goal) ans 
     where
     origin :: SkipOrigin Bit
     origin = Induction book limit
@@ -142,7 +144,8 @@ proveInductively limit t book goal indVar = let
         ans = goalPlusX 1
         msg = "indHyp is:\n" <> show (pretty ans)
       in
-        force $ trace msg
+        force 
+        -- $ trace msg
         ans
     indGoal :: Skip Count Bit
     indGoal = goalPlusX 2
@@ -200,14 +203,14 @@ proveBySimulating limit t book (Skip start goal _ _ _) = let
   ans = loop 0 (start ^. cstate) (second NotInfinity $ configToET start ^. _2) (finiteCount 0)
   msg = "starting pos:\n" <> show (pretty start) <> "\nsucceeded: " <> show (has _Right ans)
   in
-    trace msg $
+    --trace msg $
     force ans 
     where
     -- four conditions: we've taken more steps than the limit,
     -- we've succeeded, stepping fails for some reason, or we continue 
     loop :: Int -> Phase -> ExpTape Bit InfCount -> Count -> Either (Text, Maybe (Config Count Bit)) Count
     loop numSteps p tape curCount
-     | trace (toString $ "p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
+     -- | trace (toString $ "p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
       |indMatch p tape goal = pure curCount
       | numSteps > limit = Left ("exceeded limit while simulating", Nothing)
       | otherwise = case skipStep t book p tape of
@@ -400,16 +403,20 @@ generalizeFromExamples :: [(ExpTape Bit Count, ExpTape Bit Count)] -> Maybe (Ski
 generalizeFromExamples slicePairs = undefined
 
 guessInductionHypothesis :: TapeHist Bit InfCount -> DispHist -> Either Text (Skip Count Bit)
-guessInductionHypothesis (TapeHist hist) (DispHist disps) = force $ trace "begin guessIndHyp" $ do
+guessInductionHypothesis (TapeHist hist) (DispHist disps) = force 
+  -- $ trace "begin guessIndHyp" 
+  $ do
   criticalConfig@(criticalPhase, _criticalSignature) <- guessCriticalConfiguration hist
   let
     configIndicesAndConfigs = obtainConfigIndices hist criticalConfig
     configIndices = let ans = fst <$> configIndicesAndConfigs in 
-      trace ("configIndices were: " <> showP ans) ans 
+      --trace ("configIndices were: " <> showP ans) 
+      ans
     indexPairs = zipExact (U.init configIndices) (U.tail configIndices)
     slicePairs = uncurry (getSlicePair hist disps) <$> indexPairs
     allSigs = let ans = fmap (bimapBoth tapeSignature) slicePairs in 
-      trace ("allsigs were: " <> showP ans) ans
+      --trace ("allsigs were: " <> showP ans) 
+      ans
   --only proceed from here if all the pairs have the same signature at both the start and the end
   if allEqual allSigs then Right () else Left "sigs were not all equal"
   --to finish from here, our goal is for each transition start -> end, make a bunch of pairs of counts 
@@ -447,7 +454,9 @@ guessInductionHypothesis (TapeHist hist) (DispHist disps) = force $ trace "begin
       endConfig = combineIntoConfig criticalPhase endCounts endSig
       ans = Skip startConfig (EndMiddle endConfig) Empty False Zero
       msg = "guessed " <> showP ans
-  force $ trace msg $ assert (isSameInAsOut ans) $ pure ans
+  force 
+    -- $ trace msg 
+    $ assert (isSameInAsOut ans) $ pure ans
   --finishing from here is just munging - we have the common signature (almost), we have the common count 
   --pairlists, we just need to assemble them all into the skip of our dreams
   where
@@ -542,10 +551,12 @@ guessWhatHappensNext machine startConfig varToGeneralize
         (sig1 :| restSignatures) = fromList . fmap (fmap tapeSignature) . view _1 <$> simsAtNums
         ans = foldr S.intersection sig1 restSignatures
         msg = "allSigs occurred were:" <> toString (T.intercalate "\n" $ show <$> toList ans) <> "end allsigsoccured\n"
-      in force $ trace msg ans
+      in force 
+        -- $ trace msg 
+        ans
     --generalizes an ending signature if possible
     generalizeOneSig :: (Phase, Signature Bit) -> Maybe (Skip Count Bit)
-    generalizeOneSig psb@(_p, sigToGeneralize) = force $ trace ("generalizing\n" <> show sigToGeneralize)
+    generalizeOneSig psb@(_p, sigToGeneralize) = force $ --trace ("generalizing\n" <> show sigToGeneralize)
       res where
         munge :: [(Phase, ExpTape Bit Count)] -> (Int, (Phase, ExpTape Bit Count))
         munge hist = case findIndex (\(p, t) -> (p, tapeSignature t) == psb) hist of
@@ -578,7 +589,9 @@ guessWhatHappensNext machine startConfig varToGeneralize
               f = (FinCount <$> numsToSimulateAt) 
               s = cl
               m1 = "zipping:" <> showP f <> " " <> showP s
-              ans = trace m1 $ first pure <$> generalizeFromCounts (neZipExact f s)
+              ans = 
+                --trace m1 $ 
+                first pure <$> generalizeFromCounts (neZipExact f s)
               msg = "generalized:" <> show (pretty cl) <> "\ngot\n" <> show (pretty ans)
             in 
               -- trace msg 
@@ -602,7 +615,7 @@ guessWhatHappensNext machine startConfig varToGeneralize
                     neZipExact finalIndices simsAtNums
                   msg = "slicedPairs were:\n" <> show (pretty ans)
                   in
-                  trace msg 
+                  --trace msg 
                     ans
                 countLists :: NonEmpty (([Count], [Count]), ([Count], [Count]))
                 countLists = fmap (bimapBoth getCounts) slicedPairs
@@ -610,7 +623,8 @@ guessWhatHappensNext machine startConfig varToGeneralize
             --after you slice them, they may no longer all be the same signature
             --for now, lets just assume they are
             guard $ list1AllEqual $ fmap (bimapBoth tapeSignature) slicedPairs
-            countPairLists <- trace ("flipcountls" <> showP flippedCountLists) bigTraverse generalizeCL flippedCountLists
+            countPairLists <- --trace ("flipcountls" <> showP flippedCountLists) 
+              bigTraverse generalizeCL flippedCountLists
             let listOfFirstElements = (bifoldMapBoth . bifoldMapBoth . foldMap) (maybeToList . fst) countPairLists 
                 --todo does this do the right thing
                 maxFirstElt = case listOfFirstElements of 
@@ -639,7 +653,8 @@ guessWhatHappensNext machine startConfig varToGeneralize
                   (FinCount 100) False Zero --TODO
                 msg = "guessedWhatsNext " <> showP skipOut 
             assert (endSig `isSubSignatureOf` sigToGeneralize) $
-              force $ trace msg $ assert (isSameInAsOut skipOut) $
+              --force $ trace msg $ 
+              assert (isSameInAsOut skipOut) $
               pure skipOut 
 
 {- We're trying to get the first element of the pair to be target, which will require modifying 
@@ -661,7 +676,8 @@ resolveCountPair target = \case
         msg = "updated " <> showP (f, s) 
           <> " to match " <> showP target 
           <> " getting " <> showP (updatedF, updatedS)
-    trace msg $ assert (updatedF == target) $ pure updatedS
+    --trace msg $
+    assert (updatedF == target) $ pure updatedS
   (Just f, s) -> if f == target then Just s else error ("failed to resolve: " <> showP (target, f, s))
 
 --skipContainsVar :: Skip Count Bit -> Bool
@@ -674,7 +690,7 @@ thingContainsVar = getAny . bifoldMap (Any . countContainsVar) (const mempty) wh
 
 guessAndProveWhatHappensNext :: Turing -> SkipBook Bit -> Config Count Bit -> SymbolVar -> [(Skip Count Bit, SkipOrigin Bit)]
 guessAndProveWhatHappensNext machine book startConfig varToGeneralize
-  = trace ("trying to guess what happens after:\n" <> show (pretty startConfig)) $
+  = --trace ("trying to guess what happens after:\n" <> show (pretty startConfig)) $
     mapMaybe getProof $ zipExact goodGuesses proofAttempts
   where
     guesses = force $ guessWhatHappensNext machine startConfig varToGeneralize
@@ -704,7 +720,7 @@ generalizeFromCounts xs = force $ allEqualPair <|> additivePair <|> affinePair w
         ans = traverse (bitraverse countToMaybeNat countToMaybeNat) xs
         msg = "attempting to generalize these pairs:\n" <> show ans
      in
-        trace msg 
+        --trace msg 
         ans
     subNats :: Natural -> Natural -> Int
     subNats = (-) `on` fromIntegral
