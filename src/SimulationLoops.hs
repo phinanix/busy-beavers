@@ -70,25 +70,32 @@ simulateManyMachinesOuterLoop staticAnal updateFuncs startMachine = loop (startM
   bigUpdateFunc machine = foldl1 (>=>) ((&) machine <$> updateFuncs)
   loop :: (Turing, SimState) -> [(Turing, SimState)]
     -> [(Turing, SimResult (ExpTape Bit InfCount))] -> [(Turing, SimResult (ExpTape Bit InfCount))]
-  loop cur@(curMachine, curState) todo !prevRes = force $ case uncurry bigUpdateFunc cur of
+  loop cur@(curMachine, curState) todo !prevRes = --force $
+   case uncurry bigUpdateFunc cur of
     NewState newState -> loop (curMachine, newState) todo prevRes
-    Result !result -> trace ("got result: " <> show result) $ recurse todo ((curMachine, result) : prevRes)
+    Result !result -> --trace ("got result: " <> show result) $ 
+      recurse todo ((curMachine, result) : prevRes)
     UnknownEdge e -> let 
         candidateMachines = branchOnEdge e curMachine
         mbProofs = staticAnal <$> candidateMachines
         makeRes m = \case 
           Nothing -> Left m 
           (Just hp) -> Right (m, ContinueForever hp)
+        -- musing 31 dec 
+        -- worry: there might be machines that aren't getting counted, making the tree generation
+        -- correct is very important. sometimes we branch to only 4 machines, in particular?
         (newMachines, reses) = partitionEithers $ uncurry makeRes <$> zip candidateMachines mbProofs 
       in
         recurse ((makeNewState e curState <$> newMachines) <> todo) (reses <> prevRes)
   makeNewState :: Edge -> SimState -> Turing -> (Turing, SimState)
   makeNewState edge state machine = (machine, state & s_book %~ updateBook edge machine)
   recurse :: [(Turing, SimState)] -> [(Turing, SimResult (ExpTape Bit InfCount))] -> [(Turing, SimResult (ExpTape Bit InfCount))]
-  recurse todos results | trace ("length todos: " <> show (length todos) <> " length results: " <> show (length results) <> " and last result" <> show (viaNonEmpty head results))    False = undefined
+  --recurse todos results | trace ("length todos: " <> show (length todos) <> " length results: " <> show (length results) <> " and last result" <> show (viaNonEmpty head results))    False = undefined
   recurse [] results = trace "recursed empty" results
-  recurse (next : todos) results = trace ("looping to next:" <> showP (fst next) <> "\nstack depth:" <> showP (length todos))
-    deepseq results $ loop next todos results
+  recurse (next : todos) results = --trace ("looping to next:" <> showP (fst next) <> "\nstack depth:" <> showP (length todos))
+    --(if (length results `mod` 1000 == 0) then trace ("reslength:" <> show (length results)) else id)
+    --deepseq results $ 
+      loop next todos results
 
 liftOneToMulti :: SimOneAction -> SimMultiAction
 liftOneToMulti action machine state = case action machine state of
@@ -144,15 +151,16 @@ simulateStepUntilUnknown = simulateStepOneMachine handle where
 --this is pretty copied from "simulateOneMachine"
 simulateStepPartial :: Partial => Int -> SimMultiAction
 simulateStepPartial limit machine (SimState ph tape book steps skipTrace hist histSet counter curDisp dispHist) = 
-  trace ("stepping bigStep: " <> showP counter <> " smallStep: " <> showP steps) $
+  --trace ("stepping bigStep: " <> showP counter <> " smallStep: " <> showP steps) $
   if steps > limit
   then Result $ Continue steps ph tape curDisp
   else case skipStep machine book ph tape of
     Unknown e -> UnknownEdge e
     MachineStuck -> error "machinestuck "
     Stopped c newTape _skipUsed newDisp -> Result $ Halted (steps + infCountToInt c) newTape (curDisp + dispToInt newDisp)
-    Stepped c newPh newTape skipUsed newDisp -> trace ("entered stepped, c:" <> showP c) $ case c of
-      Infinity -> trace ("res: inf") $ Result $ ContinueForever (SkippedToInfinity steps skipUsed)
+    Stepped c newPh newTape skipUsed newDisp -> --trace ("entered stepped, c:" <> showP c) $ 
+      case c of
+      Infinity -> Result $ ContinueForever (SkippedToInfinity steps skipUsed)
       c -> NewState $ SimState newPh newTape book (steps + infCountToInt c) (skipUsed : skipTrace)
         hist histSet (counter + 1) (curDisp + dispToInt newDisp) dispHist
 

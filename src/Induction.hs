@@ -60,7 +60,8 @@ Shortrange plan to get a thing which can prove the counter machine into main
 proveInductivelyIMeanIT :: Turing -> SkipBook Bit -> Steps -> TapeHist Bit InfCount -> DispHist
     -> (SkipBook Bit, Either Text (Skip Count Bit))
 proveInductivelyIMeanIT machine book curStep hist dispHist
-  = force $ case guessInductionHypothesis hist dispHist of
+  = --force $ 
+  case guessInductionHypothesis hist dispHist of
     Left msg -> (book, Left $ "failed to guessIndHyp:\n" <> msg)
     Right indHyp -> let (newBook, tOrOrigin) = proveStrong 5 machine book indHyp (BoundVar 0) in
       case tOrOrigin of
@@ -115,15 +116,16 @@ proveInductively :: Int -> Turing -> SkipBook Bit -> Skip Count Bit -> BoundVar
     -> Either (Text, Maybe (Config Count Bit)) (SkipOrigin Bit)
 proveInductively limit t book goal indVar = let 
   ans =  -- <> "using book\n" <> show (pretty book)) $
-    force $ case baseCase of
+    --force $
+    case baseCase of
       Left res -> Left $ first ("failed base: " <>) res
       Right _ -> case indCase of
         Left res -> Left $ first ("failed ind: " <>) res
         Right _ ->  pure origin
   msg = ("trying to prove:\n" <> show (pretty goal)) <> "\ngot res" <> show ans
-    in force 
-      -- $ trace msg 
-      $ assert (isSameInAsOut goal) ans 
+    in --force $
+      -- trace msg $
+      assert (isSameInAsOut goal) ans 
     where
     origin :: SkipOrigin Bit
     origin = Induction book limit
@@ -135,7 +137,7 @@ proveInductively limit t book goal indVar = let
     indCase :: Either (Text, Maybe (Config Count Bit)) Count
     --this doesn't actually add the inductive hypothesis to the book!
     indCase = --trace "\nstarting ind\n" $ 
-      deepseq indHyp $
+      --deepseq indHyp $
         proveSimLinearAndTree limit limit t
          (addSkipToBook (goalPlusX 0) InductionHypothesis $ addSkipToBook indHyp InductionHypothesis book)
          indGoal
@@ -144,7 +146,7 @@ proveInductively limit t book goal indVar = let
         ans = goalPlusX 1
         msg = "indHyp is:\n" <> show (pretty ans)
       in
-        force 
+        --force 
         -- $ trace msg
         ans
     indGoal :: Skip Count Bit
@@ -156,12 +158,20 @@ proveInductively limit t book goal indVar = let
 proveSimLinearAndTree :: Int -> Int -> Turing -> SkipBook Bit -> Skip Count Bit -> Either (Text, Maybe (Config Count Bit)) Count
 -- simulateViaDFS :: Int -> Int -> SkipBook Bit -> Skip Count Bit -> Either Text Natural 
 proveSimLinearAndTree linStep treeStep machine book skip 
-  = force $ case simulateViaDFS linStep treeStep book skip of 
+  = --force $ 
+  case simulateViaDFS linStep treeStep book skip of 
     --TODO: this blurs the line of what the returned count means, between big steps and small steps
     Right nat -> Right $ FinCount nat 
     Left _text -> case proveBySimulating linStep machine book skip of 
       --works if you comment out this error and return right, but HOW COULD THAT BE TRUE you should never hit this error
-      Right count -> error $ "what " <> showP count <> "\nwe were proving:\n" <> showP skip
+      --the reason for this is simulateViaDFS should guess the same as proveBySimulating as it's first deep path, and should only recurse onto 
+      --other paths if that doesn't work
+      --but if proveBySimulating returns success, it seems to work, which is a contradiction
+      --oh dear, maybe part of the issue is whether "simulateViaDFS" and "proveBySimulating" are using "big steps" or "little steps"? 
+      --because the error occurs with count=467 which seems to be bigger than the callsite (guessAndProveWhatHappensNext), 
+      --which calls with a limit of 200 afaict 
+      Right count -> error $ "what? count: " <> showP count <> " linstep:" <> showP linStep <> " treestep: " <> showP treeStep 
+                            <> "\nmachine was\n" <> showP machine <> "\nwe were proving:\n" <> showP skip
       res@(Left _) -> res 
 
 -- given a skip, replaces all occurences of a particular BoundVar with a particular Count
@@ -204,7 +214,8 @@ proveBySimulating limit t book (Skip start goal _ _ _) = let
   msg = "starting pos:\n" <> show (pretty start) <> "\nsucceeded: " <> show (has _Right ans)
   in
     --trace msg $
-    force ans 
+    --force 
+    ans 
     where
     -- four conditions: we've taken more steps than the limit,
     -- we've succeeded, stepping fails for some reason, or we continue 
@@ -403,9 +414,8 @@ generalizeFromExamples :: [(ExpTape Bit Count, ExpTape Bit Count)] -> Maybe (Ski
 generalizeFromExamples slicePairs = undefined
 
 guessInductionHypothesis :: TapeHist Bit InfCount -> DispHist -> Either Text (Skip Count Bit)
-guessInductionHypothesis (TapeHist hist) (DispHist disps) = force 
-  -- $ trace "begin guessIndHyp" 
-  $ do
+guessInductionHypothesis (TapeHist hist) (DispHist disps) = 
+  do
   criticalConfig@(criticalPhase, _criticalSignature) <- guessCriticalConfiguration hist
   let
     configIndicesAndConfigs = obtainConfigIndices hist criticalConfig
@@ -454,9 +464,9 @@ guessInductionHypothesis (TapeHist hist) (DispHist disps) = force
       endConfig = combineIntoConfig criticalPhase endCounts endSig
       ans = Skip startConfig (EndMiddle endConfig) Empty False Zero
       msg = "guessed " <> showP ans
-  force 
+  --force $
     -- $ trace msg 
-    $ assert (isSameInAsOut ans) $ pure ans
+  assert (isSameInAsOut ans) $ pure ans
   --finishing from here is just munging - we have the common signature (almost), we have the common count 
   --pairlists, we just need to assemble them all into the skip of our dreams
   where
@@ -527,7 +537,8 @@ for now, lets do all of the ones that have the same signature complexity as the 
 -}
 guessWhatHappensNext :: Turing -> Config Count Bit -> SymbolVar -> [Skip Count Bit]
 guessWhatHappensNext machine startConfig varToGeneralize
- = mapMaybe generalizeOneSig (force $ toList sigsWhichOccurred) where
+ = mapMaybe generalizeOneSig (--force $ 
+ toList sigsWhichOccurred) where
     -- minimumComplexity = minimum $ signatureComplexity . view _2 <$> toList sigsWhichOccurred
     -- sigsOfMinComplexity = filter (\x -> signatureComplexity (view _2 x) == minimumComplexity) $ toList sigsWhichOccurred
     numsToSimulateAt :: NonEmpty Natural
@@ -551,12 +562,12 @@ guessWhatHappensNext machine startConfig varToGeneralize
         (sig1 :| restSignatures) = fromList . fmap (fmap tapeSignature) . view _1 <$> simsAtNums
         ans = foldr S.intersection sig1 restSignatures
         msg = "allSigs occurred were:" <> toString (T.intercalate "\n" $ show <$> toList ans) <> "end allsigsoccured\n"
-      in force 
+      in --force 
         -- $ trace msg 
         ans
     --generalizes an ending signature if possible
     generalizeOneSig :: (Phase, Signature Bit) -> Maybe (Skip Count Bit)
-    generalizeOneSig psb@(_p, sigToGeneralize) = force $ --trace ("generalizing\n" <> show sigToGeneralize)
+    generalizeOneSig psb@(_p, sigToGeneralize) = --force $ --trace ("generalizing\n" <> show sigToGeneralize)
       res where
         munge :: [(Phase, ExpTape Bit Count)] -> (Int, (Phase, ExpTape Bit Count))
         munge hist = case findIndex (\(p, t) -> (p, tapeSignature t) == psb) hist of
@@ -693,9 +704,12 @@ guessAndProveWhatHappensNext machine book startConfig varToGeneralize
   = --trace ("trying to guess what happens after:\n" <> show (pretty startConfig)) $
     mapMaybe getProof $ zipExact goodGuesses proofAttempts
   where
-    guesses = force $ guessWhatHappensNext machine startConfig varToGeneralize
+    guesses = --force $ 
+      guessWhatHappensNext machine startConfig varToGeneralize
     goodGuesses = filter thingContainsVar guesses
-    proofAttempts = force $ (\skip -> force $ proveInductively 200 machine book skip (BoundVar 0)) <$> goodGuesses
+    proofAttempts = --force $ 
+      (\skip -> --force $ 
+        proveInductively 200 machine book skip (BoundVar 0)) <$> goodGuesses
     getProof = \case
         (_, Left msg) -> --trace ("induction failed b/c:\n" <> show (pretty msg))
            Nothing
@@ -709,7 +723,8 @@ guessAndProveWhatHappensNext machine book startConfig varToGeneralize
 -- else, see if they are generated by a function of the form x -> m * x + b 
 -- else give up 
 generalizeFromCounts :: NonEmpty (Count, Count) -> Maybe (Count, Count)
-generalizeFromCounts xs = force $ allEqualPair <|> additivePair <|> affinePair where
+generalizeFromCounts xs = --force $ 
+  allEqualPair <|> additivePair <|> affinePair where
     allEqualPair :: Maybe (Count, Count)
     allEqualPair = guard (list1AllEqual xs) >> pure (head xs)
     countToMaybeNat = \case
