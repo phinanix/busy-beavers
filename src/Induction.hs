@@ -133,24 +133,27 @@ proveInductively limit t book goal indVar = let
     baseCase = proveSimLinearAndTree limit limit t book baseGoal
     baseGoal :: Skip Count Bit
     baseGoal = replaceVarInSkip goal indVar $ finiteCount 1 --TODO, should be 1
-    goalPlusX x = replaceVarInSkip goal indVar $ FinCount x <> symbolVarCount newSymbolVar 1
+    setStepCount steps skip = skip & hops .~ FinCount steps
+    goalPlusX x = --setStepCount 100 $ 
+      replaceVarInSkip goal indVar $ FinCount x <> symbolVarCount newSymbolVar 1
     indCase :: Either (Text, Maybe (Config Count Bit)) Count
     --this doesn't actually add the inductive hypothesis to the book!
     indCase = --trace "\nstarting ind\n" $ 
       --deepseq indHyp $
         proveSimLinearAndTree limit limit t
-         (addSkipToBook (goalPlusX 0) InductionHypothesis $ addSkipToBook indHyp InductionHypothesis book)
+         (addSkipToBook indHyp InductionHypothesis book)
          indGoal
     indHyp :: Skip Count Bit
     indHyp = let
-        ans = goalPlusX 1
+        --TODO: make the hypothesis be 0 and the goal be 1 again
+        ans = goalPlusX 0
         msg = "indHyp is:\n" <> show (pretty ans)
       in
         --force 
         -- $ trace msg
         ans
     indGoal :: Skip Count Bit
-    indGoal = goalPlusX 2
+    indGoal = goalPlusX 1
     newSymbolVar :: SymbolVar --TODO: this is obviously incredibly unsafe
     newSymbolVar = SymbolVar 0
 
@@ -162,7 +165,7 @@ proveSimLinearAndTree linStep treeStep machine book skip
   case simulateViaDFS linStep treeStep book skip of 
     --TODO: this blurs the line of what the returned count means, between big steps and small steps
     Right nat -> Right $ FinCount nat 
-    Left _text -> case proveBySimulating linStep machine book skip of 
+    Left text -> case proveBySimulating linStep machine book skip of 
       --works if you comment out this error and return right, but HOW COULD THAT BE TRUE you should never hit this error
       --the reason for this is simulateViaDFS should guess the same as proveBySimulating as it's first deep path, and should only recurse onto 
       --other paths if that doesn't work
@@ -172,6 +175,8 @@ proveSimLinearAndTree linStep treeStep machine book skip
       --which calls with a limit of 200 afaict 
       Right count -> error $ "what? count: " <> showP count <> " linstep:" <> showP linStep <> " treestep: " <> showP treeStep 
                             <> "\nmachine was\n" <> showP machine <> "\nwe were proving:\n" <> showP skip
+                            <> "\ndfs failed because:" <> text 
+                            <> "\nbook was:\n" <> showP book 
       res@(Left _) -> res 
 
 -- given a skip, replaces all occurences of a particular BoundVar with a particular Count
@@ -212,17 +217,19 @@ proveBySimulating :: Int -> Turing -> SkipBook Bit -> Skip Count Bit -> Either (
 proveBySimulating limit t book (Skip start goal _ _ _) = let 
   ans = loop 0 (start ^. cstate) (second NotInfinity $ configToET start ^. _2) (finiteCount 0)
   msg = "starting pos:\n" <> show (pretty start) <> "\nsucceeded: " <> show (has _Right ans)
+      <> "\nans:" <> showP ans 
   in
-    --trace msg $
-    --force 
+    force $ 
+    trace msg 
     ans 
     where
     -- four conditions: we've taken more steps than the limit,
     -- we've succeeded, stepping fails for some reason, or we continue 
     loop :: Int -> Phase -> ExpTape Bit InfCount -> Count -> Either (Text, Maybe (Config Count Bit)) Count
     loop numSteps p tape curCount
-     -- | trace (toString $ "p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
-      |indMatch p tape goal = pure curCount
+      | trace (Unsafe.init $ toString $ "steps:" <> show numSteps <> " count:" <> showP curCount <>
+                 " p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
+      | indMatch p tape goal = trace ("succeeded with count:" <> showP curCount) $ pure curCount
       | numSteps > limit = Left ("exceeded limit while simulating", Nothing)
       | otherwise = case skipStep t book p tape of
             Unknown e -> Left ("hit unknown edge" <> show e, Nothing)
@@ -273,14 +280,15 @@ getNextConfigs book curConfig = first deInfCount . view (_2 . resConfig) <$> cho
 --the text is why you failed, and the count is how many big steps 
 simulateViaDFS :: Int -> Int -> SkipBook Bit -> Skip Count Bit -> Either Text Natural 
 simulateViaDFS stepLim depthLim book (Skip startConfig skipEnd _hops _halts _disp) = case res of 
-  Just (Success vs) -> Right $ fromIntegral $ length vs
+  Right (Success vs) -> Right $ fromIntegral $ length vs
   --the problem here is we sort of want some kind of like 'what did the DFS get stuck on' list 
   --but that's not something we have right now
-  _notSuccess -> Left "failed "
+  Right NoSuccess -> Left "dfs exhaustively searched with no results"
+  Left message -> Left $ "failed dfs: " <> message
   where 
-    res = do 
-      endConfig <- preview _EndMiddle skipEnd
-      dfs stepLim depthLim (getNextConfigs book) (== endConfig) startConfig 
+    res = case preview _EndMiddle skipEnd of 
+      Nothing -> Left "target skip did not endmiddle"
+      Just endConfig -> dfs stepLim depthLim (getNextConfigs book) (== endConfig) startConfig 
     
 transposeNE :: NonEmpty [a] -> [NonEmpty a]
 transposeNE (x :| xs) = getZipList $ (:|) <$> ZipList x <*> ZipList (transpose xs)

@@ -28,13 +28,13 @@ spec :: Spec
 spec = do 
   describe "dfs" $ do 
     it "exhausts a simple graph" $
-      dfs 5 100 getAdjacentGWB (const False) (GraphWithBranches (4,0)) `shouldBe` (Just NoSuccess)
+      dfs 5 100 getAdjacentGWB (const False) (GraphWithBranches (4,0)) `shouldBe` (Right NoSuccess)
     it "finds a node" $ 
-      dfs 5 100 getAdjacentGWB (== GraphWithBranches (0,0)) (GraphWithBranches (5,0)) `shouldBe` (Just $ Success $ GraphWithBranches . (,0) <$> [5,4..0])
+      dfs 5 100 getAdjacentGWB (== GraphWithBranches (0,0)) (GraphWithBranches (5,0)) `shouldBe` (Right $ Success $ GraphWithBranches . (,0) <$> [5,4..0])
     it "bottoms out if the search isn't deep enough" $
-      dfs 4 100 getAdjacentGWB (== GraphWithBranches (0,0)) (GraphWithBranches (5,0)) `shouldBe` Nothing
+      dfs 4 100 getAdjacentGWB (== GraphWithBranches (0,0)) (GraphWithBranches (5,0)) `shouldSatisfy` (has _Left)
     it "finds a node with a lot of branching paths" $ 
       dfs 7 500 getAdjacentBS (== BinarySeq (take 6 (repeat True))) (BinarySeq []) `shouldBe` 
-        (Just $ Success $ (\n -> BinarySeq (take n (repeat True))) <$> [0.. 6])
+        (Right $ Success $ (\n -> BinarySeq (take n (repeat True))) <$> [0.. 6])
     it "fails if there are too many nodes" $
-      dfs 10 100 getAdjacentBS (== BinarySeq (take 7 (repeat True))) (BinarySeq []) `shouldBe`Nothing
+      dfs 10 100 getAdjacentBS (== BinarySeq (take 7 (repeat True))) (BinarySeq []) `shouldSatisfy` (has _Left)

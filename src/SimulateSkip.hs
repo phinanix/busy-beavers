@@ -101,6 +101,9 @@ instance (Pretty s) => Pretty (SkipOrigin s) where
   pretty (Glued first second) = "a skip resulting from gluing" <> line <> pretty first <> line
     <> "along with" <> pretty second
   pretty (Induction _book _i) = "a skip proved by induction"
+  pretty (GlueStepRange first second) = "a skip resulting from glueing all skips used in the step range"
+    <> show first <> " to " <> show second 
+  pretty InductionHypothesis = "a skip which is our current induction hypothesis"
 
 --the count is the number of atomic steps the skip results in
 data SkipResult s c = Skipped
@@ -300,7 +303,8 @@ pickBestSkip = \case
   [] -> MachineStuck --TODO :: can we generate this message somewhere better?
   appliedSkips -> let
     (bestSkip, Skipped hops newP newT newD) = maximumBy skipFarthest appliedSkips
-    in --trace ("bestskip was:" <> showP bestSkip) $
+    in 
+      --trace ("hops: " <> showP hops <> " bestskip was:" <> showP bestSkip) $
     if bestSkip ^. halts then Stopped hops newT bestSkip newD
       else Stepped hops newP newT bestSkip newD
 

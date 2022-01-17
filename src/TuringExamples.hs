@@ -119,10 +119,22 @@ not_halt3 = unm "FL1TLHTR0FL2TR1TL0"
 false_backward_search :: Turing
 false_backward_search = unm "TR1___FR2_________"
 
+--we got this machine from triggering the error in the second case statement in proveSimLinearAndTree
+--haven't carefully analyzed it but from a quick look appears to be bin-counter-ish
+{-
+the bug went away when I changed there to be only one induction hypothesis. I think the problem is DFS
+was using one of the indhyps first, and linear search was using the other one (somehow?) and so they 
+were getting different answers, which does seem bad. But I definitely don't understand the problem 
+as well as I could. 
+-}
+some_kind_of_bincounter :: Turing 
+some_kind_of_bincounter = unm "TR1FL2FL0FR3TR3TL0FR1___"
+
 machineList :: [Turing]
 machineList = [weird3, almostweird3, fullsim_not_halt3, bb3, simple_sweeper, 
   checkerboardSweeper, goesLeftForever, binaryCounterTFTT, machineBreaksIndGuess, 
-  false_backward_search, not_halt3, jumps_to_end, loop2, bb2]
+  false_backward_search, not_halt3, jumps_to_end, loop2, bb2,
+  some_kind_of_bincounter]
 
 instance Arbitrary Turing where 
   arbitrary = elements machineList 

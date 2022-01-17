@@ -19,24 +19,24 @@ data SearchResult v = NoSuccess | Success [v] deriving (Eq, Ord, Show, Generic)
 will search to at most the depthLimit from the start, and will see at most nodeLimit nodes
 searches from the given vertex to try to find "success" nodes. 
 -}
-dfs :: forall v. (Ord v) => Int -> Int -> (v -> [v]) -> (v -> Bool) -> v -> Maybe (SearchResult v)
+dfs :: forall v. (Ord v) => Int -> Int -> (v -> [v]) -> (v -> Bool) -> v -> Either Text (SearchResult v)
 dfs depthLimit nodeLimit getAdjacent isSuccess startVertex = munge $ loop True Empty [] [(0, startVertex)] where 
-  munge :: (Bool, Maybe [v]) -> Maybe (SearchResult v)
+  munge :: (Bool, Either Text [v]) -> Either Text (SearchResult v)
   munge = \case 
-    (_, Just path) -> Just (Success path)
-    (True, Nothing) -> Just NoSuccess 
-    (False, Nothing) -> Nothing 
+    (_, Right path) -> Right (Success path)
+    (True, Left _reason) -> Right NoSuccess 
+    (False, Left reason) -> Left $ "search was not exhaustive and " <> reason 
   --explored nodes, the path from the start to here, and the stack of things to explore
   --the stack is a list of depths and a vertex at that depth
-  loop :: Bool -> Set v -> [v] -> [(Int, v)] -> (Bool, Maybe [v])
+  loop :: Bool -> Set v -> [v] -> [(Int, v)] -> (Bool, Either Text [v])
   -- loop searchWasExhaustive explored curPath stack | 
   --    trace ("curStack: " <> show stack) False = undefined 
-  loop searchWasExhaustive explored curPath stack = if length explored > nodeLimit then (False, Nothing) else 
+  loop searchWasExhaustive explored curPath stack = if length explored > nodeLimit then (False, Left "hit nodelimit") else 
     case stack of 
-      [] -> (searchWasExhaustive, Nothing)
+      [] -> (searchWasExhaustive, Left "ran out of things to search")
       (vDepth, v) : vs -> let newPath = takeExact vDepth curPath ++ [v] in 
         if isSuccess v 
-          then (searchWasExhaustive, Just newPath)
+          then (searchWasExhaustive, Right newPath)
           else let 
               (newBool, newVertices) = if length newPath > depthLimit then (False, []) else
                 (searchWasExhaustive, filter (not . flip S.member explored) $ getAdjacent v) in 
