@@ -67,7 +67,7 @@ totalMachines r = r ^. haltCount + r ^. provenForever + r ^. unproven
 
 dispUnprovenFraction :: Results a -> Text
 dispUnprovenFraction r = fromString $
-  (showFFloat (Just 2) $ fromIntegral (100 * r ^. unproven) / fromIntegral (r^. provenForever))  ""
+  (showFFloat (Just 2) $ fromIntegral (100 * r ^. unproven) / fromIntegral (r^. provenForever + r^. unproven))  ""
 
 dispResults :: (a -> Text) -> Results a -> Text
 dispResults dispTape r = "checked: " <> show (totalMachines r) <> " machines.\n"

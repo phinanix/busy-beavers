@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 13a764a17d3985277da920307f39b76a34859c2f6a34b69118408edd01e3d2da
+-- hash: cf22de5ea01e588dd1c9e103dc3516f7ac3209531d175e7a72602fcc83f130a4
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -36,6 +36,7 @@ library
       Graphs
       HaltProof
       Induction
+      LinRecurrence
       MoreSimulationLoops
       Notation
       Results
@@ -99,6 +100,7 @@ test-suite busy-beavers-test
       GlueSpec
       GraphsSpec
       InductionSpec
+      LinRecurrenceSpec
       MoreSimulationLoopsSpec
       NotationSpec
       SimulateSkipSpec

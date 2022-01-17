@@ -130,6 +130,26 @@ as well as I could.
 some_kind_of_bincounter :: Turing 
 some_kind_of_bincounter = unm "TR1FL2FL0FR3TR3TL0FR1___"
 
+--three machines that were on 16 Jan not proven by my program
+{-
+a slightly tricky christmas tree. it prints TTF forever, but while it just scans over it in one direction,
+in the other direction it actually scoots it over one place. should be handled fine by k=3 multisymbol
+-}
+not_halt4a :: Turing 
+not_halt4a = unm "TR1TL2FL2FR0TR1FL3TL0___"
+
+{-
+bog standard TF christmas tree 
+-}
+not_halt4b :: Turing 
+not_halt4b = unm "TR1FL2FL2FR0TL0FL3TL0___"
+
+{-
+TF / TT counter, should be handled by k=2 multisymbol
+-}
+not_halt4c :: Turing 
+not_halt4c = unm "TR1TR0FL2FR0___FL3TL0TL2"
+
 machineList :: [Turing]
 machineList = [weird3, almostweird3, fullsim_not_halt3, bb3, simple_sweeper, 
   checkerboardSweeper, goesLeftForever, binaryCounterTFTT, machineBreaksIndGuess, 
