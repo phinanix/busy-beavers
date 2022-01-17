@@ -91,7 +91,8 @@ simulateManyMachinesOuterLoop staticAnal updateFuncs startMachine = loop (startM
   makeNewState edge state machine = (machine, state & s_book %~ updateBook edge machine)
   recurse :: [(Turing, SimState)] -> [(Turing, SimResult (ExpTape Bit InfCount))] -> [(Turing, SimResult (ExpTape Bit InfCount))]
   --recurse todos results | trace ("length todos: " <> show (length todos) <> " length results: " <> show (length results) <> " and last result" <> show (viaNonEmpty head results))    False = undefined
-  recurse [] results = trace "recursed empty" results
+  recurse [] results = --trace "recursed empty" 
+    results
   recurse (next : todos) results = --trace ("looping to next:" <> showP (fst next) <> "\nstack depth:" <> showP (length todos))
     --(if (length results `mod` 1000 == 0) then trace ("reslength:" <> show (length results)) else id)
     --deepseq results $ 

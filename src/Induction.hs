@@ -219,17 +219,17 @@ proveBySimulating limit t book (Skip start goal _ _ _) = let
   msg = "starting pos:\n" <> show (pretty start) <> "\nsucceeded: " <> show (has _Right ans)
       <> "\nans:" <> showP ans 
   in
-    force $ 
-    trace msg 
+    --force $ 
+    --trace msg 
     ans 
     where
     -- four conditions: we've taken more steps than the limit,
     -- we've succeeded, stepping fails for some reason, or we continue 
     loop :: Int -> Phase -> ExpTape Bit InfCount -> Count -> Either (Text, Maybe (Config Count Bit)) Count
     loop numSteps p tape curCount
-      | trace (Unsafe.init $ toString $ "steps:" <> show numSteps <> " count:" <> showP curCount <>
-                 " p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
-      | indMatch p tape goal = trace ("succeeded with count:" <> showP curCount) $ pure curCount
+      -- | trace (Unsafe.init $ toString $ "steps:" <> show numSteps <> " count:" <> showP curCount <>
+      --            " p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
+      | indMatch p tape goal = pure curCount
       | numSteps > limit = Left ("exceeded limit while simulating", Nothing)
       | otherwise = case skipStep t book p tape of
             Unknown e -> Left ("hit unknown edge" <> show e, Nothing)
