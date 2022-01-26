@@ -27,12 +27,15 @@ import Count
 --   see what might have resulted in that reaches a contradiction
 -- - SkippedToInfinity means that after the given number of steps, the given skip
 --   matches and proves the machine will consume an infinite amount of tape
+-- - LinRecur a b means the machine enters linrecurrence on step a and the length
+--   of the recurrence is b 
 data HaltProof
   = HaltUnreachable Phase
   | Cycle Steps Steps
   | OffToInfinityN Steps Dir
   | BackwardSearch
   | SkippedToInfinity Steps (Skip Count Bit)
+  | LinRecur Steps Steps 
   deriving (Eq, Ord, Show, Generic)
 instance NFData HaltProof
 

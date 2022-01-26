@@ -20,9 +20,23 @@ import Results
 import HaltProof
 import MoreSimulationLoops
 import Util
+import LinRecurrence 
+
+getRecurFromMachine :: Int -> Turing -> Maybe HaltProof
+getRecurFromMachine steps machine = undefined where
+  state = getStateAfterTime steps machine 
 
 spec :: Spec
 spec = do
-  describe "recurr" $ do
-    it "works on a simple case" $
-      3 `shouldBe` 3
+  describe "hasPair" $ do
+    it "finds a pair" $
+      hasPair "0123456289" `shouldBe` Just (2, 7)
+    it "doesn't find a pair" $
+      hasPair "abcdefghijklmnopqrstuvwxyz" `shouldBe` Nothing
+  describe "detectLinRecurrence" $ do 
+    it "finds a recurrence" $ 
+      getRecurRes 300 machineStuckMachine `shouldBe` Just (LinRecur 119 130)
+    it "doesn't find a recurrence for a halting machine" $ 
+      getRecurRes 12 bb3 `shouldBe` Nothing
+    it "doesn't find a recurrence for a counting machine" $
+      getRecurRes 500 binaryCounterTFTT `shouldBe` Nothing 

@@ -303,3 +303,10 @@ simulateForTime time = simOneFromStartLoop actionList where
 
 getStateAfterTime :: Partial => Int -> Turing -> SimState
 getStateAfterTime time turing = last $ simulateForTime time turing ^. _2
+
+getTwoHistAfterTime :: Partial => Int -> Turing -> (TapeHist Bit InfCount, DispHist)
+getTwoHistAfterTime stepCount turing 
+  = (guessingState ^. s_history, guessingState ^. s_disp_history) 
+  where
+    guessingState = getStateAfterTime stepCount turing
+  

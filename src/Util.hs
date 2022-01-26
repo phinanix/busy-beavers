@@ -11,6 +11,10 @@ import Control.Exception
 
 type MMap = MonoidalMap
 
+(.:) :: (a -> b) -> (c -> d -> a) -> c -> d -> b
+(.:) f g a b = f (g a b)
+
+
 showInt3Wide :: Int -> Text
 showInt3Wide i@((\i -> i < 10) -> True) = "  " <> show i
 showInt3Wide i@((\i -> i < 100) -> True) = " " <> show i

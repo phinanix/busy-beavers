@@ -21,6 +21,9 @@ import Control.Exception (assert)
 import Data.Foldable
 import Relude.Unsafe ((!!))
 import qualified Relude.Unsafe as U
+import Data.Bifoldable (Bifoldable)
+import Graphs
+import Data.Bitraversable
 
 import Util
 import Count
@@ -33,22 +36,33 @@ import Display
 import Safe.Partial
 import HaltProof
 import Glue
-import Data.Bifoldable (Bifoldable)
-import Graphs
-import Data.Bitraversable
 
---works by sorting the history, determining if there is a duplicate, and if so, there is a cycle and 
---we can return a haltproof right away
-histHasDuplicate :: (Ord s, Ord c) => ReverseTapeHist s c -> Maybe HaltProof 
-histHasDuplicate (ReverseTapeHist histList) = let 
-    histLen = length histList
-    enumHist = zip [(histLen - 1), (histLen -2)..] histList
-    sortedHist = sortOn snd enumHist
+
+--given a list, sorts it and uses this to find whether it contains a duplicate
+hasPair :: (Ord a) => [a] -> Maybe (Int, Int)
+hasPair [] = Nothing
+hasPair xs = let 
+    enumXs = zip [0,1..] xs 
+    sortedXs = sortOn snd enumXs 
+    xsPairs = zip (U.init sortedXs) (U.tail sortedXs)
     in 
-    undefined
+    --find the first element of the list where the two things are equal
+    --then return their indices
+    (\((i, _a), (j, _b)) -> (i,j)) <$> 
+      find (\((_i, a), (_j, b)) -> a==b) xsPairs
+
+
+--works by sorting the history, determining if there is a duplicate, 
+--and if so, there is a cycle and we can return a haltproof right away
+histHasDuplicate :: (Ord s, Ord c) => ReverseTapeHist s c -> Maybe HaltProof 
+histHasDuplicate (ReverseTapeHist revHist) = mkHP <$> hasPair (reverse revHist) 
+  where
+    mkHP (i, j) = Cycle i j
 
 --detects lin recurrence, as determined by the history
 --currently disphist is implemented in a bad way (skips can care about a whole chunk of symbols) so 
 --this function isn't actually writeable, so I should fix that first 
-detectLinRecurrence :: ReverseTapeHist Bit InfCount -> ReverseDispHist -> Maybe HaltProof
+detectLinRecurrence :: TapeHist Bit InfCount 
+  -> DispHist 
+  -> Maybe HaltProof
 detectLinRecurrence hist disphist = undefined 
