@@ -41,7 +41,10 @@ makeIndGuess :: Int -> Turing -> Either Text (Skip Count Bit)
 makeIndGuess = uncurry guessInductionHypothesis .: getTwoHistAfterTime
 
 getRecurRes :: Int -> Turing -> Maybe HaltProof
-getRecurRes = uncurry detectLinRecurrence .: getTwoHistAfterTime
+getRecurRes stepCount turing = detectLinRecurrence tapeHist rsHist where 
+  tapeHist = guessingState ^. s_history 
+  rsHist = guessingState ^. s_readshift_history
+  guessingState = getStateAfterTime stepCount turing
 
 {-
 plan for integrating proveInductivelyIMeanIT into the main loop:

@@ -129,17 +129,18 @@ addSkipToStateOrInf skip origin state = if skipGoesForever skip && skipAppliedIn
 simulateStepOneMachine :: Partial => (Edge -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState) 
   -> Int -> Turing -> SimState 
   -> Either (SimResult (ExpTape Bit InfCount)) SimState
-simulateStepOneMachine handleUnknown limit machine state@(SimState ph tape book steps skipTrace hist histSet counter curDisp dispHist) = if steps > limit
-  then Left $ Continue steps ph tape curDisp
-  else --trace ("counter:" <> show counter) $ 
-  case skipStep machine book ph tape of
-  Unknown e -> handleUnknown e state 
-  MachineStuck -> Left MachineStuckRes
-  Stopped c newTape _skipUsed newDisp -> Left $ Halted (steps + infCountToInt c) newTape (curDisp + dispToInt newDisp)
-  Stepped c newPh newTape skipUsed newDisp -> case c of
-    Infinity -> Left $ ContinueForever (SkippedToInfinity steps skipUsed)
-    c -> Right $ SimState newPh newTape book (steps + infCountToInt c) (skipUsed : skipTrace)
-      hist histSet (counter + 1) (curDisp + dispToInt newDisp) dispHist
+simulateStepOneMachine handleUnknown limit machine state@(SimState ph tape book steps skipTrace hist histSet counter curDisp dispHist rsHist) 
+  = if steps > limit
+    then Left $ Continue steps ph tape curDisp
+    else --trace ("counter:" <> show counter) $ 
+    case skipStep machine book ph tape of
+    Unknown e -> handleUnknown e state 
+    MachineStuck -> Left MachineStuckRes
+    Stopped c newTape _skipUsed newDisp rs -> Left $ Halted (steps + infCountToInt c) newTape (curDisp + dispToInt newDisp)
+    Stepped c newPh newTape skipUsed newDisp rs -> case c of
+      Infinity -> Left $ ContinueForever (SkippedToInfinity steps skipUsed)
+      c -> Right $ SimState newPh newTape book (steps + infCountToInt c) (skipUsed : skipTrace)
+        hist histSet (counter + 1) (curDisp + dispToInt newDisp) dispHist (addToRRSH rs rsHist)
 
 --this one essentially asserts there is no unknown edge, or otherwise crashes
 simulateStepTotalLoop :: Partial => Int -> Turing -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
@@ -151,19 +152,19 @@ simulateStepUntilUnknown = simulateStepOneMachine handle where
 
 --this is pretty copied from "simulateOneMachine"
 simulateStepPartial :: Partial => Int -> SimMultiAction
-simulateStepPartial limit machine (SimState ph tape book steps skipTrace hist histSet counter curDisp dispHist) = 
+simulateStepPartial limit machine (SimState ph tape book steps skipTrace hist histSet counter curDisp dispHist rsHist) = 
   --trace ("stepping bigStep: " <> showP counter <> " smallStep: " <> showP steps) $
   if steps > limit
   then Result $ Continue steps ph tape curDisp
   else case skipStep machine book ph tape of
     Unknown e -> UnknownEdge e
     MachineStuck -> error "machinestuck "
-    Stopped c newTape _skipUsed newDisp -> Result $ Halted (steps + infCountToInt c) newTape (curDisp + dispToInt newDisp)
-    Stepped c newPh newTape skipUsed newDisp -> --trace ("entered stepped, c:" <> showP c) $ 
+    Stopped c newTape _skipUsed newDisp rs -> Result $ Halted (steps + infCountToInt c) newTape (curDisp + dispToInt newDisp)
+    Stepped c newPh newTape skipUsed newDisp rs -> --trace ("entered stepped, c:" <> showP c) $ 
       case c of
       Infinity -> Result $ ContinueForever (SkippedToInfinity steps skipUsed)
       c -> NewState $ SimState newPh newTape book (steps + infCountToInt c) (skipUsed : skipTrace)
-        hist histSet (counter + 1) (curDisp + dispToInt newDisp) dispHist
+        hist histSet (counter + 1) (curDisp + dispToInt newDisp) dispHist (addToRRSH rs rsHist)
 
 gluePreviousTwoSkips :: SimState -> SimState
 gluePreviousTwoSkips state = state & s_book .~ newBook where

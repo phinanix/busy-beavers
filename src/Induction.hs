@@ -241,8 +241,8 @@ proveBySimulating limit t book (Skip start goal _ _ _) = let
                   <> "\ngoal:" <> show (pretty goal) <> "\ncur tape:" <> dispExpTape tape
                 in
                 Left (msg, Just stuckConfig)
-            Stepped Infinity _ _ _ _ -> Left ("hopped to infinity", Nothing)
-            Stepped (NotInfinity hopsTaken) newPhase newTape _ _
+            Stepped Infinity _ _ _ _ _ -> Left ("hopped to infinity", Nothing)
+            Stepped (NotInfinity hopsTaken) newPhase newTape _ _ _
                 -> loop (numSteps + 1) newPhase newTape (curCount <> hopsTaken)
     indMatch :: Phase -> ExpTape Bit InfCount -> SkipEnd Count Bit -> Bool
     indMatch cur_p et se = case bitraverse pure mbdeInfCount et of

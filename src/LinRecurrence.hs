@@ -111,12 +111,12 @@ New design of readshift
 -}
 detectLinRecurrence :: forall s. (Eq s) 
   => TapeHist s InfCount 
-  -> DispHist 
+  -> ReadShiftHist 
   -> Maybe HaltProof
-detectLinRecurrence hist@(TapeHist thList) disphist@(DispHist dhList) 
+detectLinRecurrence hist@(TapeHist thList) rshist@(ReadShiftHist rshList) 
   = viaNonEmpty head $ catMaybes allMaybeProofs
   where
-  checkForRecur :: (Natural, Natural)
+  checkForRecur :: (Int, Int)
     -> (Phase, ExpTape s InfCount) 
     -> (Phase, ExpTape s InfCount) 
     -> ReadShift -> Maybe HaltProof 
@@ -130,18 +130,19 @@ detectLinRecurrence hist@(TapeHist thList) disphist@(DispHist dhList)
       let startRng = sliceExpTape et l r 
           endRng = sliceExpTape et' l r
       guard (startRng == endRng) 
-      pure $ LinRecur (fromIntegral i) (fromIntegral j)
+      pure $ LinRecur i j
   --pretending for now that DispHist contains ReadShifts
-  checkForRecurAtIndices :: (Natural, Natural) -> Maybe HaltProof
+  checkForRecurAtIndices :: (Int, Int) -> Maybe HaltProof
   checkForRecurAtIndices (i, j) = checkForRecur (i, j) startC endC readShift where 
     startC = thList !! fromIntegral i
     endC = thList !! fromIntegral j 
-    readShift = undefined 
+    readShift = mconcat $ slice i j rshList 
   --lenHist is the length of the history, so it minus one is max valid index
-  genValidIndices :: Natural -> [(Natural, Natural)]
+  genValidIndices :: Int -> [(Int, Int)]
   genValidIndices lenHist = concat $ genIndicesAtDist lenHist <$> [1, 2 .. lenHist -1]
-  genIndicesAtDist :: Natural -> Natural -> [(Natural, Natural)]
+  genIndicesAtDist :: Int -> Int -> [(Int, Int)]
   genIndicesAtDist lenHist dist 
     = (\x -> (x, x + dist)) <$> [0, 1 .. (lenHist -1) - dist] 
-  allMaybeProofs = assert (length thList == length dhList) $ 
+  --TODO, I think this assert probably has an off by one in it?
+  allMaybeProofs = assert (length thList == length rshList) $ 
     checkForRecurAtIndices <$> genValidIndices (fromIntegral $ length thList)

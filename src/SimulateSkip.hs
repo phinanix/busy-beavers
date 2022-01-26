@@ -24,8 +24,8 @@ import Safe.Partial
 
 
 data PartialStepResult a = Unknown Edge
-                         | Stopped InfCount a (Skip Count Bit) (Displacement InfCount)
-                         | Stepped InfCount Phase a (Skip Count Bit) (Displacement InfCount)
+                         | Stopped InfCount a (Skip Count Bit) (Displacement InfCount) ReadShift 
+                         | Stepped InfCount Phase a (Skip Count Bit) (Displacement InfCount) ReadShift 
                          | MachineStuck 
                          deriving (Eq, Ord, Show, Generic)
 
@@ -47,11 +47,15 @@ newtype TapeHist s c = TapeHist {_tapeHist :: [(Phase, ExpTape s c)]} deriving (
 newtype ReverseTapeHist s c = ReverseTapeHist {_reverseTapeHist :: [(Phase, ExpTape s c)]} deriving (Eq, Ord, Show, Generic, Functor)
 newtype DispHist = DispHist {_dispHist :: [Int]} deriving (Eq, Ord, Show, Generic)
 newtype ReverseDispHist = ReverseDispHist {_reverseDispHist :: [Int]} deriving (Eq, Ord, Show, Generic)
+newtype ReadShiftHist = ReadShiftHist {_readShiftHist :: [ReadShift]} deriving (Eq, Ord, Show, Generic)
+newtype ReverseReadShiftHist = ReverseReadShiftHist {_reverseReadShiftHist :: [ReadShift]} deriving (Eq, Ord, Show, Generic)
 
 instance (NFData s, NFData c) => NFData (TapeHist s c)
 instance (NFData s, NFData c) => NFData (ReverseTapeHist s c)
 instance NFData DispHist
 instance NFData ReverseDispHist
+instance NFData ReadShiftHist
+instance NFData ReverseReadShiftHist
 
 instance Bifunctor TapeHist where 
   bimap = bimapDefault 
@@ -73,8 +77,15 @@ getReverseTapeHist = _reverseTapeHist
 
 getDispHist :: DispHist -> [Int]
 getDispHist = _dispHist
+
 getReverseDispHist :: ReverseDispHist -> [Int]
 getReverseDispHist = _reverseDispHist
+
+getReverseReadShiftHist :: ReverseReadShiftHist -> [ReadShift]
+getReverseReadShiftHist = _reverseReadShiftHist 
+
+getReadShiftHist :: ReadShiftHist -> [ReadShift]
+getReadShiftHist = _readShiftHist 
 
 data SimState = SimState
   { _s_phase :: Phase
@@ -93,6 +104,7 @@ data SimState = SimState
   --the total amount of leftward (negative) or rightward (positive) displacement we have done, starting from 0
   , _s_displacement :: Int
   , _s_reverse_disp_history :: ReverseDispHist
+  , _s_reverse_readshift_history :: ReverseReadShiftHist
   } deriving (Eq, Ord, Show, Generic)
 instance NFData SimState
 
@@ -111,12 +123,15 @@ data SkipResult s c = Skipped
   , _newPhase :: Phase
   , _newTape :: ExpTape s c
   , _resultingDisp :: Displacement InfCount
+  , _resRS :: ReadShift 
   } deriving (Eq, Ord, Show, Generic)
 
 $(makeLenses ''TapeHist)
 $(makeLenses ''ReverseTapeHist)
 $(makeLenses ''DispHist)
 $(makeLenses ''ReverseDispHist)
+$(makeLenses ''ReadShiftHist)
+$(makeLenses ''ReverseReadShiftHist)
 $(makeLenses ''SimState)
 $(makeLenses ''SkipResult)
 
@@ -126,23 +141,34 @@ s_history = to $ TapeHist . reverse . getReverseTapeHist . view s_reverse_histor
 s_disp_history :: Getter SimState DispHist 
 s_disp_history = to $ DispHist . reverse . getReverseDispHist . view s_reverse_disp_history 
 
+s_readshift_history :: Getter SimState ReadShiftHist 
+s_readshift_history = to $ ReadShiftHist . reverse 
+  . getReverseReadShiftHist . view s_reverse_readshift_history
+
+--TODO: clean up the duplication that exists between this and other histories and 
+--and so on
+addToRRSH :: ReadShift -> ReverseReadShiftHist -> ReverseReadShiftHist 
+addToRRSH rs (ReverseReadShiftHist histList) = ReverseReadShiftHist (rs : histList)
+
 resConfig :: Lens (SkipResult s c) (SkipResult t d) (Config c s) (Config d t)
 resConfig = lens get set where 
   get skipRes = etToConfig (skipRes ^. newPhase) (skipRes ^. newTape) 
   set :: SkipResult s c -> Config d t -> SkipResult t d 
-  set (Skipped hops _oldPh _oldTape oldDisp) config = Skipped hops newPh newTape oldDisp where 
-    (newPh, newTape) = configToET config
+  set (Skipped hops _oldPh _oldTape oldDisp rs) config 
+    = Skipped hops newPh newTape oldDisp rs 
+    where 
+      (newPh, newTape) = configToET config
 
 --TODO this can be generalized, it would need the exptape instance to be generalized too
 instance Pretty (SkipResult Bit InfCount) where 
-  pretty (Skipped hops phase tape disp) = "took " <> pretty hops <> " disp " <> pretty disp <> " ending in:\n" 
+  pretty (Skipped hops phase tape disp rs) = "took " <> pretty hops <> " disp " <> pretty disp <> " ending in:\n" 
     <> pretty phase <> " tape: " <> pretty tape 
 
 initExpTape :: s -> ExpTape s InfCount
 initExpTape s = ExpTape [(s, Infinity)] s [(s, Infinity)]
 
 dispSkipResult :: SkipResult Bit InfCount -> Text
-dispSkipResult (Skipped c p tape disp)
+dispSkipResult (Skipped c p tape disp rs)
   = "skipped to phase: " <> dispPhase p
   <> " and tape " <> dispExpTape tape
   <> " in " <> dispInfCount c <> " hops\ndisplacement was:" <> show disp
@@ -164,11 +190,13 @@ packageResult :: forall s. (Eq s, Pretty s, Partial) => Skip Count s
   -> ExpTape s InfCount
   -> (Map BoundVar InfCount, ([(s, InfCount)], [(s, InfCount)]))
   -> Either Text (SkipResult s InfCount)
-packageResult skip@(Skip _ e hopCount _ displacement) tape (boundVs, (newLs, newRs)) = (Skipped
-  (updateCountToInf boundVs hopCount)
-  (getSkipEndPhase e)
-  <$> getFinalET e (newLs, newRs)) ??
-  (simplifyInfDisplacement $ updateCountToInf boundVs <$> displacement)
+packageResult skip@(Skip s e hopCount _ displacement) tape (boundVs, (newLs, newRs)) 
+  = Skipped
+      (updateCountToInf boundVs hopCount)
+      (getSkipEndPhase e)
+      <$> getFinalET e (newLs, newRs)
+      <*> pure (simplifyInfDisplacement $ updateCountToInf boundVs <$> displacement)
+      <*> pure (ReadShift (-startLLen) startRLen shift)
   where
     getFinalET :: Partial => SkipEnd Count s -> ([(s, InfCount)], [(s, InfCount)]) -> Either Text (ExpTape s InfCount)
     getFinalET (EndMiddle c) (remLs, remRs) = let 
@@ -190,6 +218,22 @@ packageResult skip@(Skip _ e hopCount _ displacement) tape (boundVs, (newLs, new
       (point, remremRs) <- getNewPoint remRs
       pure $ ExpTape (finalizeList newLs `etApp` remLs) point remremRs
 
+    shiftL = endLLen - startLLen 
+    shiftR = startRLen - endRLen 
+    shift = assert (shiftL == shiftR) shiftL 
+    (startLLen, startRLen) = configLens s
+    (endLLen, endRLen) = skipELens e 
+    configLens :: Config Count s -> (Int, Int)
+    configLens (Config _ph ls _p rs) = (getLen ls, getLen rs)
+    skipELens :: SkipEnd Count s -> (Int, Int) 
+    skipELens = \case 
+      EndSide _ph L ls -> (getLen ls, 0)
+      EndSide _ph R rs -> (0, getLen rs)
+      EndMiddle con -> configLens con
+
+    getLen :: [(s, Count)] -> Int 
+    getLen xs = sum $ (\(_s, c) -> infCountToInt $ updateCountToInf boundVs c) <$> xs
+    
     -- updatePoint :: Map BoundVar InfCount -> (s, Location Count) -> (s, Location InfCount)
     -- updatePoint bs = (_2. _Side . _1 %~ updateCount bs)
     updateList :: Map BoundVar InfCount -> [(s, InfCount)] -> [(s, InfCount)]
@@ -302,17 +346,17 @@ pickBestSkip :: [(Skip Count Bit, SkipResult Bit InfCount)] -> PartialStepResult
 pickBestSkip = \case 
   [] -> MachineStuck --TODO :: can we generate this message somewhere better?
   appliedSkips -> let
-    (bestSkip, Skipped hops newP newT newD) = maximumBy skipFarthest appliedSkips
+    (bestSkip, Skipped hops newP newT newD rs) = maximumBy skipFarthest appliedSkips
     in 
       --trace ("hops: " <> showP hops <> " bestskip was:" <> showP bestSkip) $
-    if bestSkip ^. halts then Stopped hops newT bestSkip newD
-      else Stepped hops newP newT bestSkip newD
+    if bestSkip ^. halts then Stopped hops newT bestSkip newD rs
+      else Stepped hops newP newT bestSkip newD rs
 
 
 type SkipTape = ExpTape Bit InfCount
 
 skipStateFromPhTape :: Turing -> Phase -> ExpTape Bit InfCount  -> SimState 
-skipStateFromPhTape t ph tape = SimState ph tape (initBook t) 0 [] (ReverseTapeHist [(ph, tape)]) Empty 0 0 (ReverseDispHist [0])
+skipStateFromPhTape t ph tape = SimState ph tape (initBook t) 0 [] (ReverseTapeHist [(ph, tape)]) Empty 0 0 (ReverseDispHist [0]) (ReverseReadShiftHist [])
 
 initSkipState :: Turing -> SimState
 initSkipState t = skipStateFromPhTape t (Phase 0) (initExpTape (Bit False))
@@ -322,18 +366,18 @@ simulateOneMachine :: Int -> Turing -> SimState
 simulateOneMachine limit t = \case
   --SimState p tape _book steps@((>= limit) -> True) trace _hist _ _counter -> (trace, Right $ Continue steps p tape)
   state | state ^. s_steps >= limit -> (state ^. s_trace, Right $ Continue (state ^. s_steps) (state ^. s_phase) (state ^. s_tape) (state ^. s_displacement))
-  SimState p tape book steps trace hist histSet counter disp dispHist -> case skipStep t book p tape of
+  SimState p tape book steps trace hist histSet counter disp dispHist rsHist -> case skipStep t book p tape of
     MachineStuck -> error "machinestuck"
     Unknown e -> (trace, Left e)
-    Stopped c newTape skip newDisp -> (skip : trace, Right $ Halted (steps + infCountToInt c) newTape (disp + dispToInt newDisp))
-    Stepped c newP newTape skip newDisp -> case c of
+    Stopped c newTape skip newDisp _rs -> (skip : trace, Right $ Halted (steps + infCountToInt c) newTape (disp + dispToInt newDisp))
+    Stepped c newP newTape skip newDisp rs -> case c of
       Infinity -> (skip : trace, Right $ ContinueForever (SkippedToInfinity steps skip))
       c -> let newHist = hist & reverseTapeHist %~ ((p, tape) :)
                newHistSet = histSet & at (p, tape) ?~ steps 
                newDispHist = dispHist & reverseDispHist %~ (disp :)
         in 
         simulateOneMachine limit t $ SimState newP newTape book (steps + infCountToInt c) (skip : trace)
-           newHist newHistSet counter (disp + dispToInt newDisp) newDispHist
+           newHist newHistSet counter (disp + dispToInt newDisp) newDispHist (addToRRSH rs rsHist)
 
 simulateOneTotalMachine :: Int -> Turing -> ([Skip Count Bit], SimResult (ExpTape Bit InfCount))
 simulateOneTotalMachine limit machine = (^?! _Right) <$> simulateOneMachine limit machine (initSkipState machine)
