@@ -5,7 +5,7 @@ import Control.Lens
 import Witherable
 import Prettyprinter
 
-import Turing ( dispPhase, Dir(..), Phase )
+import Turing 
 import Count
 import Util
 import ExpTape
@@ -93,8 +93,23 @@ instance Bitraversable Skip where
   bitraverse f g (Skip c se hop halt disp)
     = Skip <$> bitraverse f g c <*> bitraverse f g se <*> f hop <*> pure halt <*> (f <%> disp)
 
+data ReadShift = ReadShift {_len_l :: Steps, _len_r :: Steps, _shift_dist :: Steps}
+  deriving (Eq, Ord, Show, Generic)
+instance NFData ReadShift 
+
+instance Semigroup ReadShift where 
+  (ReadShift l1 r1 s1) <> (ReadShift l2 r2 s2) 
+    = ReadShift (min l1 l2') (max r1 r2') (s1 + s2)
+   where
+    l2' = l2 + s1 
+    r2' = r2 + s1 
+
+instance Monoid ReadShift where 
+  mempty = ReadShift 0 0 0 
+
 $(makeLenses ''Config)
 $(makeLenses ''Skip)
+$(makeLenses ''ReadShift)
 
 prettyText :: Text -> Doc ann
 prettyText = pretty
@@ -115,9 +130,21 @@ instance Pretty s => Pretty (Skip Count s) where
     <> pretty s <> prettyText "\ninto: \n" <> pretty e <> prettyText (if halts then "\n and halt" else "")
     <> prettyText "\n displacement of: " <> show displace <> "\n"
 
+instance Pretty ReadShift where 
+  pretty (ReadShift l r s) = prettyText $ "RS l " <> show l 
+    <> " r " <> show r <> " s " <> show s 
+
 getSkipEndPhase :: SkipEnd c s -> Phase
 getSkipEndPhase (EndSide p _ _) = p
 getSkipEndPhase (EndMiddle (Config p _ _ _)) = p
+
+-- TODO
+-- there's some fucked stuff here, about how a skip has counts in it but an 
+-- RS has ints in it. the counts have to be filled to ints in real life, so 
+-- maybe this is supposed to be deferred to when the skip is actually applied
+
+getSkipReadShift :: Skip Count s -> ReadShift 
+getSkipReadShift skip = undefined 
 
 -- --TODO: this code is not pretty but it works
 configToET :: Config c s -> (Phase, ExpTape s c)

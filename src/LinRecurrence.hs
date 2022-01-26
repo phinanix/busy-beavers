@@ -24,6 +24,7 @@ import qualified Relude.Unsafe as U
 import Data.Bifoldable (Bifoldable)
 import Graphs
 import Data.Bitraversable
+import Data.Maybe 
 
 import Util
 import Count
@@ -64,47 +65,83 @@ histHasDuplicate (ReverseTapeHist revHist) = mkHP <$> hasPair (reverse revHist)
 --this function isn't actually writeable, so I should fix that first 
 
 {- Plan for LinRecur 30 Jan 22:
-There is a type called ReadShift, that contains 3 nonngeg ints (l, r, s). 
-applying a skip corresponds to an RS, where l and r are the number of bits 
-the skip consumes from the left of the head and the right of the head,
-and s is the amount that the machine shifts left or right after the skip is 
-done being applied. 
+There is a type called ReadShift, that contains 3 ints (l, r, s). 
+applying a skip corresponds to an RS, where (l, r) corresponds to the 
+inclusive range of bits the skip consumes (neg left, pos right, 0 current 
+head pos), and s is the amount that the machine shifts left or right after 
+the skip is done being applied. l <= r always. 
 
 ReadShift is a monoid: applying two skips in a row is always congruent to a 
 particular other skip, which has its own ReadShift. To compose two ReadShifts,
-first, you shift the first one's l and r into the second one's "frame of 
-reference" by adding s to l and subtracting it from r. Now, you have an l from
+first, you shift the second one's l and r into the first one's "frame of 
+reference" by adding the first one's shift to l and r. Now, you have an l from
 the first one and the second one, and you take the max, and the same for r. 
 For s, you simply add them together. 
 Mempty is simply all 0. 
 
 To detect whether a recurrence exists between history point i and j, you need
 3 things: the ReadShift corresponding to the sum of all the readshifts from
-i to j, the tape at i and the tape at j. The ReadShift tells you how far to 
-the left and right the tape at i affected the progression of the machine as 
-it went through to step j. You grab that width of tape at the start and at 
+i to j, the tape at i and the tape at j. The ReadShift tells you which chunk
+of the tape at i affected the progression of the machine as it went through 
+to step j. You grab that width of tape at the start and at 
 the end, if they are the same, then you have found a recurrence. 
 
 To find a readshift from a skip, the l and the r are simply the length of 
 each half of the config you start with. The shift is the difference between 
 the length of l at the start and the length of l at the end (which for 
 a correctness check should be the same as the negative difference for the 
-same for r). 
+same for r). There's a mild bit of fuckiness if you fall off the tape rather
+than ending in the middle.
 
 Functions to write / things to do:
 Function which given two tapes and a readshift computes the possibility of 
-  recurrence
+  recurrence (checkForRecur)
 Function which given two numbers and the two histories extracts the two 
   tapes and the readshift and hands it to the preceeding function
+  (checkForRecurAtIndices)
 Outer loop which calls the preceeding function with all combinations of two 
   numbers which are valid (in order; ie it should do (1,2) through (n-1, n) 
   then (1, 3) and so on increasing the common difference each time)
-Type definition and monoid instance on ReadShift
+--Type definition and monoid instance on ReadShift
 Function which takes a skip and gives you its ReadShift
 Update SimulateState to track readshifts in RSHist 
 (unsure) update other things which use DispHist to use RSHist
+
+New design of readshift 
 -}
-detectLinRecurrence :: TapeHist Bit InfCount 
+detectLinRecurrence :: forall s. (Eq s) 
+  => TapeHist s InfCount 
   -> DispHist 
   -> Maybe HaltProof
-detectLinRecurrence hist disphist = undefined 
+detectLinRecurrence hist@(TapeHist thList) disphist@(DispHist dhList) 
+  = viaNonEmpty head $ catMaybes allMaybeProofs
+  where
+  checkForRecur :: (Natural, Natural)
+    -> (Phase, ExpTape s InfCount) 
+    -> (Phase, ExpTape s InfCount) 
+    -> ReadShift -> Maybe HaltProof 
+  checkForRecur (i,j) 
+    (ph, et@(ExpTape _ls p _rs)) 
+    (ph', et'@(ExpTape _ls' p' _rs'))
+    (ReadShift l r _s) = do 
+      guard (ph == ph')
+      guard (p == p') --TODO unnecessary?
+      --TODO crashes if range does not include 0. but maybe that's actually correct
+      let startRng = sliceExpTape et l r 
+          endRng = sliceExpTape et' l r
+      guard (startRng == endRng) 
+      pure $ LinRecur (fromIntegral i) (fromIntegral j)
+  --pretending for now that DispHist contains ReadShifts
+  checkForRecurAtIndices :: (Natural, Natural) -> Maybe HaltProof
+  checkForRecurAtIndices (i, j) = checkForRecur (i, j) startC endC readShift where 
+    startC = thList !! fromIntegral i
+    endC = thList !! fromIntegral j 
+    readShift = undefined 
+  --lenHist is the length of the history, so it minus one is max valid index
+  genValidIndices :: Natural -> [(Natural, Natural)]
+  genValidIndices lenHist = concat $ genIndicesAtDist lenHist <$> [1, 2 .. lenHist -1]
+  genIndicesAtDist :: Natural -> Natural -> [(Natural, Natural)]
+  genIndicesAtDist lenHist dist 
+    = (\x -> (x, x + dist)) <$> [0, 1 .. (lenHist -1) - dist] 
+  allMaybeProofs = assert (length thList == length dhList) $ 
+    checkForRecurAtIndices <$> genValidIndices (fromIntegral $ length thList)

@@ -40,3 +40,10 @@ spec = do
       getEquations (matchTape
         [(False, num 3)] [(False, inum 5), (True, inum 1)])
         `shouldBe` Just (TapeLeft $ (False, inum 2) :| [(True, inum 1)])
+  describe "ReadShift" $ do 
+    it "adds a simple example" $ 
+      (ReadShift (-1) 0 (-1)) <> (ReadShift 0 1 1) `shouldBe` (ReadShift (-1) 0 0)
+    it "adds two basemachine steps to the left" $ 
+      (ReadShift 0 0 (-1)) <> (ReadShift 0 0 (-1)) `shouldBe` (ReadShift (-1) 0 (-2))
+    it "adds stuff which doesn't move the machine" $ 
+      (ReadShift 0 5 0) <> (ReadShift (-5) 0 0) `shouldBe` (ReadShift (-5) 5 0)
