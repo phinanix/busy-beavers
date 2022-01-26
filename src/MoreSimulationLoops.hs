@@ -42,6 +42,7 @@ makeIndGuess = uncurry guessInductionHypothesis .: getTwoHistAfterTime
 
 getRecurRes :: Int -> Turing -> Maybe HaltProof
 getRecurRes = uncurry detectLinRecurrence .: getTwoHistAfterTime
+
 {-
 plan for integrating proveInductivelyIMeanIT into the main loop:
 we need to write a function which checks whether a skip goes forever in already known history
