@@ -220,15 +220,24 @@ packageResult skip@(Skip s e hopCount _ displacement) tape (boundVs, (newLs, new
 
     shiftL = endLLen - startLLen 
     shiftR = startRLen - endRLen 
-    shift = assert (shiftL == shiftR) shiftL 
+    shift = assert (let 
+      ans = shiftL == shiftR 
+      msg = ("failing assert: " <> show (shiftL, shiftR) 
+        <> "start" <> show (startLLen, startRLen) 
+        <> "end" <> show (endLLen, endRLen)
+        <> "\nskip: " <> showP skip)
+      in 
+      (if ans then id else trace msg) ans) 
+      shiftL 
     (startLLen, startRLen) = configLens s
     (endLLen, endRLen) = skipELens e 
     configLens :: Config Count s -> (Int, Int)
     configLens (Config _ph ls _p rs) = (getLen ls, getLen rs)
     skipELens :: SkipEnd Count s -> (Int, Int) 
     skipELens = \case 
-      EndSide _ph L ls -> (getLen ls, 0)
-      EndSide _ph R rs -> (0, getLen rs)
+     --TODO (XX) are these -1s totally insane
+      EndSide _ph L ls -> (-1, getLen ls)
+      EndSide _ph R rs -> (getLen rs, -1)
       EndMiddle con -> configLens con
 
     getLen :: [(s, Count)] -> Int 

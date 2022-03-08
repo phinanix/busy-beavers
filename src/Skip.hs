@@ -138,13 +138,6 @@ getSkipEndPhase :: SkipEnd c s -> Phase
 getSkipEndPhase (EndSide p _ _) = p
 getSkipEndPhase (EndMiddle (Config p _ _ _)) = p
 
--- TODO
--- there's some fucked stuff here, about how a skip has counts in it but an 
--- RS has ints in it. the counts have to be filled to ints in real life, so 
--- maybe this is supposed to be deferred to when the skip is actually applied
-
-getSkipReadShift :: Skip Count s -> ReadShift 
-getSkipReadShift skip = undefined 
 
 -- --TODO: this code is not pretty but it works
 configToET :: Config c s -> (Phase, ExpTape s c)

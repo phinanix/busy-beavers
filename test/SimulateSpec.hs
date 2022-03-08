@@ -24,13 +24,16 @@ num = finiteCount
 
 simpleTape :: ExpTape Bit InfCount
 simpleTape = ExpTape
-  [(Bit False, inum 9), (Bit True, inum 1)]
+  [(Bit False, inum 11), (Bit True, inum 1)]
   (Bit False)
   [(Bit True, inum 3), (Bit False, newInfBoundVar 0)]
 
 simpleSkip :: Skip Count Bit
+-- (F, 11) >F< 
+-- (T, 3) >F< (F,3) (T,5)
+-- huh, not actually a legal skip
 simpleSkip = Skip
-  (Config (Phase 0) [(Bit False, num 1)] (Bit False) [])
+  (Config (Phase 0) [(Bit False, num 11)] (Bit False) [])
   (EndMiddle (Config (Phase 1)
     [(Bit True, num 3)]
     (Bit False)
@@ -39,7 +42,7 @@ simpleSkip = Skip
 
 simpleResult :: ExpTape Bit InfCount
 simpleResult = ExpTape
-  [(Bit True, inum 3), (Bit False, inum 8), (Bit True, inum 1)]
+  [(Bit True, inum 4)]
   (Bit False)
   [(Bit False, inum 3), (Bit True, inum 8), (Bit False, newInfBoundVar 0)]
 
@@ -52,7 +55,7 @@ exampleSkip = Skip
   (EndMiddle (Config (Phase 1)
     [(Bit True, num 3)]
     (Bit False)
-    [(Bit False, num 3), (Bit True, num 5)]))
+    [(Bit False, num 1)]))
   (num 10) False (OneDir L $ num 8)
 
 exampleTape :: ExpTape Bit InfCount
@@ -65,7 +68,7 @@ exampleResult :: ExpTape Bit InfCount
 exampleResult = ExpTape
   [(Bit True, inum 9), (Bit False, inum 3), (Bit True, inum 1)]
   (Bit False)
-  [(Bit False, inum 3), (Bit True, inum 7), (Bit False, newInfBoundVar 0)]
+  [(Bit False, inum 1), (Bit True, inum 2), (Bit False, newInfBoundVar 0)]
 
 varSkip :: Skip Count Bit
 varSkip = Skip
@@ -100,7 +103,7 @@ spec = do
   describe "applySkip" $ do
     it "matches the left half of the skip" $
       getEquations (matchTape (simpleSkip^.start.ls) (left simpleTape))
-      `shouldBe` Just (TapeLeft $ (Bit False, inum 8) :| [(Bit True, inum 1)])
+      `shouldBe` Just (TapeLeft $ (Bit True, inum 1) :| [])
     it "matches the right half of the skip" $
       getEquations (matchTape (simpleSkip^.start.rs) (right simpleTape))
       `shouldBe` Just (TapeLeft $ fromList (right simpleTape))
@@ -109,13 +112,23 @@ spec = do
     --     `shouldBe` Just (Lremains (False, inum 8))
     it "applies a simple skip" $
       applySkip simpleSkip (Phase 0, simpleTape)
-      `shouldBe` Just (Skipped (NotInfinity $ num 5) (Phase 1) simpleResult (OneDir L (NotInfinity $ num 3)))
+      `shouldBe` Just (Skipped 
+          (NotInfinity $ num 5) 
+          (Phase 1) 
+          simpleResult 
+          (OneDir L (NotInfinity $ num 3)) 
+          (ReadShift (-11) 0 (-8)))
     -- it "matches the point of the more complex skip" $ do
     --   getEquations (matchPoints (exampleSkip^.start.c_point) (point exampleTape))
     --     `shouldBe` Just (Lremains (True, inum 6))
     it "applies a more complex skip" $
       applySkip exampleSkip (Phase 0, exampleTape)
-      `shouldBe` Just (Skipped (NotInfinity $ num 10) (Phase 1) exampleResult (OneDir L (NotInfinity $ num 8)))
+      `shouldBe` Just (Skipped 
+          (NotInfinity $ num 10) 
+          (Phase 1) 
+          exampleResult 
+          (OneDir L (NotInfinity $ num 8))
+          (ReadShift (-1) 3 2))
 
   describe "simulateOneMachine" $ do
     it "stops after the specified number of tests" $

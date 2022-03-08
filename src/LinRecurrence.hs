@@ -109,7 +109,7 @@ Update SimulateState to track readshifts in RSHist
 
 New design of readshift 
 -}
-detectLinRecurrence :: forall s. (Eq s) 
+detectLinRecurrence :: forall s. (Eq s, Pretty s) 
   => TapeHist s InfCount 
   -> ReadShiftHist 
   -> Maybe HaltProof
@@ -131,12 +131,21 @@ detectLinRecurrence hist@(TapeHist thList) rshist@(ReadShiftHist rshList)
           endRng = sliceExpTape et' l r
       guard (startRng == endRng) 
       pure $ LinRecur i j
-  --pretending for now that DispHist contains ReadShifts
+  --i and j are inclusive, in a sense, but that means we want to index into rshList in an 
+  -- (incl., excl.) way, 
   checkForRecurAtIndices :: (Int, Int) -> Maybe HaltProof
-  checkForRecurAtIndices (i, j) = checkForRecur (i, j) startC endC readShift where 
+  checkForRecurAtIndices (i, j) = let 
+      ans = checkForRecur (i, j) startC endC readShift 
+      msg = if has _Just ans then trace ("found proof. indices " <> show i <> "," <> show j <> "\ntape1:\n"
+        <> showP startC <> "\ntape2:\n" <> showP endC <> "\nreadShift:\n" <> showP readShift <> 
+        "\nfrom list\n" <> showP rshList)
+      else id
+    in 
+    msg ans 
+    where 
     startC = thList !! fromIntegral i
     endC = thList !! fromIntegral j 
-    readShift = mconcat $ slice i j rshList 
+    readShift = mconcat $ slice i (j-1) rshList 
   --lenHist is the length of the history, so it minus one is max valid index
   genValidIndices :: Int -> [(Int, Int)]
   genValidIndices lenHist = concat $ genIndicesAtDist lenHist <$> [1, 2 .. lenHist -1]
@@ -144,5 +153,7 @@ detectLinRecurrence hist@(TapeHist thList) rshist@(ReadShiftHist rshList)
   genIndicesAtDist lenHist dist 
     = (\x -> (x, x + dist)) <$> [0, 1 .. (lenHist -1) - dist] 
   --TODO, I think this assert probably has an off by one in it?
-  allMaybeProofs = assert (length thList == length rshList) $ 
+  allMaybeProofs = let msg = "lengths:" <> show (length thList, length rshList)
+    in 
+    trace msg $ assert (length thList - 1 == length rshList) $ 
     checkForRecurAtIndices <$> genValidIndices (fromIntegral $ length thList)
