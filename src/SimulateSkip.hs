@@ -24,8 +24,8 @@ import Safe.Partial
 
 
 data PartialStepResult a = Unknown Edge
-                         | Stopped InfCount a (Skip Count Bit) (Displacement InfCount) ReadShift 
-                         | Stepped InfCount Phase a (Skip Count Bit) (Displacement InfCount) ReadShift 
+                         | Stopped InfCount a (Skip Count Bit) (Displacement InfCount) (Maybe ReadShift)
+                         | Stepped InfCount Phase a (Skip Count Bit) (Displacement InfCount) (Maybe ReadShift)
                          | MachineStuck 
                          deriving (Eq, Ord, Show, Generic)
 
@@ -123,7 +123,7 @@ data SkipResult s c = Skipped
   , _newPhase :: Phase
   , _newTape :: ExpTape s c
   , _resultingDisp :: Displacement InfCount
-  , _resRS :: ReadShift 
+  , _resRS :: Maybe ReadShift 
   } deriving (Eq, Ord, Show, Generic)
 
 $(makeLenses ''TapeHist)
@@ -147,8 +147,10 @@ s_readshift_history = to $ ReadShiftHist . reverse
 
 --TODO: clean up the duplication that exists between this and other histories and 
 --and so on
-addToRRSH :: ReadShift -> ReverseReadShiftHist -> ReverseReadShiftHist 
-addToRRSH rs (ReverseReadShiftHist histList) = ReverseReadShiftHist (rs : histList)
+addToRRSH :: HasCallStack => Maybe ReadShift -> ReverseReadShiftHist -> ReverseReadShiftHist 
+addToRRSH maybeRS (ReverseReadShiftHist histList) = case maybeRS of 
+  Nothing -> error "rs not present"
+  Just rs -> ReverseReadShiftHist (rs : histList)
 
 resConfig :: Lens (SkipResult s c) (SkipResult t d) (Config c s) (Config d t)
 resConfig = lens get set where 
@@ -161,14 +163,14 @@ resConfig = lens get set where
 
 --TODO this can be generalized, it would need the exptape instance to be generalized too
 instance Pretty (SkipResult Bit InfCount) where 
-  pretty (Skipped hops phase tape disp rs) = "took " <> pretty hops <> " disp " <> pretty disp <> " ending in:\n" 
+  pretty (Skipped hops phase tape disp _rs) = "took " <> pretty hops <> " disp " <> pretty disp <> " ending in:\n" 
     <> pretty phase <> " tape: " <> pretty tape 
 
 initExpTape :: s -> ExpTape s InfCount
 initExpTape s = ExpTape [(s, Infinity)] s [(s, Infinity)]
 
 dispSkipResult :: SkipResult Bit InfCount -> Text
-dispSkipResult (Skipped c p tape disp rs)
+dispSkipResult (Skipped c p tape disp _rs)
   = "skipped to phase: " <> dispPhase p
   <> " and tape " <> dispExpTape tape
   <> " in " <> dispInfCount c <> " hops\ndisplacement was:" <> show disp
@@ -196,7 +198,8 @@ packageResult skip@(Skip s e hopCount _ displacement) tape (boundVs, (newLs, new
       (getSkipEndPhase e)
       <$> getFinalET e (newLs, newRs)
       <*> pure (simplifyInfDisplacement $ updateCountToInf boundVs <$> displacement)
-      <*> pure (ReadShift (-startLLen) startRLen shift)
+      --TODO : un-just-ified Just (currently fixed by laziness)
+      <*> pure (Just $ ReadShift (-startLLen) startRLen shift)
   where
     getFinalET :: Partial => SkipEnd Count s -> ([(s, InfCount)], [(s, InfCount)]) -> Either Text (ExpTape s InfCount)
     getFinalET (EndMiddle c) (remLs, remRs) = let 
@@ -359,8 +362,8 @@ pickBestSkip = \case
     (bestSkip, Skipped hops newP newT newD rs) = maximumBy skipFarthest appliedSkips
     in 
       --trace ("hops: " <> showP hops <> " bestskip was:" <> showP bestSkip) $
-    if bestSkip ^. halts then Stopped hops newT bestSkip newD rs
-      else Stepped hops newP newT bestSkip newD rs
+    if bestSkip ^. halts then Stopped hops newT bestSkip newD (rs)
+      else Stepped hops newP newT bestSkip newD (rs)
 
 
 type SkipTape = ExpTape Bit InfCount

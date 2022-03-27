@@ -26,9 +26,6 @@ attemptInductionGuess machine state = case guessInductionHypothesis hist dispHis
     case proveInductively 20 machine (state ^. s_book) skip (BoundVar 0) of
       Left (fail, _config) -> trace (toString fail) $ Right state
       Right skipOrigin -> addSkipToStateOrInf skip skipOrigin state
-        -- if skipGoesForever skip && skipAppliedInHist skip hist 
-        -- then Left (ContinueForever (SkippedToInfinity (state ^. s_steps) skip))
-        -- else Right $ state & s_book %~ addSkipToBook skip skipOrigin 
   where
     hist =  state ^. s_history
     dispHist = state ^. s_disp_history

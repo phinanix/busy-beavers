@@ -117,7 +117,7 @@ spec = do
           (Phase 1) 
           simpleResult 
           (OneDir L (NotInfinity $ num 3)) 
-          (ReadShift (-11) 0 (-8)))
+          (Just $ ReadShift (-11) 0 (-8)))
     -- it "matches the point of the more complex skip" $ do
     --   getEquations (matchPoints (exampleSkip^.start.c_point) (point exampleTape))
     --     `shouldBe` Just (Lremains (True, inum 6))
@@ -128,7 +128,7 @@ spec = do
           (Phase 1) 
           exampleResult 
           (OneDir L (NotInfinity $ num 8))
-          (ReadShift (-1) 3 2))
+          (Just $ ReadShift (-1) 3 2))
 
   describe "simulateOneMachine" $ do
     it "stops after the specified number of tests" $

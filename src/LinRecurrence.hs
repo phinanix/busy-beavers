@@ -68,8 +68,11 @@ instance (TapeSymbol Bit) where
 -- a region of the tape extending some leftwards and some rightwards
 -- the first int is non-positive and expresses the leftward extent
 -- the second int is non-negative and expresses the rightward extent
-data TapeRegion = TapeRegion Int Int deriving (Eq, Ord, Show, Generic) 
+data TapeRegion = UnsafeTapeRegion Int Int deriving (Eq, Ord, Show, Generic) 
 instance NFData TapeRegion 
+
+mkTapeRegion :: HasCallStack => Int -> Int -> TapeRegion
+mkTapeRegion l r = assert (l <= 0) assert (r >= 0) UnsafeTapeRegion l r 
 
 liveRegion :: (TapeSymbol s) => [(s, InfCount)] -> Int 
 liveRegion xs = case xs of 
@@ -89,13 +92,13 @@ liveRegion xs = case xs of
         assert (ans >= 0) ans 
 
 liveTapeRegion :: (TapeSymbol s) => ExpTape s InfCount -> TapeRegion
-liveTapeRegion (ExpTape ls _p rs) = TapeRegion (- (liveRegion ls)) (liveRegion rs)
+liveTapeRegion (ExpTape ls _p rs) = mkTapeRegion (- (liveRegion ls)) (liveRegion rs)
 
 intersectRegions :: TapeRegion -> TapeRegion -> TapeRegion
-intersectRegions (TapeRegion l r) (TapeRegion l' r') = TapeRegion (max l l') (min r r')
+intersectRegions (UnsafeTapeRegion l r) (UnsafeTapeRegion l' r') = mkTapeRegion (max l l') (min r r')
 
 subsetRegion :: TapeRegion -> TapeRegion -> Bool 
-subsetRegion (TapeRegion l r) (TapeRegion l' r') = (l >= l') && (r <= r')
+subsetRegion (UnsafeTapeRegion l r) (UnsafeTapeRegion l' r') = (l >= l') && (r <= r')
 
 
 --detects lin recurrence, as determined by the history
@@ -175,8 +178,8 @@ detectLinRecurrence hist@(TapeHist thList) rshist@(ReadShiftHist rshList)
       -- at the endrange step is a subrange of the range we wrote via the start range
       -- which is the start range shifted by the readshift
       let writtenRng = -- trace ("l " <> show l <> " r " <> show r <> " s " <> show s) 
-            TapeRegion (l - s) (r - s)
-          readRng = TapeRegion l r
+            mkTapeRegion (l - s) (r - s)
+          readRng = mkTapeRegion l r
           liveAtEndRng = liveTapeRegion et' 
             {- trace ("written " <> show writtenRng <> " read " <> show readRng 
            <> " live at end " <> show liveAtEndRng) -}
