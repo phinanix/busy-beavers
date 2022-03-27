@@ -130,7 +130,7 @@ simulateStepOneMachine :: Partial => (Edge -> SimState -> Either (SimResult (Exp
   -> Int -> Turing -> SimState 
   -> Either (SimResult (ExpTape Bit InfCount)) SimState
 simulateStepOneMachine handleUnknown limit machine state@(SimState ph tape book steps skipTrace hist histSet counter curDisp dispHist rsHist) 
-  = if steps > limit
+  = if counter > limit
     then Left $ Continue steps ph tape curDisp
     else --trace ("counter:" <> show counter) $ 
     case skipStep machine book ph tape of
@@ -154,7 +154,7 @@ simulateStepUntilUnknown = simulateStepOneMachine handle where
 simulateStepPartial :: Partial => Int -> SimMultiAction
 simulateStepPartial limit machine (SimState ph tape book steps skipTrace hist histSet counter curDisp dispHist rsHist) = 
   --trace ("stepping bigStep: " <> showP counter <> " smallStep: " <> showP steps) $
-  if steps > limit
+  if counter > limit
   then Result $ Continue steps ph tape curDisp
   else case skipStep machine book ph tape of
     Unknown e -> UnknownEdge e
@@ -208,6 +208,7 @@ tapePostInfinity (ExpTape ls _p rs) = elem Infinity cs where
 skipAppliesForeverInHist :: Skip Count Bit -> TapeHist Bit InfCount -> Either Text HaltProof
 skipAppliesForeverInHist skip hist = case forevers of 
   [] -> Left "did not apply forever"
+  --TODO the "idx" here is I think in big steps but it's sort of supposed to be in small steps
   (idx, _res) : _xs -> Right $ SkippedToInfinity idx skip 
   where 
   apps = let ans = mapMaybe (\(i, entry) -> (i,) <$> applySkip skip entry) (zip [0,1 ..] $ getTapeHist hist) in 

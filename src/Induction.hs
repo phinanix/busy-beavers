@@ -353,11 +353,12 @@ obtainConfigIndices hist config
 
 --given a list of displacements and a start and end index, return the maximum 
 --left and rightward displacements that occured between the two indices, inclusive 
-maximumDisplacement :: [Int] -> Int -> Int -> (Int, Int)
-maximumDisplacement ds start end = let d_len = length ds in
-  assert (start <= end && start <= d_len && end <= d_len)
-  (minimum portion, maximum portion) where
-    portion = slice start end ds
+maximumDisplacement :: Partial => [Int] -> Int -> Int -> (Int, Int)
+maximumDisplacement ds start end = --trace ("s " <> show start <> " e " <> show end <> "  ds:\n" <> show ds) $
+ let d_len = length ds in
+    assert (start <= end && start <= d_len && end <= d_len)
+    (minimum portion, maximum portion) where
+      portion = slice start end ds
 
 getSlicePair'' :: Partial
   => ExpTape Bit Count

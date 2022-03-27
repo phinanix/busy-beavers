@@ -19,20 +19,21 @@ import HaltProof
 import LinRecurrence
 
 attemptInductionGuess :: Turing -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
-attemptInductionGuess machine state = case guessInductionHypothesis hist dispHist of
-  Left _msg -> Right state
+attemptInductionGuess machine state = trace "attempted" $ case guessInductionHypothesis hist dispHist of
+  Left msg -> traceShow msg $ Right state
   --try to prove the skip by induction 
   Right skip -> trace ("guessed a skip:\n" <> show (pretty skip)) $
     case proveInductively 20 machine (state ^. s_book) skip (BoundVar 0) of
       Left (fail, _config) -> trace (toString fail) $ Right state
-      Right skipOrigin -> addSkipToStateOrInf skip skipOrigin state
+      Right skipOrigin -> trace ("succeeded") $ addSkipToStateOrInf skip skipOrigin state
   where
     hist =  state ^. s_history
     dispHist = state ^. s_disp_history
 
+--Note! this function is outdated
 indGuessLoop ::  Int -> Turing -> OneLoopRes
 indGuessLoop limit = simOneFromStartLoop $
-  simulateStepTotalLoop limit :| [liftModifyState recordHist, runAtCount 100 attemptInductionGuess]
+  simulateStepTotalLoop limit :| [liftModifyState recordHist, liftModifyState recordDispHist, runAtCount 100 attemptInductionGuess]
 
 makeIndGuess :: Int -> Turing -> Either Text (Skip Count Bit)
 makeIndGuess = uncurry guessInductionHypothesis .: getTwoHistAfterTime

@@ -28,8 +28,9 @@ spec = do
       fst (loopForEndOfTapeGlue 100 goesLeftForever) `shouldBe` ContinueForever (OffToInfinityN 2 L)
     it "does not prove a machine that doesn't halt in this way" $ do 
       fst (loopForEndOfTapeGlue 100 weird3) `shouldBe`  
-        Continue 101 (Phase 2) 
-          (ExpTape [(Bit False,NotInfinity (c 2)),(Bit True,NotInfinity (c 1)),(Bit False,Infinity)] 
-           (Bit False)
-           [(Bit True,NotInfinity (c 2)),(Bit False,Infinity)])
-           (-3)
+        Continue 128 
+          (Phase 2) 
+          (ExpTape 
+            [(Bit True,NotInfinity (Count 2 (fromList []) (fromList []))),(Bit False,NotInfinity (Count 1 (fromList []) (fromList []))),(Bit True,NotInfinity (Count 1 (fromList []) (fromList []))),(Bit False,Infinity)] 
+            (Bit False)
+            [(Bit True,NotInfinity (Count 1 (fromList []) (fromList []))),(Bit False,Infinity)]) (-2)
