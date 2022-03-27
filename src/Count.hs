@@ -138,11 +138,11 @@ dispInfCount (NotInfinity c) = dispCount c
 instance Pretty InfCount where 
   pretty = pretty . dispInfCount 
 
-countToInt :: Count -> Int 
+countToInt :: HasCallStack => Count -> Int 
 countToInt (Count m Empty Empty) = fromIntegral m
 countToInt c = error $ "tried to int-ify: " <> dispCount c
 
-infCountToInt :: InfCount -> Int
+infCountToInt :: HasCallStack => InfCount -> Int
 infCountToInt Infinity = error "infinity isn't an int"
 infCountToInt (NotInfinity c) = countToInt c
 

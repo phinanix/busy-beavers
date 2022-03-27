@@ -18,7 +18,6 @@ import Relude.Foldable (Bitraversable)
 import qualified Relude.Unsafe as Unsafe
 import Safe.Exact
 import Control.Exception (assert)
-import Data.Foldable
 import Relude.Unsafe ((!!))
 import qualified Relude.Unsafe as U
 import Data.Bifoldable (Bifoldable)
@@ -59,6 +58,45 @@ histHasDuplicate :: (Ord s, Ord c) => ReverseTapeHist s c -> Maybe HaltProof
 histHasDuplicate (ReverseTapeHist revHist) = mkHP <$> hasPair (reverse revHist) 
   where
     mkHP (i, j) = Cycle i j
+
+class (Eq s) => (TapeSymbol s) where 
+  zero :: s 
+
+instance (TapeSymbol Bit) where 
+  zero = Bit False 
+
+-- a region of the tape extending some leftwards and some rightwards
+-- the first int is non-positive and expresses the leftward extent
+-- the second int is non-negative and expresses the rightward extent
+data TapeRegion = TapeRegion Int Int deriving (Eq, Ord, Show, Generic) 
+instance NFData TapeRegion 
+
+liveRegion :: (TapeSymbol s) => [(s, InfCount)] -> Int 
+liveRegion xs = case xs of 
+  [] -> error "empty tape"
+  (x : xs) -> let 
+    neXs = x :| xs
+    lastSym = last neXs 
+    liveSyms = init neXs
+    in let 
+      ans = assert (lastSym == (zero, Infinity)) 
+        (case viaNonEmpty last liveSyms of 
+          Nothing -> id
+          Just (s, _c) -> assert (s /= zero)
+        )
+        sum $ infCountToInt . snd <$> liveSyms 
+      in 
+        assert (ans >= 0) ans 
+
+liveTapeRegion :: (TapeSymbol s) => ExpTape s InfCount -> TapeRegion
+liveTapeRegion (ExpTape ls _p rs) = TapeRegion (- (liveRegion ls)) (liveRegion rs)
+
+intersectRegions :: TapeRegion -> TapeRegion -> TapeRegion
+intersectRegions (TapeRegion l r) (TapeRegion l' r') = TapeRegion (max l l') (min r r')
+
+subsetRegion :: TapeRegion -> TapeRegion -> Bool 
+subsetRegion (TapeRegion l r) (TapeRegion l' r') = (l >= l') && (r <= r')
+
 
 --detects lin recurrence, as determined by the history
 --currently disphist is implemented in a bad way (skips can care about a whole chunk of symbols) so 
@@ -109,7 +147,8 @@ Update SimulateState to track readshifts in RSHist
 
 New design of readshift 
 -}
-detectLinRecurrence :: forall s. (Eq s, Pretty s) 
+
+detectLinRecurrence :: forall s. (HasCallStack, TapeSymbol s, Pretty s) 
   => TapeHist s InfCount 
   -> ReadShiftHist 
   -> Maybe HaltProof
@@ -123,22 +162,36 @@ detectLinRecurrence hist@(TapeHist thList) rshist@(ReadShiftHist rshList)
   checkForRecur (i,j) 
     (ph, et@(ExpTape _ls p _rs)) 
     (ph', et'@(ExpTape _ls' p' _rs'))
-    (ReadShift l r _s) = do 
+    (ReadShift l r s) = do 
       guard (ph == ph')
-      guard (p == p') --TODO unnecessary?
+      guard (p == p') --TODO unnecessary? 
+      
       --TODO crashes if range does not include 0. but maybe that's actually correct
       let startRng = sliceExpTape et l r 
           endRng = sliceExpTape et' l r
       guard (startRng == endRng) 
+      -- here's where we need to add the new code to check - we need to check that the 
+      -- range the end is reading from intersected with the part of the tape that's live 
+      -- at the endrange step is a subrange of the range we wrote via the start range
+      -- which is the start range shifted by the readshift
+      let writtenRng = -- trace ("l " <> show l <> " r " <> show r <> " s " <> show s) 
+            TapeRegion (l - s) (r - s)
+          readRng = TapeRegion l r
+          liveAtEndRng = liveTapeRegion et' 
+            {- trace ("written " <> show writtenRng <> " read " <> show readRng 
+           <> " live at end " <> show liveAtEndRng) -}
+      guard $ (readRng `intersectRegions` liveAtEndRng) `subsetRegion` writtenRng 
       pure $ LinRecur i j
   --i and j are inclusive, in a sense, but that means we want to index into rshList in an 
   -- (incl., excl.) way, 
   checkForRecurAtIndices :: (Int, Int) -> Maybe HaltProof
   checkForRecurAtIndices (i, j) = let 
       ans = checkForRecur (i, j) startC endC readShift 
-      msg = if has _Just ans then trace ("found proof. indices " <> show i <> "," <> show j <> "\ntape1:\n"
-        <> showP startC <> "\ntape2:\n" <> showP endC <> "\nreadShift:\n" <> showP readShift <> 
-        "\nfrom list\n" <> showP rshList)
+      msg = if has _Just ans then trace ("found proof. indices " 
+        <> show i <> "," <> show j <> "\ntape1:\n"
+        <> showP startC <> "\ntape2:\n" <> showP endC
+         <> "\nreadShift:\n" <> showP readShift <> 
+        "\nfrom list\n" <> "abridged") --showP rshList)
       else id
     in 
     msg ans 

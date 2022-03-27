@@ -28,7 +28,7 @@ import Count
 -- - SkippedToInfinity means that after the given number of steps, the given skip
 --   matches and proves the machine will consume an infinite amount of tape
 -- - LinRecur a b means the machine enters linrecurrence on step a and the length
---   of the recurrence is b 
+--   of the recurrence is b (a and b are measured in rule-steps right now)
 data HaltProof
   = HaltUnreachable Phase
   | Cycle Steps Steps

@@ -337,7 +337,8 @@ skipStep (Turing _ trans) book p tape@(ExpTape _ls bit _rs) =
         --trace ("ans was: " <> show ans)
         ans
 
-getSkipsWhichApply :: SkipBook Bit
+getSkipsWhichApply :: HasCallStack 
+  => SkipBook Bit
   -> Phase
   -> ExpTape Bit InfCount
   -> [(Skip Count Bit, SkipResult Bit InfCount)] 

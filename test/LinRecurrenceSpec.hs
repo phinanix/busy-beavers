@@ -35,7 +35,7 @@ spec = do
       hasPair "abcdefghijklmnopqrstuvwxyz" `shouldBe` Nothing
   describe "detectLinRecurrence" $ do 
     it "finds a recurrence" $ 
-      getRecurRes 300 machineStuckMachine `shouldBe` Just (LinRecur 119 130)
+      getRecurRes 200 machineStuckMachine `shouldBe` Just (LinRecur 0 116)
     it "doesn't find a recurrence for a halting machine" $ 
       getRecurRes 12 bb3 `shouldBe` Nothing
     it "doesn't find a recurrence for a counting machine" $
