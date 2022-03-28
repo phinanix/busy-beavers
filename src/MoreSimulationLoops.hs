@@ -104,5 +104,5 @@ indProveLoopMany limit = simulateManyMachinesOuterLoop backwardSearch $ simulate
   :| (liftOneToMulti <$> [checkSeenBefore, liftModifyState recordHist, liftModifyState recordDispHist,
   runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof,
   runIfCond (atRightOfTape . view s_tape) attemptOtherEndOfTapeProof,
-  runAtCount 50 proveByInd
+  runAtCount 190 proveByInd
   ])

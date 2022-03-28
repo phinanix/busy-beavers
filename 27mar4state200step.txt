@@ -72,7 +72,91 @@ TR1TR0FL2FR0___FL3TL0TL2
 was not shown to halt or run forever
 final state: phase: 3 tape: (F, inf) (T, 3) (F, 1) (T, 1) |>F<|(F, 1) (T, 1) (F, inf)
 
-
---these timing directions were with printing on which is pretty bad for timing I think
+--both timings are with  indProveLoopMany 200 $ startMachine1 4 and induction firing at 50 steps 
+--these timing directions were with printing on (printing each machine's code) which is pretty bad for timing I think
 2840.29user 821.45system 10:36.72elapsed 575%CPU (0avgtext+0avgdata 954600maxresident)k
 0inputs+0outputs (0major+248711minor)pagefaults 0swaps
+
+--these timings were after removing the print statements
+1537.34user 449.16system 5:32.15elapsed 598%CPU (0avgtext+0avgdata 929480maxresident)k
+0inputs+0outputs (0major+244038minor)pagefaults 0swaps
+--the second timing is 1850 machines / second
+
+--bizarrely if you fire induction at step 190 instead you get this *worse* run!
+checked: 614636 machines.
+178808 machines halted
+the most steps was Just 107, performed by
+0 Bit False | 1 Bit True R
+0 Bit True | 1 Bit True L
+1 Bit False | 0 Bit True L
+1 Bit True | 2 Bit False L
+2 Bit False | Halt
+2 Bit True | 3 Bit True L
+3 Bit False | 3 Bit True R
+3 Bit True | 0 Bit False R
+TR1TL1TL0FL2TLHTL3TR3FR0
+final tape: Just "(F, inf) (T, 12) |>F<|(T, 1) (F, inf) \n"
+the most ones was Just 13, performed by
+0 Bit False | 1 Bit True R
+0 Bit True | 2 Bit False R
+1 Bit False | 0 Bit True L
+1 Bit True | 0 Bit True R
+2 Bit False | Halt
+2 Bit True | 3 Bit True R
+3 Bit False | 3 Bit True L
+3 Bit True | 1 Bit False L
+TR1FR2TL0TR0TLHTR3TL3FL1
+final tape:Just "(F, inf) (T, 12) |>F<|(T, 1) (F, inf) \n"
+430998 machines were proven to run forever
+0 by lack of halt-reachability
+39671 by cycling
+164477 by running off the tape in a cycle
+197811 by backwards search
+29039 by a skip to infinity
+
+4830 machines were not proven to halt (1.11%), including:
+after: 201 steps,
+0 Bit False | 1 Bit True R
+0 Bit True | 2 Bit True L
+1 Bit False | 2 Bit False L
+1 Bit True | 0 Bit False R
+2 Bit False | 1 Bit True R
+2 Bit True | 3 Bit False L
+3 Bit False | 0 Bit True L
+TR1TL2FL2FR0TR1FL3TL0___
+
+was not shown to halt or run forever
+final state: phase: 3 tape: (F, inf) (T, 1) (F, 1) (T, 2) (F, 1) (T, 2) (F, 1) (T, 2) (F, 1) (T, 2) |>F<|(F, inf)
+
+
+after: 201 steps,
+0 Bit False | 1 Bit True R
+0 Bit True | 2 Bit False L
+1 Bit False | 2 Bit False L
+1 Bit True | 0 Bit False R
+2 Bit False | 0 Bit True L
+2 Bit True | 3 Bit False L
+3 Bit False | 0 Bit True L
+TR1FL2FL2FR0TL0FL3TL0___
+
+was not shown to halt or run forever
+final state: phase: 3 tape: (F, inf) (T, 1) (F, 1) (T, 1) (F, 1) (T, 1) (F, 1) (T, 1) (F, 1) (T, 1) (F, 1) (T, 1) (F, 1) (T, 1) (F, 1) (T, 1) (F, 1) (T, 1) |>F<|(F, inf)
+
+
+after: 221 steps,
+0 Bit False | 1 Bit True R
+0 Bit True | 0 Bit True R
+1 Bit False | 2 Bit False L
+1 Bit True | 0 Bit False R
+2 Bit True | 3 Bit False L
+3 Bit False | 0 Bit True L
+3 Bit True | 2 Bit True L
+TR1TR0FL2FR0___FL3TL0TL2
+
+was not shown to halt or run forever
+final state: phase: 3 tape: (F, inf) (T, 3) (F, 1) (T, 1) |>F<|(F, 1) (T, 1) (F, inf)
+
+
+
+2130.06user 604.02system 6:35.45elapsed 691%CPU (0avgtext+0avgdata 954236maxresident)k
+0inputs+0outputs (0major+249859minor)pagefaults 0swaps
