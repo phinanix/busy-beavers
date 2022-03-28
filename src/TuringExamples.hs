@@ -150,6 +150,18 @@ TF / TT counter, should be handled by k=2 multisymbol
 not_halt4c :: Turing 
 not_halt4c = unm "TR1TR0FL2FR0___FL3TL0TL2"
 
+{-
+identified on 27 Mar 22 via it causing an assert to fail
+a slightly tricky christmas tree which satisfies the skip:
+p1 (F, 2) (T, n)   >F< (F, 1) 
+p1 (F, 1) (T, n+2) >F< 
+but does so via "wiggling" across the tape - instead of just scanning 
+straight accross the trues it has a 3 step (p0p0p1) process whereby it 
+scoots a single false from one side of the block of trues to the other
+-}
+trickyChristmasTree :: Turing 
+trickyChristmasTree = unm "TR1TR0TL2FL0___TL3FR0FL1"
+
 machineList :: [Turing]
 machineList = [weird3, almostweird3, fullsim_not_halt3, bb3, simple_sweeper, 
   checkerboardSweeper, goesLeftForever, binaryCounterTFTT, machineBreaksIndGuess, 

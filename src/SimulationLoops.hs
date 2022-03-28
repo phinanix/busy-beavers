@@ -22,6 +22,7 @@ import Control.Exception (assert)
 import Relude.Unsafe ((!!))
 import Display
 import Safe.Partial
+import Notation
 
 
 type SimOneAction = Turing -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
@@ -70,7 +71,7 @@ simulateManyMachinesOuterLoop staticAnal updateFuncs startMachine = loop (startM
   bigUpdateFunc machine = foldl1 (>=>) ((&) machine <$> updateFuncs)
   loop :: (Turing, SimState) -> [(Turing, SimState)]
     -> [(Turing, SimResult (ExpTape Bit InfCount))] -> [(Turing, SimResult (ExpTape Bit InfCount))]
-  loop cur@(curMachine, curState) todo !prevRes = --force $
+  loop cur@(curMachine, curState) todo !prevRes = trace (show $ machineToNotation curMachine) $ --force $
    case uncurry bigUpdateFunc cur of
     NewState newState -> loop (curMachine, newState) todo prevRes
     Result !result -> --trace ("got result: " <> show result) $ 

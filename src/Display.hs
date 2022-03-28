@@ -25,6 +25,9 @@ showOneMachine t n =
   (\steps -> Simple.dispResult (Simple.simulate steps Simple.dispStartState t) <> "\n")
   [0.. n]
 
+execMachine :: Turing -> Steps -> IO ()
+execMachine t n = putText $ showOneMachine t n 
+
 dispPhaseET :: (Phase, ExpTape Bit InfCount) -> Text
 dispPhaseET (ph, et) = "" <> dispPhase  ph <> ", " <> dispExpTape et <> "\n"
 

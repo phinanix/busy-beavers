@@ -28,7 +28,7 @@ spec = do
       fst (indProveLoop 200 machineBreaksIndGuess) `shouldSatisfy` has _Continue
     --TODO we should be able to prove this machine runs forever
     it "does not produce machinestuck" $ do
-      fst (indProveLoop 200 machineStuckMachine) `shouldSatisfy` has _Continue
+      fst (indProveLoop 200 machineStuckMachine) `shouldSatisfy` has _ContinueForever
     it "doesn't crash on a machine which made it crash" $ do 
       fst (indProveLoop 200 some_kind_of_bincounter) `shouldSatisfy` has _Continue
 --  describe "indProveLoopMany" $ do 
