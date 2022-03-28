@@ -71,6 +71,25 @@ proveByInd machine state = --force $ --trace ("proveByInd on:\n" <> showP machin
     --trace ("etproof:\n" <> show ans) 
     ans
 
+proveSimply :: SimOneAction 
+proveSimply machine state = case mbProof of 
+  Left _txt -> Right state 
+  Right hp -> Left $ ContinueForever hp
+  where 
+  mbProof = do 
+    indHyp <- guessInductionHypothesis (state ^. s_history) (state ^. s_disp_history)
+    --now we've proved the indhyp
+    first fst $ proveBySimulating 100 machine (state ^. s_book) indHyp 
+    arbSkip <- chainArbitrary indHyp
+    skipAppliesForeverInHist arbSkip (state ^. s_history)
+
+proveByLR :: SimOneAction 
+proveByLR _machine state = case maybeProof of 
+    Nothing -> Right state 
+    Just hp -> Left $ ContinueForever hp
+  where 
+  maybeProof = detectLinRecurrence (state ^. s_history) (state ^. s_readshift_history)
+
 --todo run at count being measured in big steps while limit is measured in small steps is bad
 indProveLoop :: Int -> Turing -> OneLoopRes
 indProveLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit

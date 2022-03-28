@@ -105,6 +105,16 @@ isSameInAsOut (Skip start end _ _ _) = addUp start == addUp end
     addUp :: (Bifoldable b) => b c s -> c 
     addUp = bifoldMap id (const mempty)
   
+{-
+A function which is sort of like `proveInductively`, but it doesn't actually do induction. It just brute 
+simulates forward and sees if that works. This is good to be able to prove things like the 1^n christmas 
+tree that just goes back and forth and we already know it skips blocks of 1s so we can just simulate for 
+a finite number of steps.
+-}
+proveSimply :: Int -> Turing -> SkipBook Bit -> Skip Count Bit 
+  -> Either (Text, Maybe (Config Count Bit)) (SkipOrigin Bit) 
+proveSimply limit t book goal = undefined 
+
 --goal: make a thing that takes a skip that might apply to a certain machine, 
 --attempts to simulate forward to prove that skip using induction
 -- the first int is the limit on the number of steps to take before giving up 

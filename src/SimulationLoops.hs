@@ -8,6 +8,7 @@ import Data.List.NonEmpty (inits)
 import Safe.Exact
 import Prettyprinter
 import qualified Data.List.NonEmpty as NE ((<|))
+import qualified Data.Set as S 
 
 import Turing
 import ExpTape
@@ -71,7 +72,7 @@ simulateManyMachinesOuterLoop staticAnal updateFuncs startMachine = loop (startM
   bigUpdateFunc machine = foldl1 (>=>) ((&) machine <$> updateFuncs)
   loop :: (Turing, SimState) -> [(Turing, SimState)]
     -> [(Turing, SimResult (ExpTape Bit InfCount))] -> [(Turing, SimResult (ExpTape Bit InfCount))]
-  loop cur@(curMachine, curState) todo !prevRes = trace (show $ machineToNotation curMachine) $ --force $
+  loop cur@(curMachine, curState) todo !prevRes = --trace (show $ machineToNotation curMachine) $ --force $
    case uncurry bigUpdateFunc cur of
     NewState newState -> loop (curMachine, newState) todo prevRes
     Result !result -> --trace ("got result: " <> show result) $ 
@@ -119,6 +120,11 @@ runAtCount :: Int -> SimOneAction -> SimOneAction
 runAtCount n = runIfCond (\state -> 
   --trace ("goal:" <> show n <> " actual: " <> show (state ^. s_counter))
   (state ^. s_counter == n))
+
+runAtCounts :: [Int] -> SimOneAction -> SimOneAction 
+runAtCounts xs = let setXs = S.fromList xs in 
+  runIfCond (\state -> 
+    (state ^. s_counter) `S.member` setXs)
 
 addSkipToStateOrInf :: Skip Count Bit -> SkipOrigin Bit -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
 addSkipToStateOrInf skip origin state = if skipGoesForever skip && skipAppliedInHist skip (state ^. s_history)
