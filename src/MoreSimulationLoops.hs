@@ -77,7 +77,7 @@ indProveLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
   :| [checkSeenBefore, liftModifyState recordHist, liftModifyState recordDispHist,
   runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof,
   runIfCond (atRightOfTape . view s_tape) attemptOtherEndOfTapeProof,
-  runAtCount 200 proveByInd
+  runAtCount 50 proveByInd
   ]
 
 indProveLoopMany :: Int -> Turing -> [_]

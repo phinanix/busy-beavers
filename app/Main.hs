@@ -94,8 +94,8 @@ main = do
   -- let results = Simulate.simulate 100 $ startMachine1 4
   -- simProgram dispTape results
   
-  --let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] =  indProveLoopMany 50 $ startMachine1 3
-  let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] =  indProveLoopMany 200 $ startMachine1 4
+  let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] =  indProveLoopMany 50 $ startMachine1 3
+  --let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] =  indProveLoopMany 200 $ startMachine1 4
   --simProgram dispExpTape $ foldr (uncurry addResult) Empty resultList 
   putTextLn $ dispResults dispExpTape $ foldr (uncurry addResult) Empty resultList 
 
