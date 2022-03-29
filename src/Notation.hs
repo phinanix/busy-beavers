@@ -3,12 +3,16 @@ module Notation where
 import Relude
 import qualified Relude.Unsafe as U
 import Control.Lens
-import Data.Char 
+import Data.Char
 import qualified Data.Text as T
 import Prettyprinter
+import qualified Data.Map.Monoidal as M
 
 import Turing
 import Util
+import Count
+import Skip
+
 {-
 The goal of this file is to define functions which convert between in memory 
 Turing machines and a compact, easy to parse string representation. Each 
@@ -37,7 +41,7 @@ transToNotation = \case
     Just Halt -> "TLH"
     Just (Step ph b dir) -> dispBit b <> show dir <> show (unPhase ph)
 
-edgesOfLen :: Int -> [Edge] 
+edgesOfLen :: Int -> [Edge]
 edgesOfLen n = bind (\x -> (x,) <$> [Bit False, Bit True]) (Phase <$> [0.. n-1])
 
 machineToNotation :: Turing -> Text
@@ -45,54 +49,54 @@ machineToNotation (Turing n trans) = T.concat $ transToNotation <$> transes wher
     transes = (\e -> trans ^. at e) <$> edgesOfLen n
 
 parseBit :: Char -> Either Text Bit
-parseBit = \case 
-  'T' -> Right $ Bit True 
-  'F' -> Right $ Bit False 
+parseBit = \case
+  'T' -> Right $ Bit True
+  'F' -> Right $ Bit False
   other -> Left $ "got " <> show other <> " for bit"
 
-parseDir :: Char -> Either Text Dir 
-parseDir = \case 
-  'L' -> Right L 
-  'R' -> Right R 
+parseDir :: Char -> Either Text Dir
+parseDir = \case
+  'L' -> Right L
+  'R' -> Right R
   other -> Left $ "got " <> show other <> " for dir"
 
-parsePhase :: Char -> Either Text Phase 
-parsePhase stateChar = do 
+parsePhase :: Char -> Either Text Phase
+parsePhase stateChar = do
     guardMsg (isDigit stateChar) ("stateChar was not digit: " <> show stateChar)
-    pure $ Phase $ digitToInt stateChar 
+    pure $ Phase $ digitToInt stateChar
 
 --the maybe being nothing means the machine does not have this trans defined
 notationToTrans :: Char -> Char -> Char -> Either Text (Maybe Trans)
-notationToTrans '_' '_' '_' = Right Nothing 
-notationToTrans bitChar dirChar stateChar = case stateChar of 
+notationToTrans '_' '_' '_' = Right Nothing
+notationToTrans bitChar dirChar stateChar = case stateChar of
   'H' -> Right (Just Halt)
-  stateDigit -> do 
-      bit <- parseBit bitChar 
-      dir <- parseDir dirChar 
-      ph <- parsePhase stateDigit  
-      pure $ Just $ Step ph bit dir  
-    
+  stateDigit -> do
+      bit <- parseBit bitChar
+      dir <- parseDir dirChar
+      ph <- parsePhase stateDigit
+      pure $ Just $ Step ph bit dir
+
 parseTrans :: Text -> Either Text (Maybe Trans)
-parseTrans inp = case T.unpack inp of 
+parseTrans inp = case T.unpack inp of
     [bitChar, dirChar, stateChar] -> notationToTrans bitChar dirChar stateChar
-    other -> error $ "tried to parseTrans: " <> T.pack other 
+    other -> error $ "tried to parseTrans: " <> T.pack other
 
 notationToMachine :: Text -> Either Text Turing
-notationToMachine inp = 
-  let chunks = T.chunksOf 3 inp in 
+notationToMachine inp =
+  let chunks = T.chunksOf 3 inp in
   --empty string is not a machine, machines need an even number of transitions since they have
   --two per phase
-  case chunks of 
+  case chunks of
     [] -> Left "got empty string"
-    (x : xs) -> do 
-      let neChunks = x :| xs 
-      guardMsg (even (length neChunks)) 
-        ("neChunks not even len length: " <> show (length neChunks) 
+    (x : xs) -> do
+      let neChunks = x :| xs
+      guardMsg (even (length neChunks))
+        ("neChunks not even len length: " <> show (length neChunks)
           <> " and list: "  <> show neChunks)
       let numPh = length neChunks `div` 2
-      guardMsg (T.length (last neChunks) == 3) 
+      guardMsg (T.length (last neChunks) == 3)
         ("string length not a multiple of 3: " <> show neChunks)
-      transes <- toList <$> traverse parseTrans neChunks 
+      transes <- toList <$> traverse parseTrans neChunks
       let map = fromList $ catMaybes $ sequenceA <$> zip (edgesOfLen numPh) transes
       pure $ Turing numPh map
 
@@ -100,7 +104,7 @@ nm :: Text -> Either Text Turing
 nm = notationToMachine
 
 unsafeNotationToMachine :: Text -> Turing
-unsafeNotationToMachine = unsafeFromRight . notationToMachine 
+unsafeNotationToMachine = unsafeFromRight . notationToMachine
 
 unm :: Text -> Turing
 unm = unsafeNotationToMachine
@@ -108,5 +112,50 @@ unm = unsafeNotationToMachine
 dispTuring :: Turing -> Text
 dispTuring m@(Turing _ transitions) = ifoldMap dispET transitions <> machineToNotation m <> "\n"
 
-instance Pretty Turing where 
-  pretty = pretty . dispTuring 
+instance Pretty Turing where
+  pretty = pretty . dispTuring
+
+{-
+Notation for Config
+[phase notation] [list of (bit notation, count notation)]>(bit notation, count notation)[list of (bit notation, count notation)]
+the first list is "backwards" ie it reads the normal way rather than the fucked way
+
+Bit notation: T or F 
+Phase notation: p(number)
+Count notation: up to 1 number + one of each boundvar or symbolvar, separated by + signs
+  Number notation: number
+  Boundvar notation: n*x_i
+  Symbolvar notation: m*a_j
+
+Notation for skipend
+either 
+  [config]
+or 
+  < [list of (bit notation, count notation)]
+or 
+  [list of (bit notation, count notation)] >
+-}
+
+notationCount :: Count -> Text
+notationCount (Count n as xs) = T.concat $ intersperse "+" symbolList where
+  symbolList = (if n > 0 then (show n :) else id) (nSymbolVar <$> M.assocs as) ++ (nBoundVar <$> M.assocs xs)
+  nBoundVar (BoundVar i, Sum n) = show n <> "*x_" <> show i
+  nSymbolVar (SymbolVar i, Sum n) = show n <> "*a_" <> show i
+
+notationBitCount :: (Bit, Count) -> Text
+notationBitCount (b, c) = "(" <> dispBit b <> ", " <> notationCount c <> ") "
+
+notationPhase :: Phase -> Text
+notationPhase (Phase i) = "p" <> show i <> " "
+
+notationConfig :: Config Count Bit -> Text
+notationConfig (Config ph ls p rs) = notationPhase ph
+  <> T.concat (notationBitCount <$> reverse ls)
+  <> ">" <> dispBit p <> "< " 
+  <> T.concat (notationBitCount <$> rs)
+
+notationSkipEnd :: SkipEnd Count Bit -> Text 
+notationSkipEnd = \case 
+  EndMiddle con -> notationConfig con 
+  EndSide ph L xs -> notationPhase ph <> "< " <> T.concat (notationBitCount <$> xs) 
+  EndSide ph R xs -> notationPhase ph <> T.concat (notationBitCount <$> reverse xs) <> " >"
