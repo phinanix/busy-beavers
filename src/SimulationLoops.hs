@@ -192,9 +192,23 @@ recordHist state = state & s_reverse_history . reverseTapeHist %~ (histEnt :) wh
 recordDispHist :: SimState -> SimState
 recordDispHist state = state & s_reverse_disp_history . reverseDispHist %~ (state ^. s_displacement :)
 
+seenBeforeProof :: SimState -> Maybe HaltProof 
+seenBeforeProof state = case state ^. s_history_set . at histEnt of
+  Just prevStepCount -> Just $ Cycle prevStepCount curStepCount
+  Nothing -> Nothing 
+  where
+  histEnt = (state ^. s_phase, state ^. s_tape)
+  curStepCount = state ^. s_steps
+
+updateHistSet :: SimOneAction 
+updateHistSet _machine state = Right $ state & s_history_set . at histEnt ?~ curStepCount
+  where
+  histEnt = (state ^. s_phase, state ^. s_tape)
+  curStepCount = state ^. s_steps
+
 checkSeenBefore :: SimOneAction
-checkSeenBefore _machine state = case state ^. s_history_set . at histEnt of
-  Just prevStepCount -> Left $ ContinueForever $ Cycle prevStepCount curStepCount
+checkSeenBefore _machine state = case seenBeforeProof state of 
+  Just proof -> Left $ ContinueForever proof 
   Nothing -> Right $ state & s_history_set . at histEnt ?~ curStepCount
   where
   histEnt = (state ^. s_phase, state ^. s_tape)
@@ -246,9 +260,9 @@ TODO this function is currently confusingly written to be interacting with the
 reverse histories, but probably should interact with the forward histories
 TODO we currently duplicate the full 20 line function here which is pretty terrible, probably we should . . . not do that
 -}
-attemptEndOfTapeProof :: SimOneAction
-attemptEndOfTapeProof _machine state = assert (atLeftOfTape $ state ^. s_tape) $
-    maybe (Right state) (Left . ContinueForever) maybeProof
+
+eotProof :: SimState -> Maybe HaltProof 
+eotProof state = assert (atLeftOfTape $ state ^. s_tape) maybeProof
  where
   samePhase = (== state ^. s_phase)
   samePoint (ExpTape _ls oldPoint _rs) = oldPoint == point (state ^. s_tape)
@@ -268,10 +282,12 @@ attemptEndOfTapeProof _machine state = assert (atLeftOfTape $ state ^. s_tape) $
   maybeProof :: Maybe HaltProof
   maybeProof = viaNonEmpty head $ mapMaybe checkProof candidates
 
+attemptEndOfTapeProof :: SimOneAction
+attemptEndOfTapeProof _m state 
+  = maybe (Right state) (Left . ContinueForever) $ eotProof state
 
-attemptOtherEndOfTapeProof :: SimOneAction
-attemptOtherEndOfTapeProof _machine state = assert (atRightOfTape $ state ^. s_tape) $
-    maybe (Right state) (Left . ContinueForever) maybeProof
+otherEotProof :: SimState -> Maybe HaltProof
+otherEotProof state = assert (atRightOfTape $ state ^. s_tape) maybeProof  
  where
   samePhase = (== state ^. s_phase)
   samePoint (ExpTape _ls oldPoint _rs) = oldPoint == point (state ^. s_tape)
@@ -291,6 +307,9 @@ attemptOtherEndOfTapeProof _machine state = assert (atRightOfTape $ state ^. s_t
   maybeProof :: Maybe HaltProof
   maybeProof = viaNonEmpty head $ mapMaybe checkProof candidates
 
+attemptOtherEndOfTapeProof :: SimOneAction
+attemptOtherEndOfTapeProof _machine state 
+  = maybe (Right state) (Left . ContinueForever) $ otherEotProof state
 
 loopSimulateSkip :: Int -> Turing -> OneLoopRes
 loopSimulateSkip limit = simOneFromStartLoop $ pure $ simulateStepTotalLoop limit

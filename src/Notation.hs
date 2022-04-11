@@ -138,7 +138,8 @@ or
 
 notationCount :: Count -> Text
 notationCount (Count n as xs) = T.concat $ intersperse "+" symbolList where
-  symbolList = (if n > 0 then (show n :) else id) (nSymbolVar <$> M.assocs as) ++ (nBoundVar <$> M.assocs xs)
+  symbolList = (if n > 0 then (show n :) else id)
+    (nSymbolVar <$> M.assocs as) ++ (nBoundVar <$> M.assocs xs)
   nBoundVar (BoundVar i, Sum n) = show n <> "*x_" <> show i
   nSymbolVar (SymbolVar i, Sum n) = show n <> "*a_" <> show i
 
@@ -158,4 +159,5 @@ notationSkipEnd :: SkipEnd Count Bit -> Text
 notationSkipEnd = \case 
   EndMiddle con -> notationConfig con 
   EndSide ph L xs -> notationPhase ph <> "< " <> T.concat (notationBitCount <$> xs) 
-  EndSide ph R xs -> notationPhase ph <> T.concat (notationBitCount <$> reverse xs) <> " >"
+  EndSide ph R xs -> notationPhase ph <> 
+    T.concat (notationBitCount <$> reverse xs) <> " >"

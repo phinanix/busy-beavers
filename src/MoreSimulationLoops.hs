@@ -4,6 +4,7 @@ import Relude
 import qualified Relude.Unsafe as Unsafe
 import Control.Lens
 import Prettyprinter
+import qualified Data.Map as M
 
 import Turing
 import ExpTape
@@ -18,14 +19,17 @@ import Util
 import HaltProof
 import LinRecurrence
 
-attemptInductionGuess :: Turing -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
-attemptInductionGuess machine state = trace "attempted" $ case guessInductionHypothesis hist dispHist of
-  Left msg -> traceShow msg $ Right state
-  --try to prove the skip by induction 
-  Right skip -> trace ("guessed a skip:\n" <> show (pretty skip)) $
-    case proveInductively 20 machine (state ^. s_book) skip (BoundVar 0) of
-      Left (fail, _config) -> trace (toString fail) $ Right state
-      Right skipOrigin -> trace ("succeeded") $ addSkipToStateOrInf skip skipOrigin state
+attemptInductionGuess :: Turing -> SimState
+  -> Either (SimResult (ExpTape Bit InfCount)) SimState
+attemptInductionGuess machine state = trace "attempted" $
+  case guessInductionHypothesis hist dispHist of
+    Left msg -> traceShow msg $ Right state
+    --try to prove the skip by induction 
+    Right skip -> trace ("guessed a skip:\n" <> show (pretty skip)) $
+      case proveInductively 20 machine (state ^. s_book) skip (BoundVar 0) of
+        Left (fail, _config) -> trace (toString fail) $ Right state
+        Right skipOrigin -> trace ("succeeded") $
+          addSkipToStateOrInf skip skipOrigin state
   where
     hist =  state ^. s_history
     dispHist = state ^. s_disp_history
@@ -33,16 +37,52 @@ attemptInductionGuess machine state = trace "attempted" $ case guessInductionHyp
 --Note! this function is outdated
 indGuessLoop ::  Int -> Turing -> OneLoopRes
 indGuessLoop limit = simOneFromStartLoop $
-  simulateStepTotalLoop limit :| [liftModifyState recordHist, liftModifyState recordDispHist, runAtCount 100 attemptInductionGuess]
+  simulateStepTotalLoop limit :| [liftModifyState recordHist,
+   liftModifyState recordDispHist,
+   runAtCount 100 attemptInductionGuess]
 
 makeIndGuess :: Int -> Turing -> Either Text (Skip Count Bit)
 makeIndGuess = uncurry guessInductionHypothesis .: getTwoHistAfterTime
 
 getRecurRes :: Int -> Turing -> Maybe HaltProof
-getRecurRes stepCount turing = detectLinRecurrence tapeHist rsHist where 
-  tapeHist = guessingState ^. s_history 
+getRecurRes stepCount turing = detectLinRecurrence tapeHist rsHist where
+  tapeHist = guessingState ^. s_history
   rsHist = guessingState ^. s_readshift_history
   guessingState = getStateAfterTime stepCount turing
+
+{-
+goal: write a function which runs 1) LR 2) cycle finding 3) end-of-tape
+and checks that 1 iff (2 or 3)
+it returns the LR proof if there is one, and it raises if the assert fails
+-}
+assertLRSameAsOthers :: SimOneAction
+assertLRSameAsOthers turing simState = (if not toAssert then trace msg else id)
+  assert toAssert $ case mbLRProof of
+    Nothing -> Right simState
+    Just hp -> Left $ ContinueForever hp
+  where
+  tapeHist = simState ^. s_history
+  rsHist = simState ^. s_readshift_history
+  mbLRProof = detectLinRecurrence tapeHist rsHist
+  mbCycleProof = seenBeforeProof simState
+  curTape = simState ^. s_tape
+  mbEOTProof = if atLeftOfTape curTape then eotProof simState else Nothing
+  mbOtherEOTProof = if atRightOfTape curTape then otherEotProof simState else Nothing
+  --
+  lrWorked = has _Just mbLRProof
+  cycleWorked = has _Just mbCycleProof
+  eotWorked = has _Just mbEOTProof
+  otherEotWorked = has _Just mbOtherEOTProof
+  -- 
+  notBothEot = not (eotWorked && otherEotWorked && not cycleWorked)
+  lrComplementsWorked = cycleWorked || eotWorked || otherEotWorked
+  lrIffComplements = lrWorked == lrComplementsWorked
+  toAssert = lrIffComplements && notBothEot
+  msg = "assert failed on:\n" <> showP turing <> "\nsteps: " <> showP (simState ^. s_steps)
+    <> " " <> showP [lrWorked, cycleWorked, eotWorked, otherEotWorked]
+    <> "\nhist: " <> showP (M.assocs $ simState ^. s_history_set)
+
+
 
 {-
 plan for integrating proveInductivelyIMeanIT into the main loop:
@@ -71,24 +111,81 @@ proveByInd machine state = --force $ --trace ("proveByInd on:\n" <> showP machin
     --trace ("etproof:\n" <> show ans) 
     ans
 
-proveSimply :: SimOneAction 
-proveSimply machine state = case mbProof of 
-  Left _txt -> Right state 
+proveSimply :: SimOneAction
+proveSimply machine state = case mbProof of
+  Left _txt -> Right state
   Right hp -> Left $ ContinueForever hp
-  where 
-  mbProof = do 
+  where
+  mbProof = do
     indHyp <- guessInductionHypothesis (state ^. s_history) (state ^. s_disp_history)
-    --now we've proved the indhyp
-    first fst $ proveBySimulating 100 machine (state ^. s_book) indHyp 
+    first fst $ proveBySimulating 100 machine (state ^. s_book) indHyp
     arbSkip <- chainArbitrary indHyp
     skipAppliesForeverInHist arbSkip (state ^. s_history)
 
-proveByLR :: SimOneAction 
-proveByLR _machine state = case maybeProof of 
-    Nothing -> Right state 
+proveByLR :: SimOneAction
+proveByLR _machine state = case maybeProof of
+    Nothing -> Right state
     Just hp -> Left $ ContinueForever hp
-  where 
+  where
   maybeProof = detectLinRecurrence (state ^. s_history) (state ^. s_readshift_history)
+
+proveLRLoop :: Int -> Turing -> OneLoopRes
+proveLRLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
+  :| [liftModifyState recordHist, liftModifyState recordDispHist, 
+    proveByLR]
+
+canProveLR :: Int -> Turing -> Bool 
+canProveLR limit m = case proveLRLoop limit m of 
+  (ContinueForever (LinRecur _ _), _ne) -> True 
+  _ -> False 
+
+proveCycleLoop :: Int -> Turing -> OneLoopRes 
+proveCycleLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
+  :| [checkSeenBefore] 
+
+canProveCycle :: Int -> Turing -> Bool 
+canProveCycle limit m = case proveCycleLoop limit m of 
+  (ContinueForever (Cycle _ _), _ne) -> True 
+  _ -> False 
+
+proveEOTLoop :: Int -> Turing -> OneLoopRes 
+proveEOTLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
+  :| [runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof]
+
+canProveEOT :: Int -> Turing -> Bool 
+canProveEOT limit m = case proveEOTLoop limit m of 
+  (ContinueForever (OffToInfinityN _ _), _) -> True 
+  _ -> False 
+
+proveOEOTLoop :: Int -> Turing -> OneLoopRes 
+proveOEOTLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
+  :| [runIfCond (atRightOfTape . view s_tape) attemptOtherEndOfTapeProof]
+
+canProveOEOT :: Int -> Turing -> Bool 
+canProveOEOT limit m = case proveOEOTLoop limit m of 
+  (ContinueForever (OffToInfinityN _ _), _) -> True 
+  _ -> False 
+
+checkLRAssertOneMachine :: Int -> Turing -> Maybe Text
+checkLRAssertOneMachine limit m = if toAssert then Nothing else Just msg where 
+  lrWorked = canProveLR limit m 
+  cycleWorked = canProveCycle limit m 
+  eotWorked = canProveEOT limit m 
+  otherEotWorked = canProveOEOT limit m
+  notBothEot = not (eotWorked && otherEotWorked && not cycleWorked)
+  lrComplementsWorked = cycleWorked || eotWorked || otherEotWorked
+  lrIffComplements = lrWorked == lrComplementsWorked
+
+  toAssert = lrIffComplements && notBothEot
+  msg = "assert failed on:\n" <> showP m 
+    <> " " <> showP [lrWorked, cycleWorked, eotWorked, otherEotWorked]
+
+checkLRAssertLoop :: Int -> Turing -> [_]
+checkLRAssertLoop limit = simulateManyMachinesOuterLoop backwardSearch $
+  simulateStepPartial limit :| (liftOneToMulti <$>
+  --updateHistSet has to be after b/c otherwise we cycle on "currentstate = currenstate"
+  [liftModifyState recordHist, liftModifyState recordDispHist,
+    assertLRSameAsOthers, updateHistSet])
 
 --todo run at count being measured in big steps while limit is measured in small steps is bad
 indProveLoop :: Int -> Turing -> OneLoopRes

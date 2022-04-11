@@ -369,7 +369,9 @@ pickBestSkip = \case
 type SkipTape = ExpTape Bit InfCount
 
 skipStateFromPhTape :: Turing -> Phase -> ExpTape Bit InfCount  -> SimState 
-skipStateFromPhTape t ph tape = SimState ph tape (initBook t) 0 [] (ReverseTapeHist [(ph, tape)]) Empty 0 0 (ReverseDispHist [0]) (ReverseReadShiftHist [])
+skipStateFromPhTape t ph tape = SimState ph tape (initBook t) 0 [] 
+  (ReverseTapeHist [(ph, tape)]) (one ((Phase 0,tape), 0)) 0 0 
+  (ReverseDispHist [0]) (ReverseReadShiftHist [])
 
 initSkipState :: Turing -> SimState
 initSkipState t = skipStateFromPhTape t (Phase 0) (initExpTape (Bit False))
