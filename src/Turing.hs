@@ -8,6 +8,7 @@ import Control.Lens hiding ((<|))
 import Control.Lens.Extras
 import Data.List.NonEmpty ((<|))
 import Prettyprinter
+import qualified Data.Map as M
 
 
 --the Phase a turing machine is in, to not conflict with State
@@ -58,14 +59,14 @@ dispBit :: Bit -> Text
 dispBit (Bit False) = "F"
 dispBit (Bit True) = "T"
 
-instance Pretty Bit where 
-  pretty = pretty . dispBit 
-  
+instance Pretty Bit where
+  pretty = pretty . dispBit
+
 dispPhase :: Phase -> Text
 dispPhase (Phase i) = show i
 
-instance Pretty Phase where 
-  pretty = pretty . dispPhase 
+instance Pretty Phase where
+  pretty = pretty . dispPhase
 
 dispEdge :: Edge -> Text
 dispEdge (p, b) = dispPhase p <> " " <> show b
@@ -77,7 +78,7 @@ dispTrans (Step p b d) = dispPhase p <> " " <> show b <> " " <> show d
 dispET :: Edge -> Trans -> Text
 dispET e t = dispEdge e <> " | " <> dispTrans t <> "\n"
 
-  
+
 --crashes if the Int is not >0, which is true of much of the program
 uniPhase :: Int -> NonEmpty Phase
 uniPhase n = Phase <$> 0 :| [1.. n-1]
@@ -176,3 +177,10 @@ startMachine1 n = Turing n $ one ((Phase 0, Bit False), Step (Phase 1) (Bit True
 --for n=1 if you don't halt right away, you are doomed to loop forever
 uni1Machine :: Turing
 uni1Machine = Turing 1 $ one ((Phase 0, Bit False), Halt)
+
+fillInMachine :: Turing -> Turing
+fillInMachine = \case
+  Turing n map -> Turing n (map `M.union` newMap)
+    where
+    relEdges = filter (`M.notMember` map) $ toList $ uniEdge n
+    newMap = M.fromList $ (, Halt) <$> relEdges 

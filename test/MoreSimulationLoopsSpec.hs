@@ -31,6 +31,8 @@ spec = do
       fst (indProveLoop 200 machineStuckMachine) `shouldSatisfy` has _Continue
     it "doesn't crash on a machine which made it crash" $ do 
       fst (indProveLoop 200 some_kind_of_bincounter) `shouldSatisfy` has _Continue
+    it "satisifes the LR assert" $ do 
+      property (\(t :: Turing) -> checkLRAssertOneMachine 120 t `shouldBe` Nothing)
 --  describe "indProveLoopMany" $ do 
 --    it "works on machines of size 3" $ 
 

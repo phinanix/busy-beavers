@@ -51,40 +51,6 @@ getRecurRes stepCount turing = detectLinRecurrence tapeHist rsHist where
   guessingState = getStateAfterTime stepCount turing
 
 {-
-goal: write a function which runs 1) LR 2) cycle finding 3) end-of-tape
-and checks that 1 iff (2 or 3)
-it returns the LR proof if there is one, and it raises if the assert fails
--}
-assertLRSameAsOthers :: SimOneAction
-assertLRSameAsOthers turing simState = (if not toAssert then trace msg else id)
-  assert toAssert $ case mbLRProof of
-    Nothing -> Right simState
-    Just hp -> Left $ ContinueForever hp
-  where
-  tapeHist = simState ^. s_history
-  rsHist = simState ^. s_readshift_history
-  mbLRProof = detectLinRecurrence tapeHist rsHist
-  mbCycleProof = seenBeforeProof simState
-  curTape = simState ^. s_tape
-  mbEOTProof = if atLeftOfTape curTape then eotProof simState else Nothing
-  mbOtherEOTProof = if atRightOfTape curTape then otherEotProof simState else Nothing
-  --
-  lrWorked = has _Just mbLRProof
-  cycleWorked = has _Just mbCycleProof
-  eotWorked = has _Just mbEOTProof
-  otherEotWorked = has _Just mbOtherEOTProof
-  -- 
-  notBothEot = not (eotWorked && otherEotWorked && not cycleWorked)
-  lrComplementsWorked = cycleWorked || eotWorked || otherEotWorked
-  lrIffComplements = lrWorked == lrComplementsWorked
-  toAssert = lrIffComplements && notBothEot
-  msg = "assert failed on:\n" <> showP turing <> "\nsteps: " <> showP (simState ^. s_steps)
-    <> " " <> showP [lrWorked, cycleWorked, eotWorked, otherEotWorked]
-    <> "\nhist: " <> showP (M.assocs $ simState ^. s_history_set)
-
-
-
-{-
 plan for integrating proveInductivelyIMeanIT into the main loop:
 we need to write a function which checks whether a skip goes forever in already known history
 then we change the return type of proveInd to return the new skip if possible
@@ -122,6 +88,12 @@ proveSimply machine state = case mbProof of
     arbSkip <- chainArbitrary indHyp
     skipAppliesForeverInHist arbSkip (state ^. s_history)
 
+{-
+goal: write a function which runs 1) LR 2) cycle finding 3) end-of-tape
+and checks that 1 iff (2 or 3)
+it returns the LR proof if there is one, and it raises if the assert fails
+-}
+
 proveByLR :: SimOneAction
 proveByLR _machine state = case maybeProof of
     Nothing -> Right state
@@ -132,11 +104,12 @@ proveByLR _machine state = case maybeProof of
 proveLRLoop :: Int -> Turing -> OneLoopRes
 proveLRLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
   :| [liftModifyState recordHist, liftModifyState recordDispHist, 
-    proveByLR]
+    runAtCount (limit-2) proveByLR]
 
 canProveLR :: Int -> Turing -> Bool 
 canProveLR limit m = case proveLRLoop limit m of 
   (ContinueForever (LinRecur _ _), _ne) -> True 
+  (ContinueForever (SkippedToInfinity _ _), _ne) -> True 
   _ -> False 
 
 proveCycleLoop :: Int -> Turing -> OneLoopRes 
@@ -146,20 +119,24 @@ proveCycleLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
 canProveCycle :: Int -> Turing -> Bool 
 canProveCycle limit m = case proveCycleLoop limit m of 
   (ContinueForever (Cycle _ _), _ne) -> True 
+  (ContinueForever (SkippedToInfinity _ _), _ne) -> True 
   _ -> False 
 
 proveEOTLoop :: Int -> Turing -> OneLoopRes 
 proveEOTLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
-  :| [runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof]
+  :| [liftModifyState recordHist, liftModifyState recordDispHist, 
+  runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof]
 
 canProveEOT :: Int -> Turing -> Bool 
 canProveEOT limit m = case proveEOTLoop limit m of 
   (ContinueForever (OffToInfinityN _ _), _) -> True 
+  (ContinueForever (SkippedToInfinity _ _), _ne) -> True 
   _ -> False 
 
 proveOEOTLoop :: Int -> Turing -> OneLoopRes 
 proveOEOTLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
-  :| [runIfCond (atRightOfTape . view s_tape) attemptOtherEndOfTapeProof]
+  :| [liftModifyState recordHist, liftModifyState recordDispHist, 
+  runIfCond (atRightOfTape . view s_tape) attemptOtherEndOfTapeProof]
 
 canProveOEOT :: Int -> Turing -> Bool 
 canProveOEOT limit m = case proveOEOTLoop limit m of 
@@ -167,7 +144,8 @@ canProveOEOT limit m = case proveOEOTLoop limit m of
   _ -> False 
 
 checkLRAssertOneMachine :: Int -> Turing -> Maybe Text
-checkLRAssertOneMachine limit m = if toAssert then Nothing else Just msg where 
+checkLRAssertOneMachine limit unfinishedM = if toAssert then Nothing else Just msg where 
+  m = fillInMachine unfinishedM
   lrWorked = canProveLR limit m 
   cycleWorked = canProveCycle limit m 
   eotWorked = canProveEOT limit m 
@@ -180,13 +158,6 @@ checkLRAssertOneMachine limit m = if toAssert then Nothing else Just msg where
   msg = "assert failed on:\n" <> showP m 
     <> " " <> showP [lrWorked, cycleWorked, eotWorked, otherEotWorked]
 
-checkLRAssertLoop :: Int -> Turing -> [_]
-checkLRAssertLoop limit = simulateManyMachinesOuterLoop backwardSearch $
-  simulateStepPartial limit :| (liftOneToMulti <$>
-  --updateHistSet has to be after b/c otherwise we cycle on "currentstate = currenstate"
-  [liftModifyState recordHist, liftModifyState recordDispHist,
-    assertLRSameAsOthers, updateHistSet])
-
 --todo run at count being measured in big steps while limit is measured in small steps is bad
 indProveLoop :: Int -> Turing -> OneLoopRes
 indProveLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
@@ -196,7 +167,16 @@ indProveLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
   runAtCount 50 proveByInd
   ]
 
-indProveLoopMany :: Int -> Turing -> [_]
+enumerateMachinesLoop :: Int -> Turing -> [(Turing, SimResult (ExpTape Bit InfCount))]
+enumerateMachinesLoop limit = simulateManyMachinesOuterLoop (const Nothing) $
+  simulateStepPartial limit :| []
+
+checkLRAssertManyMachines :: Int -> Turing -> [Text]
+checkLRAssertManyMachines limit startMachine = catMaybes texts where 
+  machines = fst <$> enumerateMachinesLoop limit startMachine
+  texts = checkLRAssertOneMachine limit <$> machines 
+
+indProveLoopMany :: Int -> Turing -> [(Turing, SimResult (ExpTape Bit InfCount))]
 indProveLoopMany limit = simulateManyMachinesOuterLoop backwardSearch $ simulateStepPartial limit
   :| (liftOneToMulti <$> [checkSeenBefore, liftModifyState recordHist, liftModifyState recordDispHist,
   runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof,

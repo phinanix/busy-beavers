@@ -95,23 +95,14 @@ main = do
   -- simProgram dispTape results
   
   --let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] =  indProveLoopMany 50 $ startMachine1 3
-  let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] =  indProveLoopMany 200 $ startMachine1 4
+  let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] = indProveLoopMany 200 $ startMachine1 4
   --simProgram dispExpTape $ foldr (uncurry addResult) Empty resultList 
-  putTextLn $ dispResults dispExpTape $ foldr (uncurry addResult) Empty resultList 
+  --putTextLn $ dispResults dispExpTape $ foldr (uncurry addResult) Empty resultList 
+
+  let assertFails = checkLRAssertManyMachines 200 $ startMachine1 4
+  for_ assertFails putTextLn 
 
 
-  -- let skipResults = simulateWithSkips 1000 $ startMachine1 5
-  -- simProgram dispExpTape skipResults
-
-  -- putTextLn $ showOneMachine bb2 10
-  -- putTextLn $ displaySkipSimulation jumps_to_end 2
- 
-  -- print $ backwardSearch $ startMachine1 3 --this returns a proof which is bad
-  -- print $ backwardSearch $ false_backward_search
-  -- traverse_ putTextLn $ show <$> backwardSearch <$> tnfPrecursors 25 bb3
-  -- traverse_ putTextLn $ dispTuring <$> tnfPrecursors 25 bb3
-  --putTextLn $ showOneMachine bb3 100
-  -- putStrLn $ force $ simpleSimulator 2 20
 
 -- num states and num machines
 -- 3 4,052

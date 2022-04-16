@@ -258,7 +258,8 @@ How this function works:
 
 TODO this function is currently confusingly written to be interacting with the 
 reverse histories, but probably should interact with the forward histories
-TODO we currently duplicate the full 20 line function here which is pretty terrible, probably we should . . . not do that
+TODO we currently duplicate the full 20 line function here which is 
+pretty terrible, probably we should . . . not do that
 -}
 
 eotProof :: SimState -> Maybe HaltProof 
@@ -266,15 +267,22 @@ eotProof state = assert (atLeftOfTape $ state ^. s_tape) maybeProof
  where
   samePhase = (== state ^. s_phase)
   samePoint (ExpTape _ls oldPoint _rs) = oldPoint == point (state ^. s_tape)
-  isCandidate (phase, tape) = samePhase phase && atLeftOfTape tape && samePoint tape
-  dispList = Unsafe.tail $ state ^. s_reverse_disp_history . reverseDispHist
+  isCandidate (disp, (phase, tape)) 
+    = samePhase phase && atLeftOfTape tape && samePoint tape && curDisp <= disp
+  (curDisp :| dispList) = fromList $ state ^. s_reverse_disp_history . reverseDispHist
   maximumInwardList = fmap maximum $ tail $ inits dispList
   bitsToCheck = uncurry (-) <$> zipExact maximumInwardList dispList
-  candidates = filter (isCandidate . view _2) $ zipExact bitsToCheck $ Unsafe.tail $ state ^. s_reverse_history . reverseTapeHist 
+  history = Unsafe.tail $ state ^. s_reverse_history . reverseTapeHist 
+  toFilter :: [(Int, (Int, (Phase, ExpTape Bit InfCount)))]
+  toFilter = zipExact bitsToCheck $ zipExact dispList history
+  candidates = filter (isCandidate . view _2) toFilter
+  -- candidates = filter (isCandidate . view _2) $ zipExact bitsToCheck $ 
+  --   Unsafe.tail $ state ^. s_reverse_history . reverseTapeHist 
   -- int is from bitsToCheck
-  checkProof :: (Int, (Phase, ExpTape Bit InfCount)) -> Maybe HaltProof
-  checkProof (numBitsToCheck, (_ph, oldTape)) = let
-    getBits tapeHalf = takeExact numBitsToCheck $ tapeHalfToBitList tapeHalf <> repeat (Bit False)
+  checkProof :: (Int, (Int, (Phase, ExpTape Bit InfCount))) -> Maybe HaltProof
+  checkProof (numBitsToCheck, (_disp, (_ph, oldTape))) = let
+    getBits tapeHalf = takeExact numBitsToCheck $ 
+      tapeHalfToBitList tapeHalf <> repeat (Bit False)
     in
     if getBits (right oldTape) == getBits (right $ state ^. s_tape)
       then Just $ OffToInfinityN (state ^. s_steps) L
@@ -291,18 +299,29 @@ otherEotProof state = assert (atRightOfTape $ state ^. s_tape) maybeProof
  where
   samePhase = (== state ^. s_phase)
   samePoint (ExpTape _ls oldPoint _rs) = oldPoint == point (state ^. s_tape)
-  isCandidate (phase, tape) = samePhase phase && atRightOfTape tape && samePoint tape
-  dispList = Unsafe.tail $ state ^. s_reverse_disp_history . reverseDispHist
-  minimumInwardList = fmap minimum $ tail $ inits dispList
-  bitsToCheck = uncurry (-) <$> zipExact dispList minimumInwardList
-  candidates = filter (isCandidate . view _2) $ zipExact bitsToCheck $ Unsafe.tail $ state ^. s_reverse_history . reverseTapeHist 
+  isCandidate (disp, (phase, tape)) = samePhase phase && atRightOfTape tape && samePoint tape && curDisp >= disp
+  (curDisp :| dispList) = let ans = fromList $ state ^. s_reverse_disp_history . reverseDispHist in 
+    --trace ("rev disps:\n" <> showP ans) 
+    ans
+  minimumInwardList = let ans = fmap minimum $ tail $ inits dispList in 
+    --trace ("minIn:\n" <> showP ans) 
+    ans 
+  bitsToCheck = let ans = uncurry (-) <$> zipExact dispList minimumInwardList in 
+    --trace ("bits to check:\n" <> showP ans) 
+    ans
+  history = Unsafe.tail $ state ^. s_reverse_history . reverseTapeHist 
+  toFilter :: [(Int, (Int, (Phase, ExpTape Bit InfCount)))]
+  toFilter = zipExact bitsToCheck $ zipExact dispList history
+  candidates = filter (isCandidate . view _2) toFilter
   -- int is from bitsToCheck
-  checkProof :: (Int, (Phase, ExpTape Bit InfCount)) -> Maybe HaltProof
-  checkProof (numBitsToCheck, (_ph, oldTape)) = let
+  checkProof :: (Int, (Int, (Phase, ExpTape Bit InfCount))) -> Maybe HaltProof
+  checkProof (numBitsToCheck, (disp, (_ph, oldTape))) = let
     getBits tapeHalf = takeExact numBitsToCheck $ tapeHalfToBitList tapeHalf <> repeat (Bit False)
     in
     if getBits (left oldTape) == getBits (left $ state ^. s_tape)
-      then Just $ OffToInfinityN (state ^. s_steps) R
+      then 
+        --trace ("bits to check " <> show numBitsToCheck) $ 
+        Just $ OffToInfinityN (state ^. s_steps) R
       else Nothing
   maybeProof :: Maybe HaltProof
   maybeProof = viaNonEmpty head $ mapMaybe checkProof candidates

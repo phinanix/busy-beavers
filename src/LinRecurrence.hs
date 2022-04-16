@@ -190,14 +190,15 @@ detectLinRecurrence hist@(TapeHist thList) rshist@(ReadShiftHist rshList)
   checkForRecurAtIndices :: (Int, Int) -> Maybe HaltProof
   checkForRecurAtIndices (i, j) = let 
       ans = checkForRecur (i, j) startC endC readShift 
-      msg = if has _Just ans then trace ("found proof. indices " 
+      showMsg = if has _Just ans then trace ("found proof. indices " 
         <> show i <> "," <> show j <> "\ntape1:\n"
         <> showP startC <> "\ntape2:\n" <> showP endC
          <> "\nreadShift:\n" <> showP readShift <> 
         "\nfrom list\n" <> "abridged") --showP rshList)
       else id
     in 
-    msg ans 
+    --showMsg
+     ans 
     where 
     startC = thList !! fromIntegral i
     endC = thList !! fromIntegral j 
@@ -211,5 +212,6 @@ detectLinRecurrence hist@(TapeHist thList) rshist@(ReadShiftHist rshList)
   --TODO, I think this assert probably has an off by one in it?
   allMaybeProofs = let msg = "lengths:" <> show (length thList, length rshList)
     in 
-    trace msg $ assert (length thList - 1 == length rshList) $ 
+    --trace msg $ 
+    assert (length thList - 1 == length rshList) $ 
     checkForRecurAtIndices <$> genValidIndices (fromIntegral $ length thList)
