@@ -177,9 +177,18 @@ checkLRAssertManyMachines limit startMachine = catMaybes texts where
   texts = checkLRAssertOneMachine limit <$> machines 
 
 indProveLoopMany :: Int -> Turing -> [(Turing, SimResult (ExpTape Bit InfCount))]
-indProveLoopMany limit = simulateManyMachinesOuterLoop backwardSearch $ simulateStepPartial limit
-  :| (liftOneToMulti <$> [checkSeenBefore, liftModifyState recordHist, liftModifyState recordDispHist,
+indProveLoopMany limit = simulateManyMachinesOuterLoop backwardSearch $ 
+  simulateStepPartial limit :| (liftOneToMulti <$> [checkSeenBefore, liftModifyState recordHist, 
+  liftModifyState recordDispHist,
   runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof,
   runIfCond (atRightOfTape . view s_tape) attemptOtherEndOfTapeProof,
+  runAtCount 190 proveByInd
+  ])
+
+bestCurrentProveLoop :: Int -> Turing -> [(Turing, SimResult (ExpTape Bit InfCount))] 
+bestCurrentProveLoop limit = simulateManyMachinesOuterLoop backwardSearch $ 
+  simulateStepPartial limit :| (liftOneToMulti <$> [checkSeenBefore, liftModifyState recordHist, 
+  liftModifyState recordDispHist,
+  runAtCounts [10, 50, 190] proveByLR,
   runAtCount 190 proveByInd
   ])

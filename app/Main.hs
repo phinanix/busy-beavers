@@ -95,12 +95,12 @@ main = do
   -- simProgram dispTape results
   
   --let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] =  indProveLoopMany 50 $ startMachine1 3
-  let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] = indProveLoopMany 200 $ startMachine1 4
+  let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] = bestCurrentProveLoop 50 $ startMachine1 3
   --simProgram dispExpTape $ foldr (uncurry addResult) Empty resultList 
-  --putTextLn $ dispResults dispExpTape $ foldr (uncurry addResult) Empty resultList 
+  putTextLn $ dispResults dispExpTape $ foldr (uncurry addResult) Empty resultList 
 
-  let assertFails = checkLRAssertManyMachines 200 $ startMachine1 4
-  for_ assertFails putTextLn 
+  -- let assertFails = checkLRAssertManyMachines 200 $ startMachine1 4
+  -- for_ assertFails putTextLn 
 
 
 
@@ -108,3 +108,7 @@ main = do
 -- 3 4,052
 -- 4 618,296
 -- 5 126,382,022
+
+--size 3
+--indprove 0.73s 
+--bestcurprove 1.27s 

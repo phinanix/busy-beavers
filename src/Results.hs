@@ -50,6 +50,7 @@ data Results a = Results
     , _backwardSearches :: Int
     , _backwardExamples :: [Turing]
     , _skipInfinity :: Int
+    , _linRecur :: Int
   , _unproven :: Int
     , _unprovenExamples :: [(Turing, Steps, Phase, a)]
   } deriving (Show, Eq, Ord, Generic, Functor)
@@ -69,6 +70,7 @@ instance Eq a => AsEmpty (Results a) where
       , _backwardSearches = 0
       , _backwardExamples = []
       , _skipInfinity = 0
+      , _linRecur = 0
     , _unproven = 0
       , _unprovenExamples = []
     }
@@ -95,6 +97,7 @@ addResult turing (ContinueForever proof) r =
     proof2lens (OffToInfinityN _ _) = infinityN
     proof2lens (BackwardSearch) = backwardSearches
     proof2lens (SkippedToInfinity _ _) = skipInfinity
+    proof2lens (LinRecur _ _) = linRecur 
     special BackwardSearch = --if r ^. backwardSearches > keepNum then id else
       backwardExamples %~ ((:) turing)
     special _ = id
