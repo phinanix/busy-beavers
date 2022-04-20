@@ -94,8 +94,8 @@ main = do
   -- let results = Simulate.simulate 100 $ startMachine1 4
   -- simProgram dispTape results
   
-  --let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] =  indProveLoopMany 50 $ startMachine1 3
-  let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] = bestCurrentProveLoop 50 $ startMachine1 3
+  --let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] = indProveLoopMany 141 $ startMachine1 4
+  let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] = bestCurrentProveLoop 141 $ startMachine1 4
   --simProgram dispExpTape $ foldr (uncurry addResult) Empty resultList 
   putTextLn $ dispResults dispExpTape $ foldr (uncurry addResult) Empty resultList 
 
@@ -111,4 +111,9 @@ main = do
 
 --size 3
 --indprove 0.73s 
---bestcurprove 1.27s 
+--bestcurprove 1.27s  
+--both leave 31 
+
+--size 4
+--indprove 3m23s leaving 6650
+--bestcurprove 4m01s leaving 4729

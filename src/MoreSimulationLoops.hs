@@ -182,13 +182,13 @@ indProveLoopMany limit = simulateManyMachinesOuterLoop backwardSearch $
   liftModifyState recordDispHist,
   runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof,
   runIfCond (atRightOfTape . view s_tape) attemptOtherEndOfTapeProof,
-  runAtCount 190 proveByInd
+  runAtCounts [40, 140] proveByInd
   ])
 
 bestCurrentProveLoop :: Int -> Turing -> [(Turing, SimResult (ExpTape Bit InfCount))] 
 bestCurrentProveLoop limit = simulateManyMachinesOuterLoop backwardSearch $ 
   simulateStepPartial limit :| (liftOneToMulti <$> [checkSeenBefore, liftModifyState recordHist, 
   liftModifyState recordDispHist,
-  runAtCounts [10, 50, 190] proveByLR,
-  runAtCount 190 proveByInd
+  runAtCounts [10, 40, 140] proveByLR,
+  runAtCounts [40, 140] proveByInd
   ])
