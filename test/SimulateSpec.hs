@@ -93,7 +93,7 @@ varResult = ExpTape
   (Bit False)
   [(Bit True, inum 1)]
 
-getContinueSteps :: SimResult a -> Maybe Steps
+getContinueSteps :: SimResult s a -> Maybe Steps
 getContinueSteps = \case
   Continue steps _ _ _ -> Just steps
   _ -> Nothing

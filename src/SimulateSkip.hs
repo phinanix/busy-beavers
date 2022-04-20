@@ -40,7 +40,13 @@ instance (NFData s) => NFData (SkipOrigin s)
 data TwoBit = TwoBit Bit Bit deriving (Eq, Ord, Show, Generic)
 instance (NFData TwoBit)
 
-class (Ord s, Show s) => TapeSymbol s where
+dispTwoBit :: TwoBit -> Text 
+dispTwoBit (TwoBit x y) = "|" <> dispBit x <> dispBit y <> "|"
+
+instance Pretty TwoBit where 
+  pretty = pretty . dispTwoBit 
+
+class (Ord s, Show s, Pretty s) => TapeSymbol s where
   blank :: s
   getPoint :: s -> Bit -- the thing under the machinehead at the point
   toBits :: s -> [Bit]
@@ -112,26 +118,26 @@ getReverseReadShiftHist = _reverseReadShiftHist
 getReadShiftHist :: ReadShiftHist -> [ReadShift]
 getReadShiftHist = _readShiftHist
 
-data SimState = SimState
+data SimState s = SimState
   { _s_phase :: Phase
-  , _s_tape :: ExpTape Bit InfCount
-  , _s_book :: SkipBook Bit
+  , _s_tape :: ExpTape s InfCount
+  , _s_book :: SkipBook s
   , _s_steps :: Steps --the number of "small" / machine steps we have simulated. 
   -- a list of the skips used so far in order
   -- since it is the skips used in order, the index 0 one takes us from step 0 to step 1
   --the slice that takes you from step 5 to step 13 is index 5 to index 12 inclusive
-  , _s_trace :: [Skip Count Bit]
+  , _s_trace :: [Skip Count s]
    --a list of the (phase, tape)s seen so far in order
-  , _s_reverse_history :: ReverseTapeHist Bit InfCount
+  , _s_reverse_history :: ReverseTapeHist s InfCount
     --a map of the (phase, tape)s seen so far to the step count at which they were seen 
-  , _s_history_set :: Map (Phase, ExpTape Bit InfCount) Int
+  , _s_history_set :: Map (Phase, ExpTape s InfCount) Int
   , _s_counter :: Int --the number of times we have taken a "big step". guaranteed to take on all values between 0 and n
   --the total amount of leftward (negative) or rightward (positive) displacement we have done, starting from 0
   , _s_displacement :: Int
   , _s_reverse_disp_history :: ReverseDispHist
   , _s_reverse_readshift_history :: ReverseReadShiftHist
   } deriving (Eq, Ord, Show, Generic)
-instance NFData SimState
+instance (NFData s) => NFData (SimState s)
 
 instance (Pretty s) => Pretty (SkipOrigin s) where
   pretty Initial = "an initial skip"
@@ -160,13 +166,13 @@ $(makeLenses ''ReverseReadShiftHist)
 $(makeLenses ''SimState)
 $(makeLenses ''SkipResult)
 
-s_history :: Getter SimState (TapeHist Bit InfCount)
+s_history :: Getter (SimState s) (TapeHist s InfCount)
 s_history = to $ TapeHist . reverse . getReverseTapeHist . view s_reverse_history
 
-s_disp_history :: Getter SimState DispHist
+s_disp_history :: Getter (SimState s) DispHist
 s_disp_history = to $ DispHist . reverse . getReverseDispHist . view s_reverse_disp_history
 
-s_readshift_history :: Getter SimState ReadShiftHist
+s_readshift_history :: Getter (SimState s) ReadShiftHist
 s_readshift_history = to $ ReadShiftHist . reverse
   . getReverseReadShiftHist . view s_reverse_readshift_history
 
@@ -394,16 +400,16 @@ pickBestSkip = \case
 
 type SkipTape = ExpTape Bit InfCount
 
-skipStateFromPhTape :: Turing -> Phase -> ExpTape Bit InfCount  -> SimState
+skipStateFromPhTape :: Turing -> Phase -> ExpTape Bit InfCount  -> SimState Bit
 skipStateFromPhTape t ph tape = SimState ph tape (initBook t) 0 []
   (ReverseTapeHist [(ph, tape)]) (one ((Phase 0,tape), 0)) 0 0
   (ReverseDispHist [0]) (ReverseReadShiftHist [])
 
-initSkipState :: Turing -> SimState
+initSkipState :: Turing -> SimState Bit
 initSkipState t = skipStateFromPhTape t (Phase 0) (initExpTape (Bit False))
 
-simulateOneMachine :: Int -> Turing -> SimState
-  -> ([Skip Count Bit], Either Edge (SimResult SkipTape))
+simulateOneMachine :: Int -> Turing -> SimState Bit
+  -> ([Skip Count Bit], Either Edge (SimResult Bit SkipTape))
 simulateOneMachine limit t = \case
   --SimState p tape _book steps@((>= limit) -> True) trace _hist _ _counter -> (trace, Right $ Continue steps p tape)
   state | state ^. s_steps >= limit -> (state ^. s_trace, Right $ Continue (state ^. s_steps) (state ^. s_phase) (state ^. s_tape) (state ^. s_displacement))
@@ -420,7 +426,7 @@ simulateOneMachine limit t = \case
         simulateOneMachine limit t $ SimState newP newTape book (steps + infCountToInt c) (skip : trace)
            newHist newHistSet counter (disp + dispToInt newDisp) newDispHist (addToRRSH rs rsHist)
 
-simulateOneTotalMachine :: Int -> Turing -> ([Skip Count Bit], SimResult (ExpTape Bit InfCount))
+simulateOneTotalMachine :: Int -> Turing -> ([Skip Count Bit], SimResult Bit (ExpTape Bit InfCount))
 simulateOneTotalMachine limit machine = (^?! _Right) <$> simulateOneMachine limit machine (initSkipState machine)
 
 updateBook :: Edge -> Turing -> SkipBook Bit -> SkipBook Bit

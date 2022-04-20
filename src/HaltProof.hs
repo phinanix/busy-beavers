@@ -29,22 +29,22 @@ import Count
 --   matches and proves the machine will consume an infinite amount of tape
 -- - LinRecur a b means the machine enters linrecurrence on step a and the length
 --   of the recurrence is b (a and b are measured in rule-steps right now)
-data HaltProof
+data HaltProof s
   = HaltUnreachable Phase
   | Cycle Steps Steps
   | OffToInfinityN Steps Dir
   | BackwardSearch
-  | SkippedToInfinity Steps (Skip Count Bit)
+  | SkippedToInfinity Steps (Skip Count s)
   | LinRecur Steps Steps 
   deriving (Eq, Ord, Show, Generic)
-instance NFData HaltProof
+instance (NFData s) => NFData (HaltProof s)
 
-mirrorHaltProof :: HaltProof -> HaltProof
+mirrorHaltProof :: HaltProof s -> HaltProof s
 mirrorHaltProof (OffToInfinityN s d) = OffToInfinityN s $ mirrorDir d
 --mirrorHaltProof (OffToInfinitySimple s d) = OffToInfinitySimple s $ mirrorDir d
 mirrorHaltProof h = h
 
-dispHaltProof :: HaltProof -> Doc ann
+dispHaltProof :: Pretty s => HaltProof s -> Doc ann
 dispHaltProof (HaltUnreachable p) = prettyText $ "there is no path to halt from phase: " <> dispPhase p
 dispHaltProof (Cycle start end) = prettyText $ "the machine cycled over " <> show (end - start)
   <> " steps starting at step " <> show start
@@ -61,21 +61,21 @@ dispHaltProof (SkippedToInfinity steps skip) = prettyText ("after " <> show step
 --then the halt state will never be reached
 --of course no such procedure can be complete, so we put a finite depth on the search and
 --give up after a while
-backwardSearch :: Turing -> Maybe HaltProof
+backwardSearch :: Turing -> Maybe (HaltProof s)
 backwardSearch (Turing n trans) | length trans < (n*2) - 1 = Nothing
 backwardSearch (Turing n trans) = recurse 0 $ fromList $ (, Min 0) <$> (initState <$> unusedEdges) where
   unusedEdges :: [Edge]
   unusedEdges = NE.filter (\e -> let t = trans ^. at e in t == Nothing || t == Just Halt) $ uniEdge n
   initState :: Edge -> (Phase,Tape)
   initState (p, b) = (p, Tape [] b [])
-  loop :: Int -> ((Phase, Tape), Int) -> MonoidalMap (Phase, Tape) (Min Int) -> Maybe HaltProof
+  loop :: Int -> ((Phase, Tape), Int) -> MonoidalMap (Phase, Tape) (Min Int) -> Maybe (HaltProof s)
   loop globalSteps _ _ | globalSteps > backwardSearchGlobalLimit = Nothing
   loop _ (_, localSteps) _ | localSteps > backwardSearchSingleLimit = Nothing
   loop globalSteps (tape, localSteps) rest
     = case fromList $ (,Min $ localSteps+1) <$> backSteps tape of
       Empty -> recurse globalSteps rest
       possibilities -> recurse (globalSteps + 1) (possibilities <> rest)
-  recurse :: Int -> MonoidalMap (Phase,Tape) (Min Int) -> Maybe HaltProof
+  recurse :: Int -> MonoidalMap (Phase,Tape) (Min Int) -> Maybe (HaltProof s)
   recurse _globalSteps Empty = Just $ BackwardSearch
   recurse globalSteps (deleteFindMin -> (f, rest)) = loop globalSteps (second getMin f) rest
 

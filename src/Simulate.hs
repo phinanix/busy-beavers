@@ -71,7 +71,7 @@ getSteps (SimState steps _ _) = (steps `div` 2, steps)
 
 -- step limit, machine, current state
 -- if we hit an unknown edge, we have to stop, and we return that. else we'll get to a result and return the result
-simulateOneMachine :: Int -> Turing -> SimState Tape -> Either Edge (SimResult Tape)
+simulateOneMachine :: Int -> Turing -> SimState Tape -> Either Edge (SimResult Bit Tape)
 simulateOneMachine limit t = \case
   s@(collision -> True) -> Right $ ContinueForever $ uncurry Cycle $ getSteps s
   SimState stepCount@((>= limit) -> True) _ (TMState p finalTape) -> Right $ Continue stepCount p finalTape 0
@@ -107,25 +107,25 @@ simulate limit startMachine = loop (startMachine, initSimState) [] Empty where
     Nothing -> loop (t,s) xs result
 
 --halting analyses that can be performed without simulating the machine
-staticAnalyze :: Turing -> Maybe HaltProof
+staticAnalyze :: Turing -> Maybe (HaltProof s)
 staticAnalyze = backwardSearch
 -- staticAnalyze = const Nothing
 
 --attempting to prove the machine runs forever starting at a given state
-proveForever :: Turing -> SimState Tape -> Maybe HaltProof
+proveForever :: Turing -> SimState Tape -> Maybe (HaltProof s)
 proveForever t s@(SimState stepsTaken _ _) = infiniteCycle (min stepsTaken infiniteSimLimit) t s
 
-infiniteCycle :: Int -> Turing -> SimState Tape -> Maybe HaltProof
+infiniteCycle :: Int -> Turing -> SimState Tape -> Maybe (HaltProof s)
 infiniteCycle limit t s = infiniteRight limit t s <|> infiniteLeft limit t s
 
-infiniteRight :: Int -> Turing -> SimState Tape -> Maybe HaltProof
+infiniteRight :: forall s. Int -> Turing -> SimState Tape -> Maybe (HaltProof s)
 infiniteRight limit t (SimState originalSteps _ mState@(TMState startPhase (Tape startLs (Bit False) [])))
   = step 0 0 0 mState where
   -- first arg counts number of steps taken in this halting proof
   -- second arg counts distance left or right from our starting point,
   -- left is negative, right is positive
   -- third arg counts max leftward distance (in positive terms)
-  step :: Steps -> Int -> Int -> TMState Tape -> Maybe HaltProof
+  step :: Steps -> Int -> Int -> TMState Tape -> Maybe (HaltProof s)
   --we hit our step limit
   step ((>= limit) -> True) _ _ _ = Nothing
   --here, distance is negative, so we just simulate another step
@@ -147,7 +147,7 @@ infiniteRight limit t (SimState originalSteps _ mState@(TMState startPhase (Tape
   newMax oldMax (negate -> newPosDist) = max oldMax newPosDist
 infiniteRight _ _ _ = Nothing
 
-infiniteLeft :: Int -> Turing -> SimState Tape -> Maybe HaltProof
+infiniteLeft :: Int -> Turing -> SimState Tape -> Maybe (HaltProof s)
 infiniteLeft limit t s = mirrorHaltProof <$> infiniteRight limit (mirrorTuring t) (mirrorSimState s)
 
 dispTMState :: TMState Tape -> Text

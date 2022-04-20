@@ -22,9 +22,6 @@ import MoreSimulationLoops
 import Util
 import LinRecurrence 
 
-getRecurFromMachine :: Int -> Turing -> Maybe HaltProof
-getRecurFromMachine steps machine = undefined where
-  state = getStateAfterTime steps machine 
 
 spec :: Spec
 spec = do

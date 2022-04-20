@@ -76,7 +76,8 @@ proveInductivelyIMeanIT machine book curStep hist dispHist
 --the latter makes no progress if it proves 0 things, which is one way to abort
 --the former makes no progress if it gets stuck on the same thing as last time, which we note in order to track
 --we also as usual put a finite integer on the number of loops we can do, although hitting that would be pretty insane
-proveStrong :: Int -> Turing -> SkipBook Bit -> Skip Count Bit -> BoundVar -> (SkipBook Bit, Either Text (SkipOrigin Bit))
+proveStrong :: Int -> Turing -> SkipBook Bit
+ -> Skip Count Bit -> BoundVar -> (SkipBook Bit, Either Text (SkipOrigin Bit))
 proveStrong loopLim machine book goal indVar = swapEither <$> loop 0 book Nothing where
   -- the skiporigin is one for specifically the goal 
   -- the text is "we failed"
@@ -122,8 +123,10 @@ proveSimply limit t book goal = undefined
 -- the BoundVar is the variable on which we are going to do induction
 --returns Left with an error message, and the config we got stuck on 
 --or Right with success
-proveInductively :: Int -> Turing -> SkipBook Bit -> Skip Count Bit -> BoundVar
-    -> Either (Text, Maybe (Config Count Bit)) (SkipOrigin Bit)
+proveInductively :: forall s. (TapeSymbol s) 
+  => Int -> Turing -> SkipBook s 
+  -> Skip Count s -> BoundVar
+  -> Either (Text, Maybe (Config Count s)) (SkipOrigin s)
 proveInductively limit t book goal indVar = let 
   ans =  -- <> "using book\n" <> show (pretty book)) $
     --force $
@@ -137,23 +140,23 @@ proveInductively limit t book goal indVar = let
       -- trace msg $
       assert (isSameInAsOut goal) ans 
     where
-    origin :: SkipOrigin Bit
+    origin :: SkipOrigin s
     origin = Induction book limit
-    baseCase :: Either (Text, Maybe (Config Count Bit)) Count
+    baseCase :: Either (Text, Maybe (Config Count s)) Count
     baseCase = proveSimLinearAndTree limit limit t book baseGoal
-    baseGoal :: Skip Count Bit
+    baseGoal :: Skip Count s
     baseGoal = replaceVarInSkip goal indVar $ finiteCount 1 --TODO, should be 1
     setStepCount steps skip = skip & hops .~ FinCount steps
     goalPlusX x = --setStepCount 100 $ 
       replaceVarInSkip goal indVar $ FinCount x <> symbolVarCount newSymbolVar 1
-    indCase :: Either (Text, Maybe (Config Count Bit)) Count
+    indCase :: Either (Text, Maybe (Config Count s)) Count
     --this doesn't actually add the inductive hypothesis to the book!
     indCase = --trace "\nstarting ind\n" $ 
       --deepseq indHyp $
         proveSimLinearAndTree limit limit t
          (addSkipToBook indHyp InductionHypothesis book)
          indGoal
-    indHyp :: Skip Count Bit
+    indHyp :: Skip Count s
     indHyp = let
         --TODO: make the hypothesis be 0 and the goal be 1 again
         ans = goalPlusX 0
@@ -162,13 +165,14 @@ proveInductively limit t book goal indVar = let
         --force 
         -- $ trace msg
         ans
-    indGoal :: Skip Count Bit
+    indGoal :: Skip Count s
     indGoal = goalPlusX 1
     newSymbolVar :: SymbolVar --TODO: this is obviously incredibly unsafe
     newSymbolVar = SymbolVar 0
 
 --first int is linear step limit, second int is tree step limit
-proveSimLinearAndTree :: Int -> Int -> Turing -> SkipBook Bit -> Skip Count Bit -> Either (Text, Maybe (Config Count Bit)) Count
+proveSimLinearAndTree :: TapeSymbol s => Int -> Int -> Turing -> SkipBook s 
+  -> Skip Count s -> Either (Text, Maybe (Config Count s)) Count
 -- simulateViaDFS :: Int -> Int -> SkipBook Bit -> Skip Count Bit -> Either Text Natural 
 proveSimLinearAndTree linStep treeStep machine book skip 
   = --force $ 
@@ -223,7 +227,8 @@ replaceBoundVarInCount varIn countOut (Count num symbolMap boundMap) =
 -- the text tells you why you failed, and you might have failed via getting "stuck" on something, in which case we return that
 -- this linearly simulates forward, which sometimes gets you into a hole when you prove something that skips ahead, because 
 -- you can end up skipping past the thing you want. to solve this problem, I wrote simulateviadfs
-proveBySimulating :: Int -> Turing -> SkipBook Bit -> Skip Count Bit -> Either (Text, Maybe (Config Count Bit)) Count
+proveBySimulating :: forall s. (TapeSymbol s) => Int -> Turing -> SkipBook s 
+  -> Skip Count s -> Either (Text, Maybe (Config Count s)) Count
 proveBySimulating limit t book (Skip start goal _ _ _) = let 
   ans = loop 0 (start ^. cstate) (second NotInfinity $ configToET start ^. _2) (finiteCount 0)
   msg = "starting pos:\n" <> show (pretty start) <> "\nsucceeded: " <> show (has _Right ans)
@@ -235,7 +240,7 @@ proveBySimulating limit t book (Skip start goal _ _ _) = let
     where
     -- four conditions: we've taken more steps than the limit,
     -- we've succeeded, stepping fails for some reason, or we continue 
-    loop :: Int -> Phase -> ExpTape Bit InfCount -> Count -> Either (Text, Maybe (Config Count Bit)) Count
+    loop :: Int -> Phase -> ExpTape s InfCount -> Count -> Either (Text, Maybe (Config Count s)) Count
     loop numSteps p tape curCount
       -- | trace (Unsafe.init $ toString $ "steps:" <> show numSteps <> " count:" <> showP curCount <>
       --            " p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
@@ -254,7 +259,7 @@ proveBySimulating limit t book (Skip start goal _ _ _) = let
             Stepped Infinity _ _ _ _ _ -> Left ("hopped to infinity", Nothing)
             Stepped (NotInfinity hopsTaken) newPhase newTape _ _ _
                 -> loop (numSteps + 1) newPhase newTape (curCount <> hopsTaken)
-    indMatch :: Phase -> ExpTape Bit InfCount -> SkipEnd Count Bit -> Bool
+    indMatch :: Phase -> ExpTape s InfCount -> SkipEnd Count s -> Bool
     indMatch cur_p et se = case bitraverse pure mbdeInfCount et of
         Nothing -> False
         Just tape@(ExpTape ls point rs) -> case se of
@@ -263,16 +268,16 @@ proveBySimulating limit t book (Skip start goal _ _ _) = let
             EndSide goalPhase dir xs -> endSideTapeMatch dir xs tape &&
                 endSideTransMatch dir goalPhase t cur_p tape
       where
-        endSideTapeMatch :: Dir -> [(Bit, Count)] -> ExpTape Bit Count -> Bool
+        endSideTapeMatch :: Dir -> [(s, Count)] -> ExpTape s Count -> Bool
         endSideTapeMatch L goal (ExpTape _ls point rs) = case getNewFinPoint goal of
             Nothing -> False
             Just (goal_p, goal_xs) -> goal_p == point && goal_xs == rs --yes this is reversed
         endSideTapeMatch R goal (ExpTape ls point _rs) = case getNewFinPoint goal of
             Nothing -> False
             Just (goal_p, goal_xs) -> goal_p == point && goal_xs == ls --yes this is reversed
-        endSideTransMatch :: Dir -> Phase -> Turing -> Phase ->  ExpTape Bit Count -> Bool
+        endSideTransMatch :: Dir -> Phase -> Turing -> Phase ->  ExpTape s Count -> Bool
         endSideTransMatch goal_d goalPhase (Turing _n map) curPhase (ExpTape _ p _)
-            = case map ^. at (curPhase, p) of
+            = case map ^. at (curPhase, getPoint p) of
                 Nothing -> False
                 (Just Halt) -> goal_d == L
                 (Just (Step transPhase _bit d)) -> goal_d == d && goalPhase == transPhase
@@ -280,16 +285,18 @@ proveBySimulating limit t book (Skip start goal _ _ _) = let
         mbdeInfCount (NotInfinity c) = Just c
 
 --TODO, it's really dumb we have to "deInfCount here"
-getNextConfigs :: SkipBook Bit -> Config Count Bit -> [Config Count Bit]
+getNextConfigs :: forall s. (Ord s, Pretty s) => SkipBook s -> Config Count s -> [Config Count s]
 getNextConfigs book curConfig = first deInfCount . view (_2 . resConfig) <$> choices
  where
-  choices :: [(Skip Count Bit, SkipResult Bit InfCount)]
+  choices :: [(Skip Count s, SkipResult s InfCount)]
   --flip since sort gives smallest to largest by default but we want the largest skip first
   choices = sortBy (flip skipFarthest) $ uncurry (getSkipsWhichApply book) (configToET $ first NotInfinity curConfig)
 
 --the text is why you failed, and the count is how many big steps 
-simulateViaDFS :: Int -> Int -> SkipBook Bit -> Skip Count Bit -> Either Text Natural 
-simulateViaDFS stepLim depthLim book (Skip startConfig skipEnd _hops _halts _disp) = case res of 
+simulateViaDFS :: (Ord s, Pretty s) => Int -> Int -> SkipBook s -> Skip Count s 
+  -> Either Text Natural 
+simulateViaDFS stepLim depthLim book (Skip startConfig skipEnd _hops _halts _disp) 
+  = case res of 
   Right (Success vs) -> Right $ fromIntegral $ length vs
   --the problem here is we sort of want some kind of like 'what did the DFS get stuck on' list 
   --but that's not something we have right now
@@ -335,12 +342,13 @@ showEvalN t x = trace (t <> "\n" <> show x) x
 showTapePhaseList :: [(Phase, ExpTape Bit InfCount)] -> String
 showTapePhaseList tapes = toString $ T.concat $ (\(p, x) -> dispPhase p <> " " <> dispExpTape x <> "\n") <$> tapes
 
-possibleSignatures :: [(Phase, ExpTape Bit InfCount)] -> [(Phase, Signature Bit)]
+possibleSignatures :: forall s. Ord s 
+  => [(Phase, ExpTape s InfCount)] -> [(Phase, Signature s)]
 possibleSignatures hist = filter (\s -> --let msg = ("ixing: " <> showP s <> "\n in map:\n" <> show (sigFreqs)) in trace msg $
   sigFreqs ^?! ix s >= 3) tapeSignatures where
-    tapeSignatures :: [(Phase, Signature Bit)]
+    tapeSignatures :: [(Phase, Signature s)]
     tapeSignatures = tapeSignature <$$> hist
-    sigFreqs :: Map (Phase, Signature Bit) Int
+    sigFreqs :: Map (Phase, Signature s) Int
     sigFreqs = M.fromListWith (+) $ (,1) <$> tapeSignatures
 
 simplestNSigs :: Natural -> [(Phase, ExpTape Bit InfCount)] -> [(Phase, Signature Bit)]
@@ -350,14 +358,14 @@ simplestNSigs n hist = take (fromIntegral n) $
 
 --given a history, guesses a "critical configuration" 
 -- a simple tape appearance the machine repeatedly returns to
-guessCriticalConfiguration :: [(Phase, ExpTape Bit InfCount)] -> Either Text (Phase, Signature Bit)
+guessCriticalConfiguration :: Ord s => [(Phase, ExpTape s InfCount)] -> Either Text (Phase, Signature s)
 guessCriticalConfiguration hist = case possibleSignatures hist of 
   [] -> Left "no possible criticalconfigs"
   xs -> Right $ minimumBy (compare `on` signatureComplexity . snd) xs
 
 -- given a particular config, return the list of times that config occurred, plus the integer position in the original list
-obtainConfigIndices :: [(Phase, ExpTape Bit InfCount)] -> (Phase, Signature Bit)
-    -> [(Int, (Phase, ExpTape Bit InfCount))]
+obtainConfigIndices :: (Eq s) => [(Phase, ExpTape s InfCount)] -> (Phase, Signature s)
+    -> [(Int, (Phase, ExpTape s InfCount))]
 obtainConfigIndices hist config
     = filter (\(_, (p, tape)) -> (p, tapeSignature tape) == config) $ zip [0, 1 .. ] hist
 
@@ -377,11 +385,11 @@ getSlicePair'' :: Partial
   -> (ExpTape Bit Count, ExpTape Bit Count)
 getSlicePair'' sT eT = getSlicePair' (second NotInfinity sT) (second NotInfinity eT)
 
-getSlicePair' :: Partial
-  => ExpTape Bit InfCount
-  -> ExpTape Bit InfCount
+getSlicePair' :: (Partial, Eq s)
+  => ExpTape s InfCount
+  -> ExpTape s InfCount
   -> [Int] -> Int -> Int
-    -> (ExpTape Bit Count, ExpTape Bit Count)
+    -> (ExpTape s Count, ExpTape s Count)
 getSlicePair' startTape endTape disps start end = (startSlice, endSlice) where
     startDisp = disps !! start
     endDisp = disps !! end
@@ -394,7 +402,8 @@ getSlicePair' startTape endTape disps start end = (startSlice, endSlice) where
 --given a tape history, a history of (relative) displacement, and a start and end point
 --obtain a slice of tape corresponding to everything the machine read / output at the start 
 --and end points respectively
-getSlicePair :: [(Phase, ExpTape Bit InfCount)] -> [Int] -> Int -> Int -> (ExpTape Bit Count, ExpTape Bit Count)
+getSlicePair :: (Eq s) => [(Phase, ExpTape s InfCount)] -> [Int] -> Int -> Int 
+  -> (ExpTape s Count, ExpTape s Count)
 getSlicePair hist disps start end = getSlicePair' startTape endTape disps start end where
     startTape = hist ^?! ix start . _2
     endTape = hist ^?! ix end . _2
@@ -403,7 +412,7 @@ getSlicePairC :: [(Phase, ExpTape Bit Count)] -> [Int] -> Int -> Int -> (ExpTape
 getSlicePairC hist = getSlicePair $ (fmap $ fmap $ second NotInfinity) hist
 
 --says whether by dropping one or both the left or the right bits of the start sig, we can reach the end sig
-calcCommonSig :: Signature Bit -> Signature Bit -> Maybe (Bool, Bool)
+calcCommonSig :: (Eq s) => Signature s -> Signature s -> Maybe (Bool, Bool)
 calcCommonSig start end = -- trace ("commonsig-ing " <> show start <> " and " <> show end) $
   asum $ check <$> tf <*> tf where
     tf = [False, True]
@@ -434,7 +443,8 @@ generalizeFromExamples slicePairs = undefined
 
 
 
-guessInductionHypothesis :: TapeHist Bit InfCount -> DispHist -> Either Text (Skip Count Bit)
+guessInductionHypothesis :: (Ord s, Pretty s) => TapeHist s InfCount -> DispHist 
+  -> Either Text (Skip Count s)
 guessInductionHypothesis th@(TapeHist hist) dh = do
   criticalConfig@(criticalPhase, _criticalSignature) <- guessCriticalConfiguration hist
   let     
@@ -448,7 +458,7 @@ guessInductionHypothesis th@(TapeHist hist) dh = do
   
   
 
-guessInductionHypWithIndices :: TapeHist Bit InfCount -> DispHist -> Phase -> [(Int, (Phase, ExpTape Bit InfCount))] -> Either Text (Skip Count Bit)
+guessInductionHypWithIndices :: (Pretty s, Eq s) => TapeHist s InfCount -> DispHist -> Phase -> [(Int, (Phase, ExpTape s InfCount))] -> Either Text (Skip Count s)
 guessInductionHypWithIndices (TapeHist hist) (DispHist disps) criticalPhase configIndicesAndConfigs =
   let
     configIndices = let ans = fst <$> configIndicesAndConfigs in 
@@ -505,7 +515,7 @@ guessInductionHypWithIndices (TapeHist hist) (DispHist disps) criticalPhase conf
   --finishing from here is just munging - we have the common signature (almost), we have the common count 
   --pairlists, we just need to assemble them all into the skip of our dreams
   where
-  combineIntoConfig :: Phase -> ([Count], [Count]) -> Signature Bit -> Config Count Bit
+  combineIntoConfig :: Phase -> ([Count], [Count]) -> Signature s -> Config Count s
   combineIntoConfig phase (leftCounts, rightCounts) (Signature leftBits p rightBits) =
     Config phase (zipExact leftBits (deleteZerosAtEnd leftCounts)) p
         (zipExact rightBits (deleteZerosAtEnd rightCounts))
@@ -734,7 +744,8 @@ thingContainsVar = getAny . bifoldMap (Any . countContainsVar) (const mempty) wh
         _notFin -> True
 
 
-guessAndProveWhatHappensNext :: Turing -> SkipBook Bit -> Config Count Bit -> SymbolVar -> [(Skip Count Bit, SkipOrigin Bit)]
+guessAndProveWhatHappensNext :: Turing -> SkipBook Bit -> Config Count Bit 
+  -> SymbolVar -> [(Skip Count Bit, SkipOrigin Bit)]
 guessAndProveWhatHappensNext machine book startConfig varToGeneralize
   = --trace ("trying to guess what happens after:\n" <> show (pretty startConfig)) $
     mapMaybe getProof $ zipExact goodGuesses proofAttempts

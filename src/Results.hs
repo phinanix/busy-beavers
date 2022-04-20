@@ -12,16 +12,16 @@ import HaltProof
 import Skip
 
 
--- the type var here is the type of tape 
-data SimResult a = Halted Steps a Int --this is steps taken and int is the total displacement
+-- s is symbol and a is the type of tape 
+data SimResult s a = Halted Steps a Int --this is steps taken and int is the total displacement
                | Continue Steps Phase a Int 
-               | ContinueForever HaltProof
+               | ContinueForever (HaltProof s)
                | MachineStuckRes
                deriving (Eq, Ord, Show, Functor, Generic)
-instance (NFData a) => (NFData (SimResult a))
+instance (NFData s, NFData a) => (NFData (SimResult s a))
 $(makePrisms ''SimResult)
 
-dispResult :: (a -> Text) -> SimResult a -> Doc ann
+dispResult ::(Pretty s) => (a -> Text) -> SimResult s a -> Doc ann
 dispResult dispTape (Halted steps tape disp) = prettyText $ "After " <> show steps 
   <> " steps, and " <> show disp <> " disp halted with tape: \n" <> dispTape tape
 dispResult dispTape (Continue steps phase tape disp) = prettyText $ "step: " <> showInt3Wide steps
@@ -78,7 +78,7 @@ instance Eq a => AsEmpty (Results a) where
 keepNum :: Int
 keepNum = 3
 
-addResult :: (Tapeable a) => Turing -> SimResult a -> Results a -> Results a
+addResult :: (Tapeable a) => Turing -> SimResult s a -> Results a -> Results a
 addResult turing (Halted steps tape _disp) r =
   addHalter $ addLongest $ addOnesiest (ones tape) r where
     addLongest r = case r ^. longestRun of

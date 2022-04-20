@@ -26,32 +26,33 @@ import Safe.Partial
 import Notation
 
 
-type SimOneAction = Turing -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
+type SimOneAction s = Turing -> SimState s -> Either (SimResult s (ExpTape s InfCount)) (SimState s)
 
-data MultiResult a = UnknownEdge Edge
-                 | Result (SimResult (ExpTape Bit InfCount))
+--a is the (?) state, s is the symbol
+data MultiResult s a = UnknownEdge Edge
+                 | Result (SimResult s (ExpTape s InfCount))
                  | NewState a
                     deriving (Eq, Ord, Show, Functor)
-type SimMultiAction = Turing -> SimState -> MultiResult SimState
+type SimMultiAction s = Turing -> SimState s -> MultiResult s (SimState s)
 
-instance Applicative MultiResult where
+instance Applicative (MultiResult s) where
   pure = return
   x1 <*> x2 = x1 >>= flip fmap x2
 
-instance Monad MultiResult where
+instance Monad (MultiResult s) where
   return = NewState
-  (>>=) :: MultiResult a -> (a -> MultiResult b) -> MultiResult b
+  (>>=) :: MultiResult s a -> (a -> MultiResult s b) -> MultiResult s b
   k >>= f = case k of
     NewState a -> f a
     UnknownEdge e -> UnknownEdge e
     Result r -> Result r
 
-concatActions :: NonEmpty SimOneAction -> SimOneAction
+concatActions :: NonEmpty (SimOneAction s) -> SimOneAction s
 concatActions actions machine = foldl1 (>=>) ((&) machine <$> actions)
 
-type OneLoopRes = (SimResult (ExpTape Bit InfCount), NonEmpty SimState)
+type OneLoopRes s = (SimResult s (ExpTape s InfCount), NonEmpty (SimState s))
 
-simulateOneMachineOuterLoop :: NonEmpty SimOneAction -> Turing -> SimState -> OneLoopRes 
+simulateOneMachineOuterLoop :: NonEmpty (SimOneAction s) -> Turing -> SimState s -> OneLoopRes s
 simulateOneMachineOuterLoop updateFuncs startMachine
   = iterateEither (concatActions updateFuncs startMachine) 
   where
@@ -60,18 +61,21 @@ simulateOneMachineOuterLoop updateFuncs startMachine
       Left r -> (r, one init)
       Right next -> (NE.<|) init <$> iterateEither k next
 
-simOneFromStartLoop :: NonEmpty SimOneAction -> Turing -> OneLoopRes 
+simOneFromStartLoop :: NonEmpty (SimOneAction Bit) -> Turing -> OneLoopRes Bit
 simOneFromStartLoop updateFuncs startMachine 
   = simulateOneMachineOuterLoop updateFuncs startMachine (initSkipState startMachine) 
 
-simulateManyMachinesOuterLoop :: (Turing -> Maybe HaltProof) -> NonEmpty SimMultiAction -> Turing -> [(Turing, SimResult (ExpTape Bit InfCount))]
+simulateManyMachinesOuterLoop :: (Turing -> Maybe (HaltProof Bit)) 
+  -> NonEmpty (SimMultiAction Bit)
+  -> Turing 
+  -> [(Turing, SimResult Bit (ExpTape Bit InfCount))]
 simulateManyMachinesOuterLoop staticAnal updateFuncs startMachine = loop (startMachine, startState) [] [] where
-  startState :: SimState
+  startState :: SimState Bit
   startState = initSkipState startMachine
-  bigUpdateFunc :: Turing -> SimState -> MultiResult SimState
+  bigUpdateFunc :: Turing -> SimState Bit -> MultiResult Bit (SimState Bit)
   bigUpdateFunc machine = foldl1 (>=>) ((&) machine <$> updateFuncs)
-  loop :: (Turing, SimState) -> [(Turing, SimState)]
-    -> [(Turing, SimResult (ExpTape Bit InfCount))] -> [(Turing, SimResult (ExpTape Bit InfCount))]
+  loop :: (Turing, SimState Bit) -> [(Turing, SimState Bit)]
+    -> [(Turing, SimResult Bit (ExpTape Bit InfCount))] -> [(Turing, SimResult Bit (ExpTape Bit InfCount))]
   loop cur@(curMachine, curState) todo !prevRes = --trace (show $ machineToNotation curMachine) $ --force $
    case uncurry bigUpdateFunc cur of
     NewState newState -> loop (curMachine, newState) todo prevRes
@@ -89,9 +93,9 @@ simulateManyMachinesOuterLoop staticAnal updateFuncs startMachine = loop (startM
         (newMachines, reses) = partitionEithers $ uncurry makeRes <$> zip candidateMachines mbProofs 
       in
         recurse ((makeNewState e curState <$> newMachines) <> todo) (reses <> prevRes)
-  makeNewState :: Edge -> SimState -> Turing -> (Turing, SimState)
+  makeNewState :: Edge -> SimState Bit -> Turing -> (Turing, SimState Bit)
   makeNewState edge state machine = (machine, state & s_book %~ updateBook edge machine)
-  recurse :: [(Turing, SimState)] -> [(Turing, SimResult (ExpTape Bit InfCount))] -> [(Turing, SimResult (ExpTape Bit InfCount))]
+  recurse :: [(Turing, SimState Bit)] -> [(Turing, SimResult Bit (ExpTape Bit InfCount))] -> [(Turing, SimResult Bit (ExpTape Bit InfCount))]
   --recurse todos results | trace ("length todos: " <> show (length todos) <> " length results: " <> show (length results) <> " and last result" <> show (viaNonEmpty head results))    False = undefined
   recurse [] results = --trace "recursed empty" 
     results
@@ -100,43 +104,47 @@ simulateManyMachinesOuterLoop staticAnal updateFuncs startMachine = loop (startM
     --deepseq results $ 
       loop next todos results
 
-liftOneToMulti :: SimOneAction -> SimMultiAction
+liftOneToMulti :: SimOneAction s -> SimMultiAction s
 liftOneToMulti action machine state = case action machine state of
   Left res -> Result res
   Right newState -> NewState newState
 
-liftModifyState :: (SimState -> SimState) -> (Turing -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState)
+liftModifyState :: (SimState s -> SimState s) -> (Turing -> SimState s -> Either (SimResult s (ExpTape s InfCount)) (SimState s))
 liftModifyState f _t = Right . f
 
-liftModifyStateMulti :: (SimState -> SimState) -> SimMultiAction
+liftModifyStateMulti :: (SimState s -> SimState s) -> SimMultiAction s
 liftModifyStateMulti = liftOneToMulti . liftModifyState
 
-runIfCond :: (SimState -> Bool) -> SimOneAction -> SimOneAction
+runIfCond :: (SimState s -> Bool) -> SimOneAction s -> SimOneAction s
 runIfCond cond act machine state = if cond state 
   then act machine state 
   else pure state
 
-runAtCount :: Int -> SimOneAction -> SimOneAction
+runAtCount :: Int -> SimOneAction s -> SimOneAction s
 runAtCount n = runIfCond (\state -> 
   --trace ("goal:" <> show n <> " actual: " <> show (state ^. s_counter))
-  (state ^. s_counter == n))
+  state ^. s_counter == n)
 
-runAtCounts :: [Int] -> SimOneAction -> SimOneAction 
+runAtCounts :: [Int] -> SimOneAction s -> SimOneAction s
 runAtCounts xs = let setXs = S.fromList xs in 
   runIfCond (\state -> 
     (state ^. s_counter) `S.member` setXs)
 
-addSkipToStateOrInf :: Skip Count Bit -> SkipOrigin Bit -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
+addSkipToStateOrInf :: (Pretty s, Show s, Ord s) 
+  => Skip Count s 
+  -> SkipOrigin s 
+  -> SimState s 
+  -> Either (SimResult s (ExpTape s InfCount)) (SimState s)
 addSkipToStateOrInf skip origin state = if skipGoesForever skip && skipAppliedInHist skip (state ^. s_history)
   then Left (ContinueForever (SkippedToInfinity (state ^. s_steps) skip))
   else Right $ state & s_book %~ addSkipToBook skip origin
 
 --this is something for simulating one machine where you tell me how to handle an unknown edge
 --and I do that
-simulateStepOneMachine :: Partial 
-  => (Edge -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState) 
-  -> Int -> Turing -> SimState 
-  -> Either (SimResult (ExpTape Bit InfCount)) SimState
+simulateStepOneMachine :: (Partial, TapeSymbol s)
+  => (Edge -> SimState s -> Either (SimResult s (ExpTape s InfCount)) (SimState s)) 
+  -> Int -> Turing -> SimState s
+  -> Either (SimResult s (ExpTape s InfCount)) (SimState s)
 simulateStepOneMachine handleUnknown limit machine
  state@(SimState ph tape book steps skipTrace hist histSet counter curDisp dispHist rsHist) 
   = if counter > limit
@@ -152,15 +160,19 @@ simulateStepOneMachine handleUnknown limit machine
         hist histSet (counter + 1) (curDisp + dispToInt newDisp) dispHist (addToRRSH rs rsHist)
 
 --this one essentially asserts there is no unknown edge, or otherwise crashes
-simulateStepTotalLoop :: Partial => Int -> Turing -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
+simulateStepTotalLoop :: (Partial, TapeSymbol s)  
+  => Int -> Turing -> SimState s 
+  -> Either (SimResult s (ExpTape s InfCount)) (SimState s)
 simulateStepTotalLoop = simulateStepOneMachine (\e _state -> error $ "edge undefined" <> show e)
 
-simulateStepUntilUnknown :: Partial => Int -> Turing -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState
+simulateStepUntilUnknown :: (Partial, TapeSymbol s)
+  => Int -> Turing -> SimState s 
+  -> Either (SimResult s (ExpTape s InfCount)) (SimState s)
 simulateStepUntilUnknown = simulateStepOneMachine handle where 
   handle _e state = Left $ Continue (state ^. s_steps) (state ^. s_phase) (state ^. s_tape) (state ^. s_displacement)
 
 --this is pretty copied from "simulateOneMachine"
-simulateStepPartial :: Partial => Int -> SimMultiAction
+simulateStepPartial :: (Partial, TapeSymbol s) => Int -> SimMultiAction s
 simulateStepPartial limit machine (SimState ph tape book steps skipTrace hist histSet counter curDisp dispHist rsHist) = 
   --trace ("stepping bigStep: " <> showP counter <> " smallStep: " <> showP steps) $
   if counter > limit
@@ -175,7 +187,7 @@ simulateStepPartial limit machine (SimState ph tape book steps skipTrace hist hi
       c -> NewState $ SimState newPh newTape book (steps + infCountToInt c) (skipUsed : skipTrace)
         hist histSet (counter + 1) (curDisp + dispToInt newDisp) dispHist (addToRRSH rs rsHist)
 
-gluePreviousTwoSkips :: SimState -> SimState
+gluePreviousTwoSkips :: (TapeSymbol s) => SimState s -> SimState s
 gluePreviousTwoSkips state = state & s_book .~ newBook where
   book = state ^. s_book
   newBook = case state ^. s_trace of
@@ -187,14 +199,14 @@ gluePreviousTwoSkips state = state & s_book .~ newBook where
         <> "\nsecond skip\n" <> show (pretty skip)
       Right gluedSkip -> addSkipToBook gluedSkip (Glued prevSkip skip) book
 
-recordHist :: SimState -> SimState
+recordHist :: SimState s -> SimState s
 recordHist state = state & s_reverse_history . reverseTapeHist %~ (histEnt :) where
   histEnt = (state ^. s_phase, state ^. s_tape)
 
-recordDispHist :: SimState -> SimState
+recordDispHist :: SimState s -> SimState s
 recordDispHist state = state & s_reverse_disp_history . reverseDispHist %~ (state ^. s_displacement :)
 
-seenBeforeProof :: SimState -> Maybe HaltProof 
+seenBeforeProof :: (Ord s) => SimState s -> Maybe (HaltProof s)
 seenBeforeProof state = case state ^. s_history_set . at histEnt of
   Just prevStepCount -> Just $ Cycle prevStepCount curStepCount
   Nothing -> Nothing 
@@ -202,13 +214,13 @@ seenBeforeProof state = case state ^. s_history_set . at histEnt of
   histEnt = (state ^. s_phase, state ^. s_tape)
   curStepCount = state ^. s_steps
 
-updateHistSet :: SimOneAction 
+updateHistSet :: (Ord s) => SimOneAction s
 updateHistSet _machine state = Right $ state & s_history_set . at histEnt ?~ curStepCount
   where
   histEnt = (state ^. s_phase, state ^. s_tape)
   curStepCount = state ^. s_steps
 
-checkSeenBefore :: SimOneAction
+checkSeenBefore :: (Ord s) => SimOneAction s
 checkSeenBefore _machine state = case seenBeforeProof state of 
   Just proof -> Left $ ContinueForever proof 
   Nothing -> Right $ state & s_history_set . at histEnt ?~ curStepCount
@@ -217,7 +229,7 @@ checkSeenBefore _machine state = case seenBeforeProof state of
   curStepCount = state ^. s_steps
 
 --applies the skip to everything in the list, checks if any of them have just 
-skipAppliedInHist :: Skip Count Bit -> TapeHist Bit InfCount -> Bool
+skipAppliedInHist :: (Eq s, Pretty s) => Skip Count s -> TapeHist s InfCount -> Bool
 skipAppliedInHist skip hist = any (has _Just) $ applySkip skip <$> getTapeHist hist
 
 --checks whether we've put an infinity in some place on the tape that is not the two ends
@@ -228,7 +240,7 @@ tapePostInfinity :: ExpTape s InfCount -> Bool
 tapePostInfinity (ExpTape ls _p rs) = elem Infinity cs where 
   cs = snd <$> Unsafe.init ls ++ Unsafe.init rs
 
-skipAppliesForeverInHist :: Skip Count Bit -> TapeHist Bit InfCount -> Either Text HaltProof
+skipAppliesForeverInHist :: (Eq s, Pretty s) => Skip Count s -> TapeHist s InfCount -> Either Text (HaltProof s)
 skipAppliesForeverInHist skip hist = case forevers of 
   [] -> Left "did not apply forever"
   --TODO the "idx" here is I think in big steps but it's sort of supposed to be in small steps
@@ -264,7 +276,7 @@ TODO we currently duplicate the full 20 line function here which is
 pretty terrible, probably we should . . . not do that
 -}
 
-eotProof :: SimState -> Maybe HaltProof 
+eotProof :: SimState Bit -> Maybe (HaltProof Bit)
 eotProof state = assert (atLeftOfTape $ state ^. s_tape) maybeProof
  where
   samePhase = (== state ^. s_phase)
@@ -281,7 +293,7 @@ eotProof state = assert (atLeftOfTape $ state ^. s_tape) maybeProof
   -- candidates = filter (isCandidate . view _2) $ zipExact bitsToCheck $ 
   --   Unsafe.tail $ state ^. s_reverse_history . reverseTapeHist 
   -- int is from bitsToCheck
-  checkProof :: (Int, (Int, (Phase, ExpTape Bit InfCount))) -> Maybe HaltProof
+  checkProof :: (Int, (Int, (Phase, ExpTape Bit InfCount))) -> Maybe (HaltProof s)
   checkProof (numBitsToCheck, (_disp, (_ph, oldTape))) = let
     getBits tapeHalf = takeExact numBitsToCheck $ 
       tapeHalfToBitList tapeHalf <> repeat (Bit False)
@@ -289,14 +301,14 @@ eotProof state = assert (atLeftOfTape $ state ^. s_tape) maybeProof
     if getBits (right oldTape) == getBits (right $ state ^. s_tape)
       then Just $ OffToInfinityN (state ^. s_steps) L
       else Nothing
-  maybeProof :: Maybe HaltProof
+  maybeProof :: Maybe (HaltProof s)
   maybeProof = viaNonEmpty head $ mapMaybe checkProof candidates
 
-attemptEndOfTapeProof :: SimOneAction
+attemptEndOfTapeProof :: SimOneAction Bit
 attemptEndOfTapeProof _m state 
   = maybe (Right state) (Left . ContinueForever) $ eotProof state
 
-otherEotProof :: SimState -> Maybe HaltProof
+otherEotProof :: SimState Bit -> Maybe (HaltProof Bit)
 otherEotProof state = assert (atRightOfTape $ state ^. s_tape) maybeProof  
  where
   samePhase = (== state ^. s_phase)
@@ -316,7 +328,7 @@ otherEotProof state = assert (atRightOfTape $ state ^. s_tape) maybeProof
   toFilter = zipExact bitsToCheck $ zipExact dispList history
   candidates = filter (isCandidate . view _2) toFilter
   -- int is from bitsToCheck
-  checkProof :: (Int, (Int, (Phase, ExpTape Bit InfCount))) -> Maybe HaltProof
+  checkProof :: (Int, (Int, (Phase, ExpTape Bit InfCount))) -> Maybe (HaltProof s)
   checkProof (numBitsToCheck, (disp, (_ph, oldTape))) = let
     getBits tapeHalf = takeExact numBitsToCheck $ tapeHalfToBitList tapeHalf <> repeat (Bit False)
     in
@@ -325,14 +337,14 @@ otherEotProof state = assert (atRightOfTape $ state ^. s_tape) maybeProof
         --trace ("bits to check " <> show numBitsToCheck) $ 
         Just $ OffToInfinityN (state ^. s_steps) R
       else Nothing
-  maybeProof :: Maybe HaltProof
+  maybeProof :: Maybe (HaltProof s)
   maybeProof = viaNonEmpty head $ mapMaybe checkProof candidates
 
-attemptOtherEndOfTapeProof :: SimOneAction
+attemptOtherEndOfTapeProof :: SimOneAction Bit
 attemptOtherEndOfTapeProof _machine state 
   = maybe (Right state) (Left . ContinueForever) $ otherEotProof state
 
-loopSimulateSkip :: Int -> Turing -> OneLoopRes
+loopSimulateSkip :: Int -> Turing -> OneLoopRes Bit
 loopSimulateSkip limit = simOneFromStartLoop $ pure $ simulateStepTotalLoop limit
 
 simulateManyBasicLoop :: Int -> Turing -> [_]
@@ -342,15 +354,15 @@ simulateManyBasicLoop limit = simulateManyMachinesOuterLoop (const Nothing) $ si
   runIfCond (atRightOfTape . view s_tape) attemptOtherEndOfTapeProof
   ])
 
-loopForEndOfTapeGlue :: Int -> Turing -> OneLoopRes
+loopForEndOfTapeGlue :: Int -> Turing -> OneLoopRes Bit
 loopForEndOfTapeGlue limit = simOneFromStartLoop $
     simulateStepTotalLoop limit :| [liftModifyState recordHist, liftModifyState recordDispHist, runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof]
 
-simulateForTime :: Partial => Int -> Turing -> OneLoopRes
+simulateForTime :: Partial => Int -> Turing -> OneLoopRes Bit
 simulateForTime time = simOneFromStartLoop actionList where
   actionList = simulateStepTotalLoop (time + 1) :| [liftModifyState recordHist, liftModifyState recordDispHist]
 
-getStateAfterTime :: Partial => Int -> Turing -> SimState
+getStateAfterTime :: Partial => Int -> Turing -> SimState Bit
 getStateAfterTime time turing = last $ simulateForTime time turing ^. _2
 
 getTwoHistAfterTime :: Partial => Int -> Turing -> (TapeHist Bit InfCount, DispHist)

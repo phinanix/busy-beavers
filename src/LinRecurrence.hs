@@ -54,7 +54,7 @@ hasPair xs = let
 
 --works by sorting the history, determining if there is a duplicate, 
 --and if so, there is a cycle and we can return a haltproof right away
-histHasDuplicate :: (Ord s, Ord c) => ReverseTapeHist s c -> Maybe HaltProof 
+histHasDuplicate :: (Ord s, Ord c) => ReverseTapeHist s c -> Maybe (HaltProof s)
 histHasDuplicate (ReverseTapeHist revHist) = mkHP <$> hasPair (reverse revHist) 
   where
     mkHP (i, j) = Cycle i j
@@ -90,7 +90,8 @@ liveTapeRegion :: (TapeSymbol s) => ExpTape s InfCount -> TapeRegion
 liveTapeRegion (ExpTape ls _p rs) = mkTapeRegion (- (liveRegion ls)) (liveRegion rs)
 
 intersectRegions :: TapeRegion -> TapeRegion -> TapeRegion
-intersectRegions (UnsafeTapeRegion l r) (UnsafeTapeRegion l' r') = mkTapeRegion (max l l') (min r r')
+intersectRegions (UnsafeTapeRegion l r) (UnsafeTapeRegion l' r') 
+  = mkTapeRegion (max l l') (min r r')
 
 subsetRegion :: TapeRegion -> TapeRegion -> Bool 
 subsetRegion (UnsafeTapeRegion l r) (UnsafeTapeRegion l' r') = (l >= l') && (r <= r')
@@ -149,14 +150,14 @@ New design of readshift
 detectLinRecurrence :: forall s. (HasCallStack, TapeSymbol s, Pretty s) 
   => TapeHist s InfCount 
   -> ReadShiftHist 
-  -> Maybe HaltProof
+  -> Maybe (HaltProof s)
 detectLinRecurrence hist@(TapeHist thList) rshist@(ReadShiftHist rshList) 
   = viaNonEmpty head $ catMaybes allMaybeProofs
   where
   checkForRecur :: (Int, Int)
     -> (Phase, ExpTape s InfCount) 
     -> (Phase, ExpTape s InfCount) 
-    -> ReadShift -> Maybe HaltProof 
+    -> ReadShift -> Maybe (HaltProof s)
   checkForRecur (i,j) 
     (ph, et@(ExpTape _ls p _rs)) 
     (ph', et'@(ExpTape _ls' p' _rs'))
@@ -182,7 +183,7 @@ detectLinRecurrence hist@(TapeHist thList) rshist@(ReadShiftHist rshList)
       pure $ LinRecur i j
   --i and j are inclusive, in a sense, but that means we want to index into rshList in an 
   -- (incl., excl.) way, 
-  checkForRecurAtIndices :: (Int, Int) -> Maybe HaltProof
+  checkForRecurAtIndices :: (Int, Int) -> Maybe (HaltProof s)
   checkForRecurAtIndices (i, j) = let 
       ans = checkForRecur (i, j) startC endC readShift 
       showMsg = if has _Just ans then trace ("found proof. indices " 

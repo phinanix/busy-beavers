@@ -95,7 +95,7 @@ main = do
   -- simProgram dispTape results
   
   --let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] = indProveLoopMany 141 $ startMachine1 4
-  let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] = bestCurrentProveLoop 141 $ startMachine1 4
+  let resultList :: [(Turing, SimResult Bit (ExpTape Bit InfCount))] = bestCurrentProveLoop 141 $ startMachine1 4
   --simProgram dispExpTape $ foldr (uncurry addResult) Empty resultList 
   putTextLn $ dispResults dispExpTape $ foldr (uncurry addResult) Empty resultList 
 
