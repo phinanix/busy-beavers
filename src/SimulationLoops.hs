@@ -133,10 +133,12 @@ addSkipToStateOrInf skip origin state = if skipGoesForever skip && skipAppliedIn
 
 --this is something for simulating one machine where you tell me how to handle an unknown edge
 --and I do that
-simulateStepOneMachine :: Partial => (Edge -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState) 
+simulateStepOneMachine :: Partial 
+  => (Edge -> SimState -> Either (SimResult (ExpTape Bit InfCount)) SimState) 
   -> Int -> Turing -> SimState 
   -> Either (SimResult (ExpTape Bit InfCount)) SimState
-simulateStepOneMachine handleUnknown limit machine state@(SimState ph tape book steps skipTrace hist histSet counter curDisp dispHist rsHist) 
+simulateStepOneMachine handleUnknown limit machine
+ state@(SimState ph tape book steps skipTrace hist histSet counter curDisp dispHist rsHist) 
   = if counter > limit
     then Left $ Continue steps ph tape curDisp
     else --trace ("counter:" <> show counter) $ 

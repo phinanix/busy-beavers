@@ -59,11 +59,6 @@ histHasDuplicate (ReverseTapeHist revHist) = mkHP <$> hasPair (reverse revHist)
   where
     mkHP (i, j) = Cycle i j
 
-class (Eq s) => (TapeSymbol s) where 
-  zero :: s 
-
-instance (TapeSymbol Bit) where 
-  zero = Bit False 
 
 -- a region of the tape extending some leftwards and some rightwards
 -- the first int is non-positive and expresses the leftward extent
@@ -82,10 +77,10 @@ liveRegion xs = case xs of
     lastSym = last neXs 
     liveSyms = init neXs
     in let 
-      ans = assert (lastSym == (zero, Infinity)) 
+      ans = assert (lastSym == (blank, Infinity)) 
         (case viaNonEmpty last liveSyms of 
           Nothing -> id
-          Just (s, _c) -> assert (s /= zero)
+          Just (s, _c) -> assert (s /= blank)
         )
         sum $ infCountToInt . snd <$> liveSyms 
       in 
