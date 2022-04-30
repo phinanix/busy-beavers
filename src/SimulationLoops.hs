@@ -69,7 +69,9 @@ simulateManyMachinesOuterLoop :: (Turing -> Maybe (HaltProof Bit))
   -> NonEmpty (SimMultiAction Bit)
   -> Turing 
   -> [(Turing, SimResult Bit (ExpTape Bit InfCount))]
-simulateManyMachinesOuterLoop staticAnal updateFuncs startMachine = loop (startMachine, startState) [] [] where
+simulateManyMachinesOuterLoop staticAnal updateFuncs startMachine 
+  = loop (startMachine, startState) [] [] 
+  where
   startState :: SimState Bit
   startState = initSkipState startMachine
   bigUpdateFunc :: Turing -> SimState Bit -> MultiResult Bit (SimState Bit)
@@ -187,6 +189,8 @@ simulateStepPartial limit machine (SimState ph tape book steps skipTrace hist hi
       c -> NewState $ SimState newPh newTape book (steps + infCountToInt c) (skipUsed : skipTrace)
         hist histSet (counter + 1) (curDisp + dispToInt newDisp) dispHist (addToRRSH rs rsHist)
 
+{-# SPECIALISE simulateStepPartial :: Int -> SimMultiAction Bit #-}
+
 gluePreviousTwoSkips :: (TapeSymbol s) => SimState s -> SimState s
 gluePreviousTwoSkips state = state & s_book .~ newBook where
   book = state ^. s_book
@@ -227,6 +231,9 @@ checkSeenBefore _machine state = case seenBeforeProof state of
   where
   histEnt = (state ^. s_phase, state ^. s_tape)
   curStepCount = state ^. s_steps
+
+{-# SPECIALISE checkSeenBefore :: SimOneAction Bit #-}
+
 
 --applies the skip to everything in the list, checks if any of them have just 
 skipAppliedInHist :: (Eq s, Pretty s) => Skip Count s -> TapeHist s InfCount -> Bool

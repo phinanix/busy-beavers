@@ -101,6 +101,8 @@ proveByLR _machine state = case maybeProof of
   where
   maybeProof = detectLinRecurrence (state ^. s_history) (state ^. s_readshift_history)
 
+{-# SPECIALISE proveByLR :: SimOneAction Bit #-}
+
 proveLRLoop :: Int -> Turing -> OneLoopRes Bit
 proveLRLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
   :| [liftModifyState recordHist, liftModifyState recordDispHist, 

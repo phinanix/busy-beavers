@@ -117,3 +117,4 @@ main = do
 --size 4
 --indprove 3m23s leaving 6650
 --bestcurprove 4m01s leaving 4729
+--bestcurprove became 17m34s after making a shit ton of stuff general
