@@ -8,6 +8,8 @@ import qualified Data.List.NonEmpty as NE ((<|))
 import Data.Map.Strict (assocs, keysSet, unions)
 import Witherable
 import Prettyprinter
+import Control.Exception
+import Safe.Partial
 
 import Util
 import Turing
@@ -19,8 +21,6 @@ import HaltProof
 import Results
 import Glue
 import Simulate (initSimState)
-import Control.Exception
-import Safe.Partial
 
 --a is type of "tape", s is type of "symbol"
 data PartialStepResult a s = Unknown Edge
@@ -340,6 +340,9 @@ addMultipleToBook xs book = foldr (uncurry addSkipToBook) book xs
 initBook :: Turing -> SkipBook Bit
 initBook (Turing _n trans) = appEndo (foldMap (Endo . addInitialSkipToBook) skips) Empty where
   skips = foldMap (uncurry initTransSkip) $ assocs trans
+
+initTwoBitBook :: Turing -> SkipBook TwoBit 
+initTwoBitBook t = undefined 
 
 lookupSkips :: (Ord s) => (Phase, s) -> SkipBook s -> Set (Skip Count s)
 lookupSkips (p, s) book = keysSet $ book ^. atE (p, s)

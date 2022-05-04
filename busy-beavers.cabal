@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4996063c14f4740c3eca739f2f0c137800602bd88c660501c762e1e9f788b3a2
+-- hash: 2b631f9a1feea2dc7dcd2db4f1d0107eb77f1fab5be4a0440423c0f3a5ebd9c5
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -45,6 +45,7 @@ library
       Simple.Tape
       Simulate
       SimulateSkip
+      SimulateTwoBit
       SimulationLoops
       Skip
       Tape
