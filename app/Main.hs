@@ -5,7 +5,7 @@ import Relude
 import Control.Lens
 import qualified Data.Text as T (length)
 import Data.Text.Read
-import System.IO (hSetBuffering, stdout, BufferMode(..))
+import System.IO (stdout, BufferMode(..))
 
 import Turing
 import TuringExamples
@@ -95,7 +95,9 @@ main = do
   -- simProgram dispTape results
   
   --let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] = indProveLoopMany 141 $ startMachine1 4
-  let resultList :: [(Turing, SimResult Bit (ExpTape Bit InfCount))] = bestCurrentProveLoop 141 $ startMachine1 4
+  let resultList 
+        :: [(Turing, SimResult Bit (ExpTape Bit InfCount))]
+        = bestCurrentProveLoop 141 $ startMachine1 4
   --simProgram dispExpTape $ foldr (uncurry addResult) Empty resultList 
   putTextLn $ dispResults dispExpTape $ foldr (uncurry addResult) Empty resultList 
 

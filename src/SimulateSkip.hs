@@ -355,11 +355,6 @@ skipFarthest _   (Skip _ _ _ True _, _) = GT
 skipFarthest (_, res1) (_, res2) = compare (res1 ^. hopsTaken) (res2 ^. hopsTaken)
 
 --simulates one step of a TM using a skip-book
---right now you can't generalize this Bit to an s because you want to be able to case
---on whether the base transition is present in the line marked ~
---but that should be generalizeable
---a TapeSymbol has a function (s, Location c) -> Bit called getPointBit or something
---or laterphina says the Skipbook maybe should be parameterized by s as well
 skipStep :: (TapeSymbol s, Pretty s) => Turing -> SkipBook s -> Phase -> ExpTape s InfCount
   -> PartialStepResult (ExpTape s InfCount) s
 skipStep (Turing _ trans) book ph tape@(ExpTape _ls p _rs) =
