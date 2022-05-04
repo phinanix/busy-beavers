@@ -18,7 +18,7 @@ import Simulate
 import SimulateSkip
 
 --blindly assumes the Turing machine here is a total one 
-simulateBasicAndSkip :: Int -> Turing -> (SimResult Bit Tape, SimResult Bit SkipTape)
+simulateBasicAndSkip :: Int -> Turing -> (SimResult Bit (Tape Bit), SimResult Bit SkipTape)
 simulateBasicAndSkip limit t = (normalRes, skipRes) where 
     normalRes = case Simulate.simulateOneMachine limit t initSimState of 
         Left e -> error $ show e <> " was not a known edge simulateBasicAndSkip"
@@ -27,7 +27,7 @@ simulateBasicAndSkip limit t = (normalRes, skipRes) where
         (_, Left e) -> error $ show e <> " was not a known edge simulateBasicAndSkip 2"
         (_, Right res) -> res
 
--- simulateBasicAndGlue :: Int -> Turing -> (SimResult Tape, SimResult SkipTape)
+-- simulateBasicAndGlue :: Int -> Turing -> (SimResult (Tape Bit), SimResult SkipTape)
 -- simulateBasicAndGlue limit t = (normalRes, skipRes) where 
 --   normalRes = case Simulate.simulateOneMachine limit t initSimState of 
 --           Left e -> error $ show e <> " was not a known edge simulateBasicAndGlue"
@@ -36,7 +36,7 @@ simulateBasicAndSkip limit t = (normalRes, skipRes) where
 --     (_, _, Left e) -> error $ show e <> " was not a known edge simulateBasicAndGlue 2"
 --     (_, _, Right res) -> res 
 
-twoThingsSimulatesSame :: SimResult Bit Tape -> SimResult Bit SkipTape -> Expectation 
+twoThingsSimulatesSame :: SimResult Bit (Tape Bit) -> SimResult Bit SkipTape -> Expectation 
 twoThingsSimulatesSame normalRes skipRes = if normalSteps == skipSteps 
         then normalRes `shouldBe` expTapeToTape <$> skipRes 
         else pure () --skips don't always stop right at the limit
@@ -44,7 +44,7 @@ twoThingsSimulatesSame normalRes skipRes = if normalSteps == skipSteps
         normalSteps = normalRes ^? _Continue . _1 
         skipSteps = skipRes ^? _Continue . _1 
 
-simulatesSameForAll :: (Int -> Turing -> (SimResult Bit Tape, SimResult Bit SkipTape)) -> Int -> Turing -> Expectation 
+simulatesSameForAll :: (Int -> Turing -> (SimResult Bit (Tape Bit), SimResult Bit SkipTape)) -> Int -> Turing -> Expectation 
 simulatesSameForAll func limit t = for_ [0.. limit] 
   (\i -> uncurry twoThingsSimulatesSame $ func i t)
 
