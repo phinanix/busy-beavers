@@ -124,7 +124,7 @@ getNewFinPoint  ((b, c) : xs) = if c == finiteCount 1
   then Just (b, xs)
   else subNatFromCount c 1 <&> (\newC -> (b, (b, newC) : xs))
 
-expTapeToTape :: ExpTape Bit InfCount -> Tape
+expTapeToTape :: ExpTape Bit InfCount -> Tape Bit
 expTapeToTape (ExpTape left point right) = Tape (tapeHalfToBitList left) point (tapeHalfToBitList right) where
 
 tapeHalfToBitList :: Partial => [(s, InfCount)] -> [s]
@@ -138,6 +138,7 @@ data Signature s = Signature [s] s [s] deriving (Eq, Ord, Show, Generic)
 instance (NFData s) => NFData (Signature s)
 
 instance (Show s, Pretty s) => Pretty (Signature s)
+
 tapeSignature :: ExpTape s c -> Signature s
 tapeSignature (ExpTape ls p rs) = Signature (fst <$> ls) p  (fst <$> rs)
 

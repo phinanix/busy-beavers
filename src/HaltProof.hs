@@ -66,16 +66,16 @@ backwardSearch (Turing n trans) | length trans < (n*2) - 1 = Nothing
 backwardSearch (Turing n trans) = recurse 0 $ fromList $ (, Min 0) <$> (initState <$> unusedEdges) where
   unusedEdges :: [Edge]
   unusedEdges = NE.filter (\e -> let t = trans ^. at e in t == Nothing || t == Just Halt) $ uniEdge n
-  initState :: Edge -> (Phase,Tape)
+  initState :: Edge -> (Phase,Tape Bit)
   initState (p, b) = (p, Tape [] b [])
-  loop :: Int -> ((Phase, Tape), Int) -> MonoidalMap (Phase, Tape) (Min Int) -> Maybe (HaltProof s)
+  loop :: Int -> ((Phase, Tape Bit), Int) -> MonoidalMap (Phase, Tape Bit) (Min Int) -> Maybe (HaltProof s)
   loop globalSteps _ _ | globalSteps > backwardSearchGlobalLimit = Nothing
   loop _ (_, localSteps) _ | localSteps > backwardSearchSingleLimit = Nothing
   loop globalSteps (tape, localSteps) rest
     = case fromList $ (,Min $ localSteps+1) <$> backSteps tape of
       Empty -> recurse globalSteps rest
       possibilities -> recurse (globalSteps + 1) (possibilities <> rest)
-  recurse :: Int -> MonoidalMap (Phase,Tape) (Min Int) -> Maybe (HaltProof s)
+  recurse :: Int -> MonoidalMap (Phase,Tape Bit) (Min Int) -> Maybe (HaltProof s)
   recurse _globalSteps Empty = Just $ BackwardSearch
   recurse globalSteps (deleteFindMin -> (f, rest)) = loop globalSteps (second getMin f) rest
 
@@ -86,11 +86,11 @@ backwardSearch (Turing n trans) = recurse 0 $ fromList $ (, Min 0) <$> (initStat
   candidateTrans :: Phase -> [(Edge, Trans)]
   candidateTrans p = filter ((== Just p) . getPhase . snd) transList
   --given a tape, returns all tapes that could result in the given tape
-  backSteps :: (Phase,Tape) -> [(Phase,Tape)]
+  backSteps :: (Phase,Tape Bit) -> [(Phase,Tape Bit)]
   backSteps (p, t) = mapMaybe (backStep (p,t)) $ candidateTrans p
 
   --precondition: the phase given and the getPhase of the Trans are the same
-  backStep :: (Phase,Tape) -> (Edge,Trans) -> Maybe (Phase, Tape)
+  backStep :: (Phase,Tape Bit) -> (Edge,Trans) -> Maybe (Phase, Tape Bit)
   --if the trans makes us step left, we care about what is to the right
   backStep (_p, Tape ls point []) ((inP, inB), (Step _p' _outB L))
     = Just $ (inP, Tape (point:ls) inB [])
