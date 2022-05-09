@@ -22,8 +22,61 @@ import Results
 import Glue
 import Simulate (initSimState)
 
+{-
+Morning of 9 May 22
+Dataflow of the output side of a skip
+Inside the Skip, there is a SkipEnd
+applySkip turns a Skip into a SkipResult
+pickBestSkip turns a (Skip,SkipResult) pair into a PartialStepResult
+skipStep pairs applySkip and pickBestSkip and also can return Unknown directly
+ it is used in downstream applications
+
+SkipEnd is a Phase and a partial/full Config 
+SkipResult is a Phase, a full tape, and hop + displacement + read (HDR) information
+PartialStepResult is a Unknown edge, a MachineStuck, a Halted configuration w HDR info, 
+  or a normal configuration with HDR info
+We at one point care about, in essence, whether a "skipresult" halts or not, but that info
+  isn't actually stored in a SkipResult, so we use pairs of Skip, SkipResult, looking at 
+  whether the Skip itself is storing halting or not
+
+So this dataflow is essentially trying to support one main / happy path: 
+  take a Skip & an ExpTape, match them up, return the new tape + some extra information
+But several other things can happen: the edge can be undefined, the machine can halt 
+(potentially in a place that doesn't nicely sort into macro symbols), or we can realize 
+we have proven the machine runs forever. 
+
+Right now SkipResult is in a confused place, because it essentially is trying to pretend
+we're on the main path, but we might not actually be on the main path yet, so it doesn't
+quite make sense. We also need to allow a skip to have a lot more ability to throw the 
+exceptional paths "within" itself.
+
+Therefore, the new datatypes and flow should be thus:
+1) PartialStepResult is mostly right as is. It needs a new case for "we proved the machine
+  runs forever by X means" (probably of type CurHopNumber -> HaltProof), and the halting 
+  case needs to handle the fact that a machine might halt in the middle of a macro symbol.
+2) SkipResult is probably just destroyed. 
+3) SkipEnd will remain, and keep its current two cases, but needs to be substantially 
+  generalized. Halting becomes an explicit case of SkipEnd (and the boolean y/n halt is 
+  removed from Skip), which handles the fact that the tape might be in an improper state.
+  UnknownEdge and ProvenForever become new cases. 
+Data processing works like this:
+1) we match the front half of the skip to the current tape as before, which as before
+  produces the extra info of what the remaining bits of the tape look like. 
+2) we directly combine that info with the SkipEnd to produce a PartialStepResult. 
+3) we define an ordering on PartialStepResults that determines which ones are preferable:
+  (forever / halt) > step > unknownedge, step ordered by how many steps. Any two of forever,
+  halt and unknownedge are an assertionerror to have both of. I thought unknownedge was an
+  error to have with step also, but it's actually not - you have both unknownedge and step 
+  in the edge case where the unknownedge takes you more hops forward than the step. The 
+  reason you prefer step in this case is to share the work of taking the hops that are 
+  possible without defining the new edge before eventually being forced to define it 
+  (though it is a bit hard to imagine this coming up and it might be worth making it error
+  for now to see if it ever does). 
+-}
+
 --a is type of "tape", s is type of "symbol"
---the ints are displacements
+--the ints are displacements (TODO: make displacement its own newtype; or maybe just roll 
+-- all its uses into ReadShift, that probably works too)
 data PartialStepResult a s = Unknown Edge
                          | Stopped InfCount a (Skip Count s) (Maybe Int) (Maybe ReadShift)
                          | Stepped InfCount Phase a (Skip Count s) (Maybe Int) (Maybe ReadShift)

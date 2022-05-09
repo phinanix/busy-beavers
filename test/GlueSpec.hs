@@ -70,6 +70,7 @@ case2CorrectOutput = Skip
   (finiteCount 3) 
   False
 
+c :: Natural -> Count
 c = finiteCount 
 
 -- the one which is wrong is the Right one
