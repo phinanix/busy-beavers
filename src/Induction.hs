@@ -101,7 +101,7 @@ proveStrong loopLim machine book goal indVar = swapEither <$> loop 0 book Nothin
 
 
 isSameInAsOut :: forall c s. (Monoid c, Eq c) => Skip c s -> Bool 
-isSameInAsOut (Skip start end _ _ _) = addUp start == addUp end
+isSameInAsOut (Skip start end _ _) = addUp start == addUp end
   where 
     addUp :: (Bifoldable b) => b c s -> c 
     addUp = bifoldMap id (const mempty)
@@ -195,8 +195,8 @@ proveSimLinearAndTree linStep treeStep machine book skip
 
 -- given a skip, replaces all occurences of a particular BoundVar with a particular Count
 replaceVarInSkip :: Skip Count s -> BoundVar -> Count -> Skip Count s
-replaceVarInSkip (Skip sConfig eSE hopCount halts displacement) varIn countOut =
-    Skip newConfig newSE (replaceVarInCount hopCount) halts (replaceVarInDisplacement displacement) where
+replaceVarInSkip (Skip sConfig eSE hopCount halts) varIn countOut =
+    Skip newConfig newSE (replaceVarInCount hopCount) halts where
     newConfig = replaceVarInConfig sConfig
     newSE = replaceVarInSE eSE
     replaceVarInConfig (Config p ls c_point rs)
@@ -207,10 +207,7 @@ replaceVarInSkip (Skip sConfig eSE hopCount halts displacement) varIn countOut =
     replaceVarInSE = \case
         EndMiddle config -> EndMiddle $ replaceVarInConfig config
         EndSide p d xs -> EndSide p d $ replaceVarInList xs
-    replaceVarInDisplacement = \case
-        Zero -> Zero
-        OneDir d c -> OneDir d $ replaceVarInCount c
-        BothDirs c c' -> BothDirs (replaceVarInCount c) (replaceVarInCount c')
+
     replaceVarInList :: [(s, Count)] -> [(s, Count)]
     replaceVarInList = fmap $ fmap replaceVarInCount
     replaceVarInCount = replaceBoundVarInCount varIn countOut 
@@ -229,7 +226,7 @@ replaceBoundVarInCount varIn countOut (Count num symbolMap boundMap) =
 -- you can end up skipping past the thing you want. to solve this problem, I wrote simulateviadfs
 proveBySimulating :: forall s. (TapeSymbol s) => Int -> Turing -> SkipBook s 
   -> Skip Count s -> Either (Text, Maybe (Config Count s)) Count
-proveBySimulating limit t book (Skip start goal _ _ _) = let 
+proveBySimulating limit t book (Skip start goal _ _) = let 
   ans = loop 0 (start ^. cstate) (second NotInfinity $ configToET start ^. _2) (finiteCount 0)
   msg = "starting pos:\n" <> show (pretty start) <> "\nsucceeded: " <> show (has _Right ans)
       <> "\nans:" <> showP ans 
@@ -295,7 +292,7 @@ getNextConfigs book curConfig = first deInfCount . view (_2 . resConfig) <$> cho
 --the text is why you failed, and the count is how many big steps 
 simulateViaDFS :: (Ord s, Pretty s) => Int -> Int -> SkipBook s -> Skip Count s 
   -> Either Text Natural 
-simulateViaDFS stepLim depthLim book (Skip startConfig skipEnd _hops _halts _disp) 
+simulateViaDFS stepLim depthLim book (Skip startConfig skipEnd _hops _halts) 
   = case res of 
   Right (Success vs) -> Right $ fromIntegral $ length vs
   --the problem here is we sort of want some kind of like 'what did the DFS get stuck on' list 
@@ -507,7 +504,7 @@ guessInductionHypWithIndices (TapeHist hist) (DispHist disps) criticalPhase conf
       endCounts =  bimapBoth (fmap snd) allThingsGeneralized
       startConfig = combineIntoConfig criticalPhase startCounts startSig
       endConfig = combineIntoConfig criticalPhase endCounts endSig
-      ans = Skip startConfig (EndMiddle endConfig) Empty False Zero
+      ans = Skip startConfig (EndMiddle endConfig) Empty False
       msg = "guessed " <> showP ans
   --force $
   --trace msg $
@@ -706,7 +703,7 @@ guessWhatHappensNext machine startConfig varToGeneralize
                   --and signature we're trying to generalize across, so we just need to write 
                   -- Signature Bit -> ([Count], [Count]) -> ExpTape Bit Count with zipExact
                   (EndMiddle $ etToConfig e_ph $ zipSigToET endSig (e_cls, e_crs))
-                  (FinCount 100) False Zero --TODO
+                  (FinCount 100) False --TODO
                 msg = "guessedWhatsNext " <> showP skipOut 
             assert (endSig `isSubSignatureOf` sigToGeneralize) $
               --force $ trace msg $ 
@@ -882,11 +879,11 @@ varNotUsedInSkip skip = case S.lookupMax allInts of
   countUsedVars (Count _n _as xs) = keysSet xs 
 
 chainArbitrary :: forall s. (Eq s, Pretty s) => Skip Count s -> Either Text (Skip Count s)
-chainArbitrary skip@(Skip start end steps halts disp) = case end of 
+chainArbitrary skip@(Skip start end steps halts) = case end of 
   EndSide _ph _dir _xs -> Left "endside" --TODO we can probably handle this
   EndMiddle endConfig -> do 
     (newStart, newEnd) <- matchConfigs start endConfig 
-    pure (Skip newStart (EndMiddle newEnd) Empty False Zero) --TODO handle steps obviously
+    pure (Skip newStart (EndMiddle newEnd) Empty False) --TODO handle steps obviously
   where 
   newVar :: BoundVar 
   newVar = varNotUsedInSkip skip 

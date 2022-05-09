@@ -38,7 +38,7 @@ simpleSkip = Skip
     [(Bit True, num 3)]
     (Bit False)
     [(Bit False, num 3), (Bit True, num 5)]))
-  (num 5) False (OneDir L $ num 3)
+  (num 5) False
 
 simpleResult :: ExpTape Bit InfCount
 simpleResult = ExpTape
@@ -56,7 +56,7 @@ exampleSkip = Skip
     [(Bit True, num 3)]
     (Bit False)
     [(Bit False, num 1)]))
-  (num 10) False (OneDir L $ num 8)
+  (num 10) False 
 
 exampleTape :: ExpTape Bit InfCount
 exampleTape = ExpTape
@@ -79,7 +79,7 @@ varSkip = Skip
     [(Bit False, newBoundVar 0), (Bit True, One <> newBoundVar 0)]
     (Bit False) []))
   (Count 11 Empty (fromList [(BoundVar 0, Sum 3)]))
-  False (OneDir L $ Count 1 Empty (fromList [(BoundVar 0, Sum 1)]))
+  False
 
 varTape :: ExpTape Bit InfCount
 varTape = ExpTape
@@ -116,7 +116,7 @@ spec = do
           (NotInfinity $ num 5) 
           (Phase 1) 
           simpleResult 
-          (OneDir L (NotInfinity $ num 3)) 
+          (-3) 
           (Just $ ReadShift (-11) 0 (-8)))
     -- it "matches the point of the more complex skip" $ do
     --   getEquations (matchPoints (exampleSkip^.start.c_point) (point exampleTape))
@@ -127,7 +127,7 @@ spec = do
           (NotInfinity $ num 10) 
           (Phase 1) 
           exampleResult 
-          (OneDir L (NotInfinity $ num 8))
+          (-8)
           (Just $ ReadShift (-1) 3 2))
 
   describe "simulateOneMachine" $ do

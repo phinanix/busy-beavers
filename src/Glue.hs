@@ -174,12 +174,11 @@ updateSkipEnd map = \case
 --   BothDirs c c' -> BothDirs (updateCount map c) (updateCount map c')
 
 updateSkip :: Map BoundVar Count -> Skip Count s -> Skip Count s 
-updateSkip map (Skip config end hops halts disp) = Skip 
+updateSkip map (Skip config end hops halts) = Skip 
   (updateConfig map config) 
   (updateSkipEnd map end) 
   (updateCount map hops) 
   halts
-  (updateCount map <$> disp)
 
 simplifyInfDisplacement :: Displacement InfCount -> Displacement InfCount 
 simplifyInfDisplacement = \case 
@@ -242,8 +241,8 @@ glueDisplacements (BothDirs lC rC) (BothDirs lC' rC') = BothDirs (lC <> lC') (rC
 --results from applying one then the next. Tries to keep universals as general as
 --possible but this is not guaranteed to find the most general universal quantifiers
 glueSkips :: forall s. (Eq s, Show s) => Skip Count s -> Skip Count s -> Either Text (Skip Count s)
-glueSkips (Skip startConfig middleSkipEnd c b d) (Skip middleConfig endSkipEnd c' b' d') 
- = uncurry updateSkip <$> munge (runEquations skipWithEquations) & _Right . displacement %~ simplifyDisplacement where
+glueSkips (Skip startConfig middleSkipEnd c b) (Skip middleConfig endSkipEnd c' b') 
+ = uncurry updateSkip <$> munge (runEquations skipWithEquations) where
   munge :: Either Text (Map BoundVar InfCount, a) -> Either Text (Map BoundVar Count, a)
   munge = second $ first $ fmap unsafeDeInf
   unsafeDeInf :: InfCount -> Count 
@@ -260,7 +259,6 @@ glueSkips (Skip startConfig middleSkipEnd c b d) (Skip middleConfig endSkipEnd c
                 (applyTailsSkipEnd endTails endSkipEnd) 
                 (c <> c') 
                 b'
-                (glueDisplacements d d') 
 
 -- TODO I think this is like wrong or broken somehow >>  
 skipGoesForever :: forall s. (Eq s, Show s) => Skip Count s -> Bool 

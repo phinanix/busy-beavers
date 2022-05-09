@@ -79,19 +79,19 @@ data Skip c s = Skip
   , _end :: SkipEnd c s
   , _hops :: c --number of atomic TM steps
   , _halts :: Bool --true if the skip results in the machine halting
-  , _displacement :: Displacement c
+  -- , _displacement :: Displacement c
   } deriving (Eq, Ord, Show, Generic, Functor)
 instance (NFData s, NFData c) => NFData (Skip c s)
 
 instance Bifunctor Skip where
-  bimap f g (Skip c se hop halt disp) = Skip (bimap f g c) (bimap f g se) (f hop) halt (f <$> disp)
+  bimap f g (Skip c se hop halt) = Skip (bimap f g c) (bimap f g se) (f hop) halt
 
 instance Bifoldable Skip where
   bifoldMap = bifoldMapDefault
 
 instance Bitraversable Skip where
-  bitraverse f g (Skip c se hop halt disp)
-    = Skip <$> bitraverse f g c <*> bitraverse f g se <*> f hop <*> pure halt <*> (f <%> disp)
+  bitraverse f g (Skip c se hop halt)
+    = Skip <$> bitraverse f g c <*> bitraverse f g se <*> f hop <*> pure halt 
 
 data ReadShift = ReadShift {_len_l :: Steps, _len_r :: Steps, _shift_dist :: Steps}
   deriving (Eq, Ord, Show, Generic)
@@ -126,9 +126,9 @@ instance Pretty s => Pretty (SkipEnd Count s) where
   pretty (EndMiddle c) = pretty c
 
 instance Pretty s => Pretty (Skip Count s) where
-  pretty (Skip s e c halts displace) = prettyText "in " <> pretty (dispCount c) <> prettyText " steps we turn\n"
+  pretty (Skip s e c halts) = prettyText "in " <> pretty (dispCount c) <> prettyText " steps we turn\n"
     <> pretty s <> prettyText "\ninto: \n" <> pretty e <> prettyText (if halts then "\n and halt" else "")
-    <> prettyText "\n displacement of: " <> show displace <> "\n"
+    <> prettyText "\n displacement of: "
 
 instance Pretty ReadShift where 
   pretty (ReadShift l r s) = prettyText $ "RS l " <> show l 
@@ -264,7 +264,7 @@ matchConfigTape (Config _p lsC pointC rsC) (ExpTape lsT pointT rsT)
 
 matchSkipTape :: (Eq s) => Skip Count s -> ExpTape s InfCount
   -> Equations ([(s, InfCount)], [(s, InfCount)])
-matchSkipTape (Skip config end _hops _halts _displacement) tape = do
+matchSkipTape (Skip config end _hops _halts) tape = do
   out@(lRem, rRem) <- matchConfigTape config tape
   case end of
     EndMiddle _ -> pure out

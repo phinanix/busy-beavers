@@ -23,9 +23,10 @@ import Glue
 import Simulate (initSimState)
 
 --a is type of "tape", s is type of "symbol"
+--the ints are displacements
 data PartialStepResult a s = Unknown Edge
-                         | Stopped InfCount a (Skip Count s) (Displacement InfCount) (Maybe ReadShift)
-                         | Stepped InfCount Phase a (Skip Count s) (Displacement InfCount) (Maybe ReadShift)
+                         | Stopped InfCount a (Skip Count s) Int (Maybe ReadShift)
+                         | Stepped InfCount Phase a (Skip Count s) Int (Maybe ReadShift)
                          | MachineStuck
                          deriving (Eq, Ord, Show, Generic)
 
@@ -148,12 +149,12 @@ instance (Pretty s) => Pretty (SkipOrigin s) where
     <> show first <> " to " <> show second
   pretty InductionHypothesis = "a skip which is our current induction hypothesis"
 
---the count is the number of atomic steps the skip results in
+--displacement is measured in the count of "s", not in the count of atomic symbols
 data SkipResult s c = Skipped
   { _hopsTaken :: InfCount
   , _newPhase :: Phase
   , _newTape :: ExpTape s c
-  , _resultingDisp :: Displacement InfCount
+  , _resultingDisp :: Int 
   , _resRS :: Maybe ReadShift
   } deriving (Eq, Ord, Show, Generic)
 
@@ -203,7 +204,7 @@ dispSkipResult :: SkipResult Bit InfCount -> Text
 dispSkipResult (Skipped c p tape disp _rs)
   = "skipped to phase: " <> dispPhase p
   <> " and tape " <> dispExpTape tape
-  <> " in " <> dispInfCount c <> " hops\ndisplacement was:" <> show disp
+  <> " in " <> dispInfCount c
 
 instance (Ord s, Pretty s) => Pretty (SkipBook s) where
   pretty book = let skipPile = unions book in
@@ -214,7 +215,7 @@ instance (Ord s, Pretty s) => Pretty (SkipBook s) where
 --returns nothing if the skip is inapplicable, else returns a new tape
 applySkip :: forall s. (Eq s, Pretty s, Partial) => Skip Count s -> (Phase, ExpTape s InfCount)
   -> Maybe (SkipResult s InfCount)
-applySkip skip@(Skip s _ _ _ _) (p, tape)
+applySkip skip@(Skip s _ _ _) (p, tape)
   = guard (s^.cstate == p) >> either (const Nothing) Just
       (packageResult skip tape =<< runEquations (matchSkipTape skip tape))
 
@@ -222,12 +223,12 @@ packageResult :: forall s. (Eq s, Pretty s, Partial) => Skip Count s
   -> ExpTape s InfCount
   -> (Map BoundVar InfCount, ([(s, InfCount)], [(s, InfCount)]))
   -> Either Text (SkipResult s InfCount)
-packageResult skip@(Skip s e hopCount _ displacement) tape (boundVs, (newLs, newRs))
+packageResult skip@(Skip s e hopCount _) tape (boundVs, (newLs, newRs))
   = Skipped
       (updateCountToInf boundVs hopCount)
       (getSkipEndPhase e)
       <$> getFinalET e (newLs, newRs)
-      <*> pure (simplifyInfDisplacement $ updateCountToInf boundVs <$> displacement)
+      <*> pure shift 
       --TODO : un-just-ified Just (currently fixed by laziness)
       <*> pure (Just $ ReadShift (-startLLen) startRLen shift)
   where
@@ -296,7 +297,6 @@ oneStepSkip (p, b) q c d = Skip
   (EndSide q d [(c, finiteCount 1)])
   (finiteCount 1)
   False
-  (OneDir d $ finiteCount 1)
 
 --the skip that results from an atomic transition which transitions a phase to itself
 --writing the given bit and dir
@@ -308,18 +308,17 @@ infiniteSkip (p, b) c L = Skip
   (EndSide p L [(c, One <> newBoundVar 0)])
   (One <> newBoundVar 0)
   False
-  (OneDir L $ One <> newBoundVar 0)
 infiniteSkip (p, b) c R = Skip
   -- (Config p [] (b, Side (newBoundVar 0) L) [])
   (Config p [] b [(b, newBoundVar 0)])
   (EndSide p R [(c, One <> newBoundVar 0)])
   (One <> newBoundVar 0)
   False
-  (OneDir R $ One <> newBoundVar 0)
 
 initTransSkip :: Edge -> Trans -> Set (Skip Count Bit)
 --we need to modify this skip so that it's halt question is true
---a halting machine is assumed to write True and go left
+--a halting machine is assumed to write True and go left 
+--(and not change phase, but conceptually it is now in "haltphase")
 initTransSkip e@(p, _b) Halt = one $ oneStepSkip e p (Bit True) L & halts .~ True
 initTransSkip e@(p, _b) (Step q c d) | p == q = fromList
   [ oneStepSkip e q c d
@@ -353,8 +352,8 @@ skipFarthest :: (Eq s, Eq c, Eq c')
   -> (Skip c s, SkipResult s c')
   -> Ordering
 skipFarthest a b | a == b = EQ
-skipFarthest (Skip _ _ _ True _, _)   _ = LT
-skipFarthest _   (Skip _ _ _ True _, _) = GT
+skipFarthest (Skip _ _ _ True, _)   _ = LT
+skipFarthest _   (Skip _ _ _ True, _) = GT
 skipFarthest (_, res1) (_, res2) = compare (res1 ^. hopsTaken) (res2 ^. hopsTaken)
 
 --simulates one step of a TM using a skip-book
@@ -414,7 +413,7 @@ simulateOneMachine limit t = \case
   SimState p tape book steps trace hist histSet counter disp dispHist rsHist -> case skipStep t book p tape of
     MachineStuck -> error "machinestuck"
     Unknown e -> (trace, Left e)
-    Stopped c newTape skip newDisp _rs -> (skip : trace, Right $ Halted (steps + infCountToInt c) newTape (disp + dispToInt newDisp))
+    Stopped c newTape skip newDisp _rs -> (skip : trace, Right $ Halted (steps + infCountToInt c) newTape (disp + newDisp))
     Stepped c newP newTape skip newDisp rs -> case c of
       Infinity -> (skip : trace, Right $ ContinueForever (SkippedToInfinity steps skip))
       c -> let newHist = hist & reverseTapeHist %~ ((p, tape) :)
@@ -422,7 +421,7 @@ simulateOneMachine limit t = \case
                newDispHist = dispHist & reverseDispHist %~ (disp :)
         in
         simulateOneMachine limit t $ SimState newP newTape book (steps + infCountToInt c) (skip : trace)
-           newHist newHistSet counter (disp + dispToInt newDisp) newDispHist (addToRRSH rs rsHist)
+           newHist newHistSet counter (disp + newDisp) newDispHist (addToRRSH rs rsHist)
 
 simulateOneTotalMachine :: Int -> Turing -> ([Skip Count Bit], SimResult Bit (ExpTape Bit InfCount))
 simulateOneTotalMachine limit machine = (^?! _Right) <$> simulateOneMachine limit machine (initSkipState machine)
@@ -511,4 +510,3 @@ weird3Goal = Skip
         [(Bit True, finiteCount 1 <> newBoundVar 0)] (Bit True) [(Bit False, finiteCount 1)])
     (finiteCount 0) --obviously this is fake for now 
     False
-    Zero --obviously this is fake for now 

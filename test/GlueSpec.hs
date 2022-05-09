@@ -18,7 +18,6 @@ skipA = Skip
     (EndSide (Phase 1) L [(Bit False, One)])
     One
     False 
-    (OneDir L One)
 
 skipB :: Skip Count Bit 
 skipB = Skip 
@@ -26,7 +25,6 @@ skipB = Skip
     (EndSide (Phase 2) L [(Bit True, One)]) 
     One
     False 
-    (OneDir L One) 
 
 skipAB :: Skip Count Bit 
 skipAB = Skip 
@@ -35,7 +33,6 @@ skipAB = Skip
     (EndSide (Phase 2) L [(Bit True, One), (Bit False, One)])
     (finiteCount 2) 
     False
-    (OneDir L $ finiteCount 2)
 
 selfGlueSkip :: Skip Count Bit 
 selfGlueSkip = Skip 
@@ -43,7 +40,6 @@ selfGlueSkip = Skip
   (EndMiddle $ Config (Phase 1) [(Bit True, One)] (Bit False) [(Bit False, One)])
   (finiteCount 3) 
   False
-  (OneDir L One)
 
 twoSelfGlueSkip :: Skip Count Bit 
 twoSelfGlueSkip = Skip 
@@ -51,7 +47,6 @@ twoSelfGlueSkip = Skip
   (EndMiddle $ Config (Phase 1) [(Bit True, One)] (Bit False) [(Bit False, finiteCount 2)]) 
   (finiteCount 6)
   False
-  (OneDir L $ finiteCount 2)
 
 -- these two skips should glue, but based on my bb3 glueing runs same as vanilla test, 
 -- the gluing algorithm nonsenically produces the skip 
@@ -74,7 +69,6 @@ case2CorrectOutput = Skip
   (EndSide (Phase 2) L [(Bit True, finiteCount 2)])
   (finiteCount 3) 
   False
-  (OneDir L One)
 
 c = finiteCount 
 

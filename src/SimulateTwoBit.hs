@@ -88,8 +88,7 @@ simulateUntilCondition t (ph, startTape) = loop startState 0 Empty where
          _ -> loop newState newStep newMap 
 
 makeTwoBitSkip :: Turing -> (Phase, Tape Bit) -> Skip Natural TwoBit
-makeTwoBitSkip t (startPh, startT) = Skip skipStart skipEnd hops 
-    (error "halt undefined") (error "destroy displacement") 
+makeTwoBitSkip t (startPh, startT) = Skip skipStart skipEnd hops (error "halt undefined")
   where
   skipStart = etToConfig startPh $ etBitToTwoBit $ unFlattenET startT
   (hops, simEnd) = simulateUntilCondition t (startPh, startT)

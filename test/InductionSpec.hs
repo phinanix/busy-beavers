@@ -30,7 +30,6 @@ checkerboardFalseGoal = Skip
     (EndMiddle $ Config (Phase 0) [(Bit True, finiteCount 3 <> newBoundVar 0)] (Bit True) [])
     (finiteCount 0) --obviously this is fake for now 
     False
-    Zero --obviously this is fake for now 
 
 simple_sweeperGoal :: Skip Count Bit
 simple_sweeperGoal = Skip
@@ -41,7 +40,6 @@ simple_sweeperGoal = Skip
       [] (Bit True) [(Bit True, finiteCount 1 <> newBoundVar 0), (Bit False, finiteCount 1)])
   (finiteCount 0) --obviously this is fake for now 
   False
-  Zero --obviously this is fake for now 
 
 beforeReplace :: Config Count Bit 
 beforeReplace = Config (Phase 2) [(Bit False, symbolVarCount (SymbolVar 0) 1)] (Bit True) [(Bit True, One), (Bit False, One)]
@@ -116,7 +114,7 @@ spec = do
         (Config (Phase 2) [(Bit False, c 1)] (Bit False) [(Bit True, Count 0 Empty (fromList [(BoundVar 0,Sum 1)])), (Bit False, c 1)])
         (EndMiddle (Config (Phase 2) [] (Bit False) [(Bit True, Count 1 Empty (fromList [(BoundVar 0,Sum 1)])), (Bit False, c 1)]))
         Empty
-        False Zero)
+        False)
         --this is of course only one reasonable guess, others would also be fine 
     it "guesses for a sweeper" $ do
       -- at step 15, F >F< (T, 3)
@@ -125,7 +123,7 @@ spec = do
       makeIndGuess 1000 simple_sweeper `assertPrettySkip` (Skip
         (Config (Phase 0) [(Bit False, c 1)] (Bit False) [(Bit True, Count 0 Empty (fromList [(BoundVar 0, Sum 1)])), (Bit False, c 1)])
         (EndMiddle (Config (Phase 0) [] (Bit False) [(Bit True, Count 1 Empty (fromList [(BoundVar 0, Sum 1)])), (Bit False, c 1)]))
-        Empty False Zero)
+        Empty False)
     it "guesses for a second sweeper" $ do
       -- at step 6, F (T, 3) >F< F
       -- at step 15, (T, 5) >F<
@@ -135,7 +133,7 @@ spec = do
             [(Bit True, Count 0 Empty (fromList [(BoundVar 0, Sum 1)])), (Bit False, c 1)] (Bit False) [(Bit False, c 1)])
         (EndMiddle (Config (Phase 1)
              [(Bit True, Count 2 Empty (fromList [(BoundVar 0, Sum 1)]))] (Bit False) []))
-        Empty False Zero)
+        Empty False)
   describe "replaceSymbolVarInConfig" $ do 
     it "replaces in a simple example" $ do 
       replaceSymbolVarInConfig True beforeReplace (SymbolVar 0) (FinCount 5) `shouldBe` afterReplace

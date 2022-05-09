@@ -99,7 +99,7 @@ machineStuckMachine = unsafeFromRight $ nm "TR1FL0FR2___TL2TL3FR0TL0"
 --I think this fails to be self glued basically because it assumes that x_0 is the same as x_0 in a different skip 
 --which is kind of nonsense
 thingWhichShouldBeSelfGlued :: Skip Count Bit 
-thingWhichShouldBeSelfGlued = Skip {_start = Config {_cstate = (Phase 2), _ls = [(Bit False,One)], _c_point = Bit False, _rs = [(Bit True,Count 0 (fromList []) (fromList [(BoundVar 0,Sum {getSum = 1})])),(Bit False,Count 1 (fromList []) (fromList []))]}, _end = EndMiddle (Config {_cstate = (Phase 2), _ls = [], _c_point = Bit False, _rs = [(Bit True,Count 1 (fromList []) (fromList [(BoundVar 0,Sum {getSum = 1})])),(Bit False,Count 1 (fromList []) (fromList []))]}), _hops = Count 0 (fromList []) (fromList []), _halts = False, _displacement = Zero} 
+thingWhichShouldBeSelfGlued = Skip {_start = Config {_cstate = (Phase 2), _ls = [(Bit False,One)], _c_point = Bit False, _rs = [(Bit True,Count 0 (fromList []) (fromList [(BoundVar 0,Sum {getSum = 1})])),(Bit False,Count 1 (fromList []) (fromList []))]}, _end = EndMiddle (Config {_cstate = (Phase 2), _ls = [], _c_point = Bit False, _rs = [(Bit True,Count 1 (fromList []) (fromList [(BoundVar 0,Sum {getSum = 1})])),(Bit False,Count 1 (fromList []) (fromList []))]}), _hops = Count 0 (fromList []) (fromList []), _halts = False} 
 
 bb2 :: Turing
 bb2 = unm "TL1TR1TR0TLH"
