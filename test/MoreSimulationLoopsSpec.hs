@@ -33,8 +33,7 @@ spec = do
       fst (indProveLoop 200 some_kind_of_bincounter) `shouldSatisfy` has _Continue
     it "satisifes the LR assert" $ do
       property (\(t :: Turing) -> checkLRAssertOneMachine 120 t `shouldBe` Nothing)
---  describe "indProveLoopMany" $ do 
---    it "works on machines of size 3" $ 
-
-      --this appears to be an infinite loop !? :c
-      --length (indProveLoopMany 200 (startMachine1 3)) `shouldBe` 4052
+  describe "indProveLoopMany" $ do 
+   it "works on machines of size 3" $ 
+      -- this appears to be an infinite loop !? :c
+      length (indProveLoopMany 200 (startMachine1 3)) `shouldBe` 4052
