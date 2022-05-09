@@ -180,45 +180,45 @@ updateSkip map (Skip config end hops halts) = Skip
   (updateCount map hops) 
   halts
 
-simplifyInfDisplacement :: Displacement InfCount -> Displacement InfCount 
-simplifyInfDisplacement = \case 
-  BothDirs Infinity Infinity -> error "double infinity ??"
-  --commented out because these feel weird and I kind of want to not commit to them 
-  -- BothDirs Infinity _c -> OneDir L Infinity 
-  -- BothDirs _c Infinity -> OneDir R Infinity 
-  BothDirs (NotInfinity c) (NotInfinity d) -> NotInfinity <$> simplifyDisplacement (BothDirs c d)
-  other -> other
+-- simplifyInfDisplacement :: Displacement InfCount -> Displacement InfCount 
+-- simplifyInfDisplacement = \case 
+--   BothDirs Infinity Infinity -> error "double infinity ??"
+--   --commented out because these feel weird and I kind of want to not commit to them 
+--   -- BothDirs Infinity _c -> OneDir L Infinity 
+--   -- BothDirs _c Infinity -> OneDir R Infinity 
+--   BothDirs (NotInfinity c) (NotInfinity d) -> NotInfinity <$> simplifyDisplacement (BothDirs c d)
+--   other -> other
 
-simplifyDisplacement :: Displacement Count -> Displacement Count
-simplifyDisplacement d | traceShow d False = undefined
-simplifyDisplacement Zero = Zero 
-simplifyDisplacement (OneDir d c) = OneDir d c 
-simplifyDisplacement (BothDirs c c') = case (c, c') of 
-  (Empty, ans) -> OneDir R ans 
-  (ans, Empty) -> OneDir L ans 
-  -- TODO:: I'm pretty sure this code is redundant, make actually sure
-  -- (Count n as xs, FinCount m) -> if n >= m 
-  --   then OneDir L $ Count (n - m) as xs 
-  --   else BothDirs (Count 0 as xs) (FinCount $ m - n)
-  -- (FinCount n, Count m as xs) -> if m >= n
-  --   then OneDir R $ Count (m - n) as xs 
-  --   else BothDirs (FinCount $ m - n) (Count 0 as xs)
-  (Count n as xs, Count m bs ys) -> let 
-    (n', m') = subMin n m 
-    (as', bs') = removeCommon' as bs 
-    (xs', ys') = removeCommon' xs ys 
-    in simplifyDisplacement $ BothDirs (Count n' as' xs') (Count m' bs' ys')
-  where 
-    subMin :: Natural -> Natural -> (Natural, Natural)
-    subMin x y = (x - theMin, y - theMin) where 
-      theMin = min x y 
-    removeCommon' xs ys = bimapBoth (fmap Sum) $ removeCommon (getSum <$> xs) (getSum <$> ys) 
-    --takes two maps and returns both, with the keys they both had subtracted out 
-    removeCommon :: (Ord k) => MMap k Natural -> MMap k Natural -> (MMap k Natural, MMap k Natural)
-    removeCommon xs ys = (unionWith (-) xs commonElts, unionWith (-) ys commonElts) where
-      commonElts = intersectionWith min xs ys 
+-- simplifyDisplacement :: Displacement Count -> Displacement Count
+-- simplifyDisplacement d | traceShow d False = undefined
+-- simplifyDisplacement Zero = Zero 
+-- simplifyDisplacement (OneDir d c) = OneDir d c 
+-- simplifyDisplacement (BothDirs c c') = case (c, c') of 
+--   (Empty, ans) -> OneDir R ans 
+--   (ans, Empty) -> OneDir L ans 
+--   -- TODO:: I'm pretty sure this code is redundant, make actually sure
+--   -- (Count n as xs, FinCount m) -> if n >= m 
+--   --   then OneDir L $ Count (n - m) as xs 
+--   --   else BothDirs (Count 0 as xs) (FinCount $ m - n)
+--   -- (FinCount n, Count m as xs) -> if m >= n
+--   --   then OneDir R $ Count (m - n) as xs 
+--   --   else BothDirs (FinCount $ m - n) (Count 0 as xs)
+--   (Count n as xs, Count m bs ys) -> let 
+--     (n', m') = subMin n m 
+--     (as', bs') = removeCommon' as bs 
+--     (xs', ys') = removeCommon' xs ys 
+--     in simplifyDisplacement $ BothDirs (Count n' as' xs') (Count m' bs' ys')
+--   where 
+--     subMin :: Natural -> Natural -> (Natural, Natural)
+--     subMin x y = (x - theMin, y - theMin) where 
+--       theMin = min x y 
+--     removeCommon' xs ys = bimapBoth (fmap Sum) $ removeCommon (getSum <$> xs) (getSum <$> ys) 
+--     --takes two maps and returns both, with the keys they both had subtracted out 
+--     removeCommon :: (Ord k) => MMap k Natural -> MMap k Natural -> (MMap k Natural, MMap k Natural)
+--     removeCommon xs ys = (unionWith (-) xs commonElts, unionWith (-) ys commonElts) where
+--       commonElts = intersectionWith min xs ys 
   
-
+{- 
 glueDisplacements :: Displacement Count -> Displacement Count -> Displacement Count
 glueDisplacements Zero d = d 
 glueDisplacements d Zero = d 
@@ -235,7 +235,7 @@ glueDisplacements (OneDir d c) (BothDirs lC rC) = case d of
   R -> BothDirs lC (rC <> c) 
 glueDisplacements both@(BothDirs _ _) one@(OneDir _ _) = glueDisplacements one both 
 glueDisplacements (BothDirs lC rC) (BothDirs lC' rC') = BothDirs (lC <> lC') (rC <> rC')
-
+ -}
 
 --takes a first and a second skip and returns, if it is possible, a skip that
 --results from applying one then the next. Tries to keep universals as general as

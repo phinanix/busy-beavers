@@ -57,22 +57,22 @@ instance Bitraversable SkipEnd where
 --it read to end up there, which is required to detect Lin recurrence. However I guess that's fine as long 
 --as machines only depend on the literal things read by a skip? In fact, if that is true, not clear we even 
 --need to track displacement. (it might also be trivially derivable from a skip?)
-data Displacement c = Zero | OneDir Dir c | BothDirs c c deriving (Eq, Ord, Show, Generic, Functor, Foldable, Traversable)
-instance (NFData c) => NFData (Displacement c)
+-- data Displacement c = Zero | OneDir Dir c | BothDirs c c deriving (Eq, Ord, Show, Generic, Functor, Foldable, Traversable)
+-- instance (NFData c) => NFData (Displacement c)
 
-dispToInt :: Displacement InfCount -> Int
-dispToInt = \case
-  Zero -> 0
-  OneDir L (NotInfinity (FinCount n)) -> -1 * fromIntegral n
-  OneDir R (NotInfinity (FinCount n)) -> fromIntegral n
-  BothDirs (NotInfinity (FinCount n)) (NotInfinity (FinCount m)) -> fromIntegral m - fromIntegral n
-  other -> error $ "couldn't convert " <> show other <> " to an int"
+-- dispToInt :: Displacement InfCount -> Int
+-- dispToInt = \case
+--   Zero -> 0
+--   OneDir L (NotInfinity (FinCount n)) -> -1 * fromIntegral n
+--   OneDir R (NotInfinity (FinCount n)) -> fromIntegral n
+--   BothDirs (NotInfinity (FinCount n)) (NotInfinity (FinCount m)) -> fromIntegral m - fromIntegral n
+--   other -> error $ "couldn't convert " <> show other <> " to an int"
 
-instance (Pretty c) => Pretty (Displacement c) where 
-  pretty = \case 
-    Zero -> "d Zero"
-    OneDir dir c -> show dir <> " " <> pretty c 
-    BothDirs c c' -> "left " <> pretty c <> " and right " <> pretty c'
+-- instance (Pretty c) => Pretty (Displacement c) where 
+--   pretty = \case 
+--     Zero -> "d Zero"
+--     OneDir dir c -> show dir <> " " <> pretty c 
+--     BothDirs c c' -> "left " <> pretty c <> " and right " <> pretty c'
 
 data Skip c s = Skip
   { _start :: Config c s

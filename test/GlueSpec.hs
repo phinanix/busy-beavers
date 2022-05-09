@@ -82,15 +82,15 @@ spec = do
       glueSkips selfGlueSkip selfGlueSkip `shouldBe` Right twoSelfGlueSkip
     it "glues two skips case 2" $ do 
       glueSkips case2SkipA case2SkipB `shouldBe` Right case2CorrectOutput
-  describe "glueDisplacements" $ do 
-    it "glues things going the same way" $ do 
-      glueDisplacements (OneDir L $ c 2) (OneDir L $ c 5) `shouldBe` (OneDir L $ c 7) 
-    it "glues things going different ways" $ do 
-      glueDisplacements (OneDir L $ c 1) (OneDir R $ c 8) `shouldBe` (OneDir R $ c 7)
-    it "glues a thing adding to zero" $ do 
-      glueDisplacements (OneDir L $ c 3) (OneDir R $ c 3) `shouldBe` (OneDir L $ c 0)
-    it "glues a thing involving some variables" $ do 
-      glueDisplacements (OneDir L $ Count 2 Empty (SingletonMap (BoundVar 0) (Sum 2))) 
-        (OneDir L $ Count 5 (SingletonMap (SymbolVar 3) (Sum 1)) Empty) `shouldBe`
-        (OneDir L $ Count 7 (SingletonMap (SymbolVar 3) (Sum 1)) (SingletonMap (BoundVar 0) (Sum 2))) 
+  -- describe "glueDisplacements" $ do 
+  --   it "glues things going the same way" $ do 
+  --     glueDisplacements (OneDir L $ c 2) (OneDir L $ c 5) `shouldBe` (OneDir L $ c 7) 
+  --   it "glues things going different ways" $ do 
+  --     glueDisplacements (OneDir L $ c 1) (OneDir R $ c 8) `shouldBe` (OneDir R $ c 7)
+  --   it "glues a thing adding to zero" $ do 
+  --     glueDisplacements (OneDir L $ c 3) (OneDir R $ c 3) `shouldBe` (OneDir L $ c 0)
+  --   it "glues a thing involving some variables" $ do 
+  --     glueDisplacements (OneDir L $ Count 2 Empty (SingletonMap (BoundVar 0) (Sum 2))) 
+  --       (OneDir L $ Count 5 (SingletonMap (SymbolVar 3) (Sum 1)) Empty) `shouldBe`
+  --       (OneDir L $ Count 7 (SingletonMap (SymbolVar 3) (Sum 1)) (SingletonMap (BoundVar 0) (Sum 2))) 
     
