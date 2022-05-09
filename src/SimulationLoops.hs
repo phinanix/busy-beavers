@@ -156,11 +156,11 @@ simulateStepOneMachine handleUnknown limit machine
     Unknown e -> handleUnknown e state 
     MachineStuck -> Left MachineStuckRes
     Stopped c newTape _skipUsed newDisp rs ->
-      Left $ Halted (steps + infCountToInt c) newTape (curDisp + newDisp)
+      Left $ Halted (steps + infCountToInt c) newTape (curDisp + fromJust newDisp)
     Stepped c newPh newTape skipUsed newDisp rs -> case c of
       Infinity -> Left $ ContinueForever (SkippedToInfinity steps skipUsed)
       c -> Right $ SimState newPh newTape book (steps + infCountToInt c) (skipUsed : skipTrace)
-        hist histSet (counter + 1) (curDisp + newDisp) dispHist (addToRRSH rs rsHist)
+        hist histSet (counter + 1) (curDisp + fromJust newDisp) dispHist (addToRRSH rs rsHist)
 
 --this one essentially asserts there is no unknown edge, or otherwise crashes
 simulateStepTotalLoop :: (Partial, TapeSymbol s)  
@@ -184,12 +184,12 @@ simulateStepPartial limit machine (SimState ph tape book steps skipTrace hist hi
     Unknown e -> UnknownEdge e
     MachineStuck -> error "machinestuck "
     Stopped c newTape _skipUsed newDisp rs ->
-      Result $ Halted (steps + infCountToInt c) newTape (curDisp + newDisp)
+      Result $ Halted (steps + infCountToInt c) newTape (curDisp + fromJust newDisp)
     Stepped c newPh newTape skipUsed newDisp rs -> --trace ("entered stepped, c:" <> showP c) $ 
       case c of
       Infinity -> Result $ ContinueForever (SkippedToInfinity steps skipUsed)
       c -> NewState $ SimState newPh newTape book (steps + infCountToInt c) (skipUsed : skipTrace)
-        hist histSet (counter + 1) (curDisp + newDisp) dispHist (addToRRSH rs rsHist)
+        hist histSet (counter + 1) (curDisp + fromJust newDisp) dispHist (addToRRSH rs rsHist)
 
 {-# SPECIALISE simulateStepPartial :: Int -> SimMultiAction Bit #-}
 

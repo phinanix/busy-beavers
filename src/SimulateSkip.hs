@@ -25,8 +25,8 @@ import Simulate (initSimState)
 --a is type of "tape", s is type of "symbol"
 --the ints are displacements
 data PartialStepResult a s = Unknown Edge
-                         | Stopped InfCount a (Skip Count s) Int (Maybe ReadShift)
-                         | Stepped InfCount Phase a (Skip Count s) Int (Maybe ReadShift)
+                         | Stopped InfCount a (Skip Count s) (Maybe Int) (Maybe ReadShift)
+                         | Stepped InfCount Phase a (Skip Count s) (Maybe Int) (Maybe ReadShift)
                          | MachineStuck
                          deriving (Eq, Ord, Show, Generic)
 
@@ -154,7 +154,7 @@ data SkipResult s c = Skipped
   { _hopsTaken :: InfCount
   , _newPhase :: Phase
   , _newTape :: ExpTape s c
-  , _resultingDisp :: Int 
+  , _resultingDisp :: Maybe Int 
   , _resRS :: Maybe ReadShift
   } deriving (Eq, Ord, Show, Generic)
 
@@ -212,7 +212,7 @@ instance (Ord s, Pretty s) => Pretty (SkipBook s) where
             <> "which resulted from" <> line <> pretty o <> line <> line)
               $ assocs skipPile
 
---returns nothing if the skip is inapplicable, else returns a new tape
+--returns nothing if the skip is inapplicable, else returns the result
 applySkip :: forall s. (Eq s, Pretty s, Partial) => Skip Count s -> (Phase, ExpTape s InfCount)
   -> Maybe (SkipResult s InfCount)
 applySkip skip@(Skip s _ _ _) (p, tape)
@@ -228,8 +228,14 @@ packageResult skip@(Skip s e hopCount _) tape (boundVs, (newLs, newRs))
       (updateCountToInf boundVs hopCount)
       (getSkipEndPhase e)
       <$> getFinalET e (newLs, newRs)
-      <*> pure shift 
       --TODO : un-just-ified Just (currently fixed by laziness)
+      -- in other words, somtimes, there is an error inside the ReadShift / shift, 
+      -- but we don't force the thunk on those calls because we don't care about 
+      -- the result (actually, because there is no sensical result), without the 
+      -- "Just", "Skipped" is strict so we force the error, but with the Just, 
+      -- we lazily never force the error and so it is just discarded on the branch
+      -- we don't care about 
+      <*> pure (Just shift)
       <*> pure (Just $ ReadShift (-startLLen) startRLen shift)
   where
     getFinalET :: Partial => SkipEnd Count s -> ([(s, InfCount)], [(s, InfCount)]) -> Either Text (ExpTape s InfCount)
@@ -413,7 +419,8 @@ simulateOneMachine limit t = \case
   SimState p tape book steps trace hist histSet counter disp dispHist rsHist -> case skipStep t book p tape of
     MachineStuck -> error "machinestuck"
     Unknown e -> (trace, Left e)
-    Stopped c newTape skip newDisp _rs -> (skip : trace, Right $ Halted (steps + infCountToInt c) newTape (disp + newDisp))
+    Stopped c newTape skip newDisp _rs -> 
+      (skip : trace, Right $ Halted (steps + infCountToInt c) newTape (disp + fromJust newDisp))
     Stepped c newP newTape skip newDisp rs -> case c of
       Infinity -> (skip : trace, Right $ ContinueForever (SkippedToInfinity steps skip))
       c -> let newHist = hist & reverseTapeHist %~ ((p, tape) :)
@@ -421,7 +428,7 @@ simulateOneMachine limit t = \case
                newDispHist = dispHist & reverseDispHist %~ (disp :)
         in
         simulateOneMachine limit t $ SimState newP newTape book (steps + infCountToInt c) (skip : trace)
-           newHist newHistSet counter (disp + newDisp) newDispHist (addToRRSH rs rsHist)
+           newHist newHistSet counter (disp + fromJust newDisp) newDispHist (addToRRSH rs rsHist)
 
 simulateOneTotalMachine :: Int -> Turing -> ([Skip Count Bit], SimResult Bit (ExpTape Bit InfCount))
 simulateOneTotalMachine limit machine = (^?! _Right) <$> simulateOneMachine limit machine (initSkipState machine)

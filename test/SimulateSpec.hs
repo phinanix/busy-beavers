@@ -48,6 +48,8 @@ simpleResult = ExpTape
 
 
 exampleSkip :: Skip Count Bit
+-- (T, 1) T (F, 2) (T, 1)
+-- (T, 3) F (F, 1)
 exampleSkip = Skip
   (Config (Phase 0) [(Bit True, One)]
     (Bit True)
@@ -107,27 +109,21 @@ spec = do
     it "matches the right half of the skip" $
       getEquations (matchTape (simpleSkip^.start.rs) (right simpleTape))
       `shouldBe` Just (TapeLeft $ fromList (right simpleTape))
-    -- it "matches the point of the simple skip" $ do
-    --   getEquations (matchPoints (simpleSkip^.start.c_point) (point simpleTape))
-    --     `shouldBe` Just (Lremains (False, inum 8))
     it "applies a simple skip" $
       applySkip simpleSkip (Phase 0, simpleTape)
       `shouldBe` Just (Skipped 
           (NotInfinity $ num 5) 
           (Phase 1) 
           simpleResult 
-          (-3) 
+          (Just $ -8) 
           (Just $ ReadShift (-11) 0 (-8)))
-    -- it "matches the point of the more complex skip" $ do
-    --   getEquations (matchPoints (exampleSkip^.start.c_point) (point exampleTape))
-    --     `shouldBe` Just (Lremains (True, inum 6))
     it "applies a more complex skip" $
       applySkip exampleSkip (Phase 0, exampleTape)
       `shouldBe` Just (Skipped 
           (NotInfinity $ num 10) 
           (Phase 1) 
           exampleResult 
-          (-8)
+          (Just 2)
           (Just $ ReadShift (-1) 3 2))
 
   describe "simulateOneMachine" $ do
