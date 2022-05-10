@@ -18,7 +18,7 @@ import Skip
 import Count
 import Results
 import Glue
-import Simulate 
+import Simulate
 import SimulateSkip ( TwoBit(..) )
 import Tape
 {-
@@ -63,40 +63,41 @@ data ConditionEnd = UnknownEdge Edge
                   | FallRight Phase [Bit]
                   | ReachedLeftMost Phase Bit [Bit]
                   | Cycle Natural Natural
-                  | Halts (Tape Bit) 
+                  | Halts (Tape Bit)
 
   deriving (Eq, Ord, Show, Generic)
 instance NFData ConditionEnd
 simulateUntilCondition :: Turing -> (Phase, Tape Bit) -> (Natural, ConditionEnd)
-simulateUntilCondition t (ph, startTape) = loop startState 0 Empty where 
-  startState = TMState ph startTape 
+simulateUntilCondition t (ph, startTape) = loop startState 0 Empty where
+  startState = TMState ph startTape
   loop :: TMState (Tape Bit) -> Natural -> Map (TMState (Tape Bit)) Natural
     -> (Natural, ConditionEnd)
-  loop curState curStep pastStateMap = case pastStateMap ^. at curState of 
+  loop curState curStep pastStateMap = case pastStateMap ^. at curState of
     Just m -> (m, Cycle curStep m)
-    Nothing -> let 
-      newMap = pastStateMap & at curState ?~ curStep 
+    Nothing -> let
+      newMap = pastStateMap & at curState ?~ curStep
       newStep = curStep + 1
     --note that simStep right now does the wrong thing because at the end of 
     --the tape it assumes that there is an infinite bank of trues there but we 
     --want to fall off the end of the tape
-     in case simStep t curState of 
+     in case simStep t curState of
        Unknown e -> (curStep, UnknownEdge e)
        Stopped _ finalTape -> (newStep, Halts finalTape)
-       Stepped _ newState@(TMState newPh newTape) -> case newTape of 
+       Stepped _ newState@(TMState newPh newTape) -> case newTape of
          Tape [] p rs -> (newStep, ReachedLeftMost newPh p rs)
-         _ -> loop newState newStep newMap 
+         _ -> loop newState newStep newMap
 
 makeTwoBitSkip :: Turing -> (Phase, Tape Bit) -> Skip Natural TwoBit
-makeTwoBitSkip t (startPh, startT) = Skip skipStart skipEnd hops (error "halt undefined")
+makeTwoBitSkip t (startPh, startT) = Skip skipStart skipEnd hops
   where
   skipStart = etToConfig startPh $ etBitToTwoBit $ unFlattenET startT
   (hops, simEnd) = simulateUntilCondition t (startPh, startT)
   skipEnd = case simEnd of
     UnknownEdge e -> error "unknownSkip"
-    FallRight ph ls -> EndSide ph R $ rle $ pairBitList ls 
-    ReachedLeftMost ph p (r : rs) -> EndMiddle $ etToConfig ph $ ExpTape [] (TwoBit p r) $ rle $ pairBitList rs 
-    ReachedLeftMost _ _ _ -> error "unreachable maketwobitskip"
+    FallRight ph ls -> SkipStepped ph $ Side R $ rle $ pairBitList ls
+    ReachedLeftMost ph p (r : rs) 
+      -> SkipStepped ph $ Middle $ ExpTape [] (TwoBit p r) $ rle $ pairBitList rs
+    ReachedLeftMost {} -> error "unreachable maketwobitskip"
     Cycle n m -> error "cycleSkip"
     Halts finalTape -> error "haltSkip"
 
@@ -116,7 +117,7 @@ rle = \case
 flattenET :: ExpTape s Natural -> Tape s
 flattenET (ExpTape ls p rs) = Tape (unRLE ls) p (unRLE rs)
 
-unFlattenET :: (Eq s) => Tape s -> ExpTape s Natural 
+unFlattenET :: (Eq s) => Tape s -> ExpTape s Natural
 unFlattenET (Tape ls p rs) = ExpTape (rle ls) p (rle rs)
 
 pairBitList :: [Bit] -> [TwoBit]

@@ -12,6 +12,7 @@ import Turing
 import Util
 import Count
 import Skip
+import ExpTape
 
 {-
 The goal of this file is to define functions which convert between in memory 
@@ -149,15 +150,14 @@ notationBitCount (b, c) = "(" <> dispBit b <> ", " <> notationCount c <> ") "
 notationPhase :: Phase -> Text
 notationPhase (Phase i) = "p" <> show i <> " "
 
-notationConfig :: Config Count Bit -> Text
-notationConfig (Config ph ls p rs) = notationPhase ph
-  <> T.concat (notationBitCount <$> reverse ls)
+notationTape :: ExpTape Bit Count -> Text
+notationTape (ExpTape ls p rs)
+  =  T.concat (notationBitCount <$> reverse ls)
   <> ">" <> dispBit p <> "< " 
   <> T.concat (notationBitCount <$> rs)
 
-notationSkipEnd :: SkipEnd Count Bit -> Text 
+notationSkipEnd :: TapePush Count Bit -> Text 
 notationSkipEnd = \case 
-  EndMiddle con -> notationConfig con 
-  EndSide ph L xs -> notationPhase ph <> "< " <> T.concat (notationBitCount <$> xs) 
-  EndSide ph R xs -> notationPhase ph <> 
-    T.concat (notationBitCount <$> reverse xs) <> " >"
+  Middle tape -> notationTape tape 
+  Side L xs -> "< " <> T.concat (notationBitCount <$> xs) 
+  Side R xs -> T.concat (notationBitCount <$> reverse xs) <> " >"

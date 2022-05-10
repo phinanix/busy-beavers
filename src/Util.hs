@@ -102,3 +102,5 @@ myRecLength counter = \case
   [] -> undefined  --trace (show counter) counter 
   (x : xs) -> undefined --trace (show counter) $ myRecLength (counter + 1) xs 
 
+prettyText :: Text -> Doc ann
+prettyText = pretty

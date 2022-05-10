@@ -64,28 +64,37 @@ remainingLonger xs ys = if length xs < length ys
   then Right (drop (length xs) ys) 
   else Left (drop (length ys) xs)
 
---takes two lists, fails if they are incompatible, else returns a Left if some 
---of the first list was leftover, or a Right if 
---some of the second list was leftover 
-glueTapeHalves :: forall s. (Eq s) => [(s, Count)] -> [(s, Count)] -> Equations (Leftover s)
-glueTapeHalves xs ys = matched >> pure answer where
-  zipped = zip xs ys --discards longer 
-  matchOne :: ((s, Count), (s, Count)) -> Equations (s, Count)
-  matchOne ((s, c), (t, d)) = do 
-    -- TODO :: this works / makes sense as long as we never spawn any new variables, otherwise
-    --  this really needs to be returning the new list as a result, which is built out of the
-    --  thing unified from c and d 
-    newCount <- glueCounts c d 
-    if s == t then pure (s, newCount) else fail "matched tapes with different bits"
-  matched :: Equations [(s, Count)]
-  matched = traverse matchOne zipped 
-  --if the start one is longer, it means we need to add to the *end*
-  --if the end one is longer, we need to add to the start
-  answer :: Leftover s
-  answer = case remainingLonger xs ys of 
-    Left xs -> End xs 
-    Right ys -> Start ys
+updateCount :: Map BoundVar Count -> Count -> Count 
+updateCount m (Count n as xs) = Count n as Empty 
+  <> foldMap (updateVar m) (assocs xs) where 
+    updateVar :: Map BoundVar Count -> (BoundVar, Sum Natural) -> Count 
+    updateVar m (x, Sum n) = n `nTimes` getVar m x 
+    getVar :: Map BoundVar Count -> BoundVar -> Count 
+    getVar m x = case m^.at x of 
+      Just c -> c 
+      Nothing -> boundVarCount x 1
 
+updateCountToInf :: Map BoundVar InfCount -> Count -> InfCount
+updateCountToInf m (Count n as (MonoidalMap xs))
+  = NotInfinity (Count n as Empty) <> foldMap (updateVar m) (M.assocs xs) where
+  updateVar :: Map BoundVar InfCount -> (BoundVar, Sum Natural) -> InfCount
+  updateVar m (x, Sum n) = n `nTimes` getVar m x
+  getVar :: Map BoundVar InfCount -> BoundVar -> InfCount
+  getVar m x = case m^.at x of
+    Just c -> c
+    Nothing -> error $ show m <> "\n" <> show x
+      <> " a bound var wasn't mapped"
+
+updateConfig :: Map BoundVar Count -> Config Count s -> Config Count s 
+updateConfig map (Config p ls point rs) = Config p (updateCount map <$$> ls) point (updateCount map <$$> rs) 
+
+updateTape :: Map BoundVar Count -> ExpTape s Count -> ExpTape s Count 
+updateTape map (ExpTape ls p rs) = ExpTape(updateCount map <$$> ls) p (updateCount map <$$> rs) 
+
+updateTapePush :: Map BoundVar Count -> TapePush Count s -> TapePush Count s 
+updateTapePush map = \case 
+  Side d xs -> Side d $ updateCount map <$$> xs
+  Middle tape -> Middle $ updateTape map tape 
 --things you add to the left and right of a Config or SkipEnd
 data Tails s = Tails [(s, Count)] [(s, Count)] deriving (Eq, Ord, Show)
 
@@ -109,6 +118,34 @@ leftoverTails (ls, rs)
 applyTailsConfig :: (Eq s) => Tails s -> Config Count s -> Config Count s
 applyTailsConfig (Tails lTail rTail) (Config p ls point rs) 
   = Config p (ls `etApp` lTail) point (rs `etApp` rTail)
+
+--I think this concept is somewhat confused, and ultimately it is probably not worth 
+--maintaining this code as is. unmaintained it will definitely rot, but maybe we'll 
+--come back to it at some point. (chainArbitrary is doing a similar thing, more correctly
+-- / sensically I think). 
+{-
+--takes two lists, fails if they are incompatible, else returns a Left if some 
+--of the first list was leftover, or a Right if 
+--some of the second list was leftover 
+glueTapeHalves :: forall s. (Eq s) => [(s, Count)] -> [(s, Count)] -> Equations (Leftover s)
+glueTapeHalves xs ys = matched >> pure answer where
+  zipped = zip xs ys --discards longer 
+  matchOne :: ((s, Count), (s, Count)) -> Equations (s, Count)
+  matchOne ((s, c), (t, d)) = do 
+    -- TODO :: this works / makes sense as long as we never spawn any new variables, otherwise
+    --  this really needs to be returning the new list as a result, which is built out of the
+    --  thing unified from c and d 
+    newCount <- glueCounts c d 
+    if s == t then pure (s, newCount) else fail "matched tapes with different bits"
+  matched :: Equations [(s, Count)]
+  matched = traverse matchOne zipped 
+  --if the start one is longer, it means we need to add to the *end*
+  --if the end one is longer, we need to add to the start
+  answer :: Leftover s
+  answer = case remainingLonger xs ys of 
+    Left xs -> End xs 
+    Right ys -> Start ys
+
 
 applyTailsSkipEnd :: (Eq s) => Tails s -> SkipEnd Count s -> SkipEnd Count s 
 applyTailsSkipEnd tails (EndMiddle c) = EndMiddle (applyTailsConfig tails c)
@@ -138,34 +175,6 @@ glueEndToBeginning (EndSide p R ls) (Config q ls' s' rs') = do
   if p == q then pure () else fail "phases were different" 
   (,) <$> glueTapeHalves ls ls' <*> pure (Start ((s', finiteCount 1) : rs'))
 
-updateCount :: Map BoundVar Count -> Count -> Count 
-updateCount m (Count n as xs) = Count n as Empty 
-  <> foldMap (updateVar m) (assocs xs) where 
-    updateVar :: Map BoundVar Count -> (BoundVar, Sum Natural) -> Count 
-    updateVar m (x, Sum n) = n `nTimes` getVar m x 
-    getVar :: Map BoundVar Count -> BoundVar -> Count 
-    getVar m x = case m^.at x of 
-      Just c -> c 
-      Nothing -> boundVarCount x 1
-
-updateCountToInf :: Map BoundVar InfCount -> Count -> InfCount
-updateCountToInf m (Count n as (MonoidalMap xs))
-  = NotInfinity (Count n as Empty) <> foldMap (updateVar m) (M.assocs xs) where
-  updateVar :: Map BoundVar InfCount -> (BoundVar, Sum Natural) -> InfCount
-  updateVar m (x, Sum n) = n `nTimes` getVar m x
-  getVar :: Map BoundVar InfCount -> BoundVar -> InfCount
-  getVar m x = case m^.at x of
-    Just c -> c
-    Nothing -> error $ show m <> "\n" <> show x
-      <> " a bound var wasn't mapped"
-
-updateConfig :: Map BoundVar Count -> Config Count s -> Config Count s 
-updateConfig map (Config p ls point rs) = Config p (updateCount map <$$> ls) point (updateCount map <$$> rs) 
-
-updateSkipEnd :: Map BoundVar Count -> SkipEnd Count s -> SkipEnd Count s 
-updateSkipEnd map = \case 
-  EndSide p d xs -> EndSide p d $ updateCount map <$$> xs --the problem is update count turns a count into an infcount but that doesn't work here
-  EndMiddle config -> EndMiddle $ updateConfig map config 
 
 -- updateDisplacement :: Map BoundVar Count -> Displacement Count -> Displacement Count
 -- updateDisplacement map = \case 
@@ -174,11 +183,10 @@ updateSkipEnd map = \case
 --   BothDirs c c' -> BothDirs (updateCount map c) (updateCount map c')
 
 updateSkip :: Map BoundVar Count -> Skip Count s -> Skip Count s 
-updateSkip map (Skip config end hops halts) = Skip 
+updateSkip map (Skip config end hops) = Skip 
   (updateConfig map config) 
   (updateSkipEnd map end) 
-  (updateCount map hops) 
-  halts
+  (updateCount map hops)
 
 -- simplifyInfDisplacement :: Displacement InfCount -> Displacement InfCount 
 -- simplifyInfDisplacement = \case 
@@ -241,7 +249,7 @@ glueDisplacements (BothDirs lC rC) (BothDirs lC' rC') = BothDirs (lC <> lC') (rC
 --results from applying one then the next. Tries to keep universals as general as
 --possible but this is not guaranteed to find the most general universal quantifiers
 glueSkips :: forall s. (Eq s, Show s) => Skip Count s -> Skip Count s -> Either Text (Skip Count s)
-glueSkips (Skip startConfig middleSkipEnd c b) (Skip middleConfig endSkipEnd c' b') 
+glueSkips (Skip startConfig middleSkipEnd c) (Skip middleConfig endSkipEnd c') 
  = uncurry updateSkip <$> munge (runEquations skipWithEquations) where
   munge :: Either Text (Map BoundVar InfCount, a) -> Either Text (Map BoundVar Count, a)
   munge = second $ first $ fmap unsafeDeInf
@@ -250,15 +258,13 @@ glueSkips (Skip startConfig middleSkipEnd c b) (Skip middleConfig endSkipEnd c' 
     NotInfinity c -> c 
     Infinity -> error "unsafeDeInf" 
   skipWithEquations :: Equations (Skip Count s)
-  skipWithEquations = do 
-    if not b then pure () else fail "first skip halted"
+  skipWithEquations = do
     leftovers <- glueEndToBeginning middleSkipEnd middleConfig 
     let (startTails, endTails) = leftoverTails leftovers
     --trace ("start tails were\n" <> show startTails <> "\n" <> "end tails were\n" <> show endTails) $
     pure $ Skip (applyTailsConfig startTails startConfig) 
                 (applyTailsSkipEnd endTails endSkipEnd) 
-                (c <> c') 
-                b'
+                (c <> c')
 
 -- TODO I think this is like wrong or broken somehow >>  
 skipGoesForever :: forall s. (Eq s, Show s) => Skip Count s -> Bool 
@@ -266,3 +272,4 @@ skipGoesForever skip = has _Right (glueSkips skip skip)
 
 glueMany :: (Eq s, Show s) => NonEmpty (Skip Count s) -> Either Text (Skip Count s)
 glueMany (h :| tail) = foldlM glueSkips h tail 
+-}

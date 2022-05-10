@@ -20,7 +20,7 @@ import HaltProof
 import LinRecurrence
 
 attemptInductionGuess :: Turing -> SimState Bit
-  -> Either (SimResult Bit (ExpTape Bit InfCount)) (SimState Bit)
+  -> Either (SimResult InfCount Bit) (SimState Bit)
 attemptInductionGuess machine state = trace "attempted" $
   case guessInductionHypothesis hist dispHist of
     Left msg -> traceShow msg $ Right state
@@ -111,7 +111,7 @@ proveLRLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
 canProveLR :: Int -> Turing -> Bool 
 canProveLR limit m = case proveLRLoop limit m of 
   (ContinueForever (LinRecur _ _), _ne) -> True 
-  (ContinueForever (SkippedToInfinity _ _), _ne) -> True 
+  (ContinueForever (SkippedToInfinity _), _ne) -> True 
   _ -> False 
 
 proveCycleLoop :: Int -> Turing -> OneLoopRes Bit
@@ -121,7 +121,7 @@ proveCycleLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
 canProveCycle :: Int -> Turing -> Bool 
 canProveCycle limit m = case proveCycleLoop limit m of 
   (ContinueForever (Cycle _ _), _ne) -> True 
-  (ContinueForever (SkippedToInfinity _ _), _ne) -> True 
+  (ContinueForever (SkippedToInfinity _), _ne) -> True 
   _ -> False 
 
 proveEOTLoop :: Int -> Turing -> OneLoopRes Bit
@@ -132,7 +132,7 @@ proveEOTLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
 canProveEOT :: Int -> Turing -> Bool 
 canProveEOT limit m = case proveEOTLoop limit m of 
   (ContinueForever (OffToInfinityN _ _), _) -> True 
-  (ContinueForever (SkippedToInfinity _ _), _ne) -> True 
+  (ContinueForever (SkippedToInfinity _), _ne) -> True 
   _ -> False 
 
 proveOEOTLoop :: Int -> Turing -> OneLoopRes Bit
@@ -169,7 +169,8 @@ indProveLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
   runAtCount 50 proveByInd
   ]
 
-enumerateMachinesLoop :: Int -> Turing -> [(Turing, SimResult Bit (ExpTape Bit InfCount))]
+
+enumerateMachinesLoop :: Int -> Turing -> MultiLoopRes Bit
 enumerateMachinesLoop limit = simulateManyMachinesOuterLoop (const Nothing) $
   simulateStepPartial limit :| []
 
@@ -178,7 +179,7 @@ checkLRAssertManyMachines limit startMachine = catMaybes texts where
   machines = fst <$> enumerateMachinesLoop limit startMachine
   texts = checkLRAssertOneMachine limit <$> machines 
 
-indProveLoopMany :: Int -> Turing -> [(Turing, SimResult Bit (ExpTape Bit InfCount))]
+indProveLoopMany :: Int -> Turing -> MultiLoopRes Bit
 indProveLoopMany limit = simulateManyMachinesOuterLoop backwardSearch $ 
   simulateStepPartial limit :| (liftOneToMulti <$> [checkSeenBefore, liftModifyState recordHist, 
   liftModifyState recordDispHist,
@@ -187,7 +188,7 @@ indProveLoopMany limit = simulateManyMachinesOuterLoop backwardSearch $
   runAtCounts [40, 140] proveByInd
   ])
 
-bestCurrentProveLoop :: Int -> Turing -> [(Turing, SimResult Bit (ExpTape Bit InfCount))] 
+bestCurrentProveLoop :: Int -> Turing -> MultiLoopRes Bit
 bestCurrentProveLoop limit = simulateManyMachinesOuterLoop backwardSearch $ 
   simulateStepPartial limit :| (liftOneToMulti <$> [checkSeenBefore, liftModifyState recordHist, 
   liftModifyState recordDispHist,

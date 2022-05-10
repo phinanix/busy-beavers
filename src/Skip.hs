@@ -11,6 +11,22 @@ import Util
 import ExpTape
 import Data.Bitraversable (Bitraversable)
 import Data.Bifoldable (Bifoldable)
+import HaltProof
+
+--when the machine halts, there are two ends of the tape plus a thing we push in the middle
+data FinalTape c s = FinalTape ([(s, c)], [(s, c)]) (TapePush c Bit)
+  deriving (Eq, Ord, Show, Generic)
+instance (NFData s, NFData c) => NFData (FinalTape c s) 
+
+--TODO write a pretty version
+dispFinalTape :: (Show s, Show c) => FinalTape c s -> Text 
+dispFinalTape = show 
+
+instance (Pretty s, Pretty c, Show s, Show c) => Pretty (FinalTape c s) where 
+  pretty = pretty . dispFinalTape
+
+instance Functor (FinalTape c) where 
+  fmap f (FinalTape (ls,rs) tp) = FinalTape (first f <$> ls, first f <$> rs) tp 
 
 --a configuration of the machine's state - it is in a given phase, with the point of the tape and the stuff to the 
 --left and right looking as specified
@@ -31,26 +47,52 @@ instance Bifoldable Config where
 instance Bitraversable Config where
   bitraverse f g (Config ph ls p rs) = Config ph <$> (bitraverse g f <%> ls) <*> g p <*> (bitraverse g f <%> rs)
 
+
+data TapePush c s = Side Dir [(s, c)] 
+                  | Middle (ExpTape s c) 
+                  deriving (Eq, Ord, Show, Generic) 
+instance (NFData c, NFData s) => (NFData (TapePush c s))
+
+instance Functor (TapePush c) where 
+  fmap f = \case 
+    Side dir xs -> Side dir $ first f <$> xs
+    Middle et -> Middle $ first f et
+
+instance Bifunctor TapePush where 
+  bimap = bimapDefault 
+instance Bifoldable TapePush where 
+  bifoldMap = bifoldMapDefault
+
+instance Bitraversable TapePush where 
+  bitraverse f g = \case
+    Side d xs -> Side d <$> bitraverse g f <%> xs
+    Middle tape -> Middle <$> bitraverse g f tape
+
 --at the end of a skip, you might've fallen off the L of the given pile of bits, or you might be in the middle of some 
 --known bits, which is a config
-data SkipEnd c s = EndSide Phase Dir [(s, c)] | EndMiddle (Config c s)
+data SkipEnd c s = SkipStepped Phase (TapePush c s)
+                --  EndSide Phase Dir [(s, c)] 
+                -- | EndMiddle (Config c s)
+                 | SkipHalt (TapePush c Bit) --the machine halts and puts this out onto the tape
+                 | SkipUnknownEdge Edge 
+                 | SkipNonhaltProven (HaltProof s)  
   deriving (Eq, Ord, Show, Generic, Functor)
 instance (NFData s, NFData c) => NFData (SkipEnd c s)
 
 $(makePrisms ''SkipEnd)
 
 instance Bifunctor SkipEnd where
-  bimap f g = \case
-    EndSide p d xs -> EndSide p d $ bimap g f <$> xs
-    EndMiddle c -> EndMiddle $ bimap f g c
+  bimap = bimapDefault
 
 instance Bifoldable SkipEnd where
   bifoldMap = bifoldMapDefault
 
 instance Bitraversable SkipEnd where
   bitraverse f g = \case
-    EndSide p d xs-> EndSide p d <$> bitraverse g f <%> xs
-    EndMiddle c -> EndMiddle <$> bitraverse f g c
+    SkipStepped p tp -> SkipStepped p <$> bitraverse f g tp 
+    SkipHalt tp -> SkipHalt <$> bitraverse f pure tp 
+    SkipUnknownEdge e -> pure $ SkipUnknownEdge e
+    SkipNonhaltProven hp -> SkipNonhaltProven <$> (g <%> hp)
 
 --Zero and OneDir as they say, BothDirs goes the first count steps left and the second count steps right 
 --here's a problem with displacement. it lets you track where the machine ended up, but not which symbols 
@@ -78,20 +120,19 @@ data Skip c s = Skip
   { _start :: Config c s
   , _end :: SkipEnd c s
   , _hops :: c --number of atomic TM steps
-  , _halts :: Bool --true if the skip results in the machine halting
   -- , _displacement :: Displacement c
   } deriving (Eq, Ord, Show, Generic, Functor)
 instance (NFData s, NFData c) => NFData (Skip c s)
 
 instance Bifunctor Skip where
-  bimap f g (Skip c se hop halt) = Skip (bimap f g c) (bimap f g se) (f hop) halt
+  bimap f g (Skip c se hop) = Skip (bimap f g c) (bimap f g se) (f hop)
 
 instance Bifoldable Skip where
   bifoldMap = bifoldMapDefault
 
 instance Bitraversable Skip where
-  bitraverse f g (Skip c se hop halt)
-    = Skip <$> bitraverse f g c <*> bitraverse f g se <*> f hop <*> pure halt 
+  bitraverse f g (Skip c se hop)
+    = Skip <$> bitraverse f g c <*> bitraverse f g se <*> f hop
 
 data ReadShift = ReadShift {_len_l :: Steps, _len_r :: Steps, _shift_dist :: Steps}
   deriving (Eq, Ord, Show, Generic)
@@ -111,33 +152,37 @@ $(makeLenses ''Config)
 $(makeLenses ''Skip)
 $(makeLenses ''ReadShift)
 
-prettyText :: Text -> Doc ann
-prettyText = pretty
-
 instance Pretty s => Pretty (Config Count s) where
   pretty (Config p ls point rs) = pretty $ "phase: " <> dispPhase p <> "  "
     <> mconcat (dispETPair <$> reverse ls)
     <> dispPoint point
     <> mconcat (dispETPair <$> rs)
 
-instance Pretty s => Pretty (SkipEnd Count s) where
-  pretty (EndSide p L ls) =  pretty $ "phase: " <> dispPhase p <> "  <|" <> mconcat (dispETPair <$> ls)
-  pretty (EndSide p R ls) =  pretty $ "phase: " <> dispPhase p <> " " <> mconcat (dispETPair <$> ls) <> "|>"
-  pretty (EndMiddle c) = pretty c
+instance Pretty s => Pretty (TapePush Count s) where
+  pretty (Side L ls) =  pretty $ "  <|" <> mconcat (dispETPair <$> ls)
+  pretty (Side R ls) =  pretty $ " " <> mconcat (dispETPair <$> ls) <> "|>"
+  pretty (Middle c) = pretty c
+
+instance Pretty s => Pretty (SkipEnd Count s) where 
+  pretty = \case 
+    SkipStepped ph tp -> pretty $ "phase: " <> dispPhase ph <> showP tp 
+    SkipHalt tp -> prettyText $ "halted, pushing: " <> showP tp 
+    SkipUnknownEdge e -> prettyText $ "skip reaches unknown edge: " <> showP e
+    SkipNonhaltProven hp -> prettyText $ "skip reaches known nonhalting: " <> showP hp 
 
 instance Pretty s => Pretty (Skip Count s) where
-  pretty (Skip s e c halts) = prettyText "in " <> pretty (dispCount c) <> prettyText " steps we turn\n"
-    <> pretty s <> prettyText "\ninto: \n" <> pretty e <> prettyText (if halts then "\n and halt" else "")
+  pretty (Skip s e c) = prettyText "in " <> pretty (dispCount c) <> prettyText " steps we turn\n"
+    <> pretty s <> prettyText "\ninto: \n" <> pretty e
     <> prettyText "\n displacement of: "
 
 instance Pretty ReadShift where 
   pretty (ReadShift l r s) = prettyText $ "RS l " <> show l 
     <> " r " <> show r <> " s " <> show s 
 
-getSkipEndPhase :: SkipEnd c s -> Phase
-getSkipEndPhase (EndSide p _ _) = p
-getSkipEndPhase (EndMiddle (Config p _ _ _)) = p
-
+getSkipEndPhase :: SkipEnd c s -> Maybe Phase
+getSkipEndPhase = \case
+  SkipStepped p _ -> Just p
+  _ -> Nothing 
 
 -- --TODO: this code is not pretty but it works
 configToET :: Config c s -> (Phase, ExpTape s c)
@@ -264,13 +309,24 @@ matchConfigTape (Config _p lsC pointC rsC) (ExpTape lsT pointT rsT)
 
 matchSkipTape :: (Eq s) => Skip Count s -> ExpTape s InfCount
   -> Equations ([(s, InfCount)], [(s, InfCount)])
-matchSkipTape (Skip config end _hops _halts) tape = do
+matchSkipTape (Skip config end _hops) tape = do
   out@(lRem, rRem) <- matchConfigTape config tape
-  case end of
-    EndMiddle _ -> pure out
-    EndSide _ph L _xs -> case lRem of
-      [] -> nothingES "matched and fell off left side, but left side was end of tape"
-      _x1 : _x2 -> pure out
-    EndSide _ph R _xs -> case rRem of
-      [] -> nothingES "matched and fell off right side, but right side was end of tape"
-      _x1 : _x2 -> pure out
+  let checkTP :: forall g. (TapePush Count g -> Equations ()) = \case 
+        (Side L _xs) -> case lRem of
+          [] -> nothingES "matched and fell off left side, but left side was end of tape"
+          _x1 : _x2 -> pure ()
+        (Side R _xs) -> case rRem of
+          [] -> nothingES "matched and fell off right side, but right side was end of tape"
+          _x1 : _x2 -> pure ()
+        _ -> pure ()
+
+  case end of     
+    SkipStepped _ph tp -> do 
+      checkTP tp 
+      pure () 
+    SkipHalt tp -> do 
+      checkTP tp 
+      pure ()
+    SkipUnknownEdge _e -> pure ()
+    SkipNonhaltProven _hp -> pure ()
+  pure out 

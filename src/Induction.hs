@@ -100,21 +100,21 @@ proveStrong loopLim machine book goal indVar = swapEither <$> loop 0 book Nothin
                 loop (idx + 1) newBook (Just stuckConfig)
 
 
-isSameInAsOut :: forall c s. (Monoid c, Eq c) => Skip c s -> Bool 
-isSameInAsOut (Skip start end _ _) = addUp start == addUp end
-  where 
-    addUp :: (Bifoldable b) => b c s -> c 
+isSameInAsOut :: forall c s. (Monoid c, Eq c) => Skip c s -> Bool
+isSameInAsOut (Skip start end _) = addUp start == addUp end
+  where
+    addUp :: (Bifoldable b) => b c s -> c
     addUp = bifoldMap id (const mempty)
-  
+
 {-
 A function which is sort of like `proveInductively`, but it doesn't actually do induction. It just brute 
 simulates forward and sees if that works. This is good to be able to prove things like the 1^n christmas 
 tree that just goes back and forth and we already know it skips blocks of 1s so we can just simulate for 
 a finite number of steps.
 -}
-proveSimply :: Int -> Turing -> SkipBook Bit -> Skip Count Bit 
-  -> Either (Text, Maybe (Config Count Bit)) (SkipOrigin Bit) 
-proveSimply limit t book goal = undefined 
+proveSimply :: Int -> Turing -> SkipBook Bit -> Skip Count Bit
+  -> Either (Text, Maybe (Config Count Bit)) (SkipOrigin Bit)
+proveSimply limit t book goal = undefined
 
 --goal: make a thing that takes a skip that might apply to a certain machine, 
 --attempts to simulate forward to prove that skip using induction
@@ -123,11 +123,11 @@ proveSimply limit t book goal = undefined
 -- the BoundVar is the variable on which we are going to do induction
 --returns Left with an error message, and the config we got stuck on 
 --or Right with success
-proveInductively :: forall s. (TapeSymbol s) 
-  => Int -> Turing -> SkipBook s 
+proveInductively :: forall s. (TapeSymbol s)
+  => Int -> Turing -> SkipBook s
   -> Skip Count s -> BoundVar
   -> Either (Text, Maybe (Config Count s)) (SkipOrigin s)
-proveInductively limit t book goal indVar = let 
+proveInductively limit t book goal indVar = let
   ans =  -- <> "using book\n" <> show (pretty book)) $
     --force $
     case baseCase of
@@ -138,7 +138,7 @@ proveInductively limit t book goal indVar = let
   msg = ("trying to prove:\n" <> show (pretty goal)) <> "\ngot res" <> show ans
     in --force $
       -- trace msg $
-      assert (isSameInAsOut goal) ans 
+      assert (isSameInAsOut goal) ans
     where
     origin :: SkipOrigin s
     origin = Induction book limit
@@ -171,15 +171,15 @@ proveInductively limit t book goal indVar = let
     newSymbolVar = SymbolVar 0
 
 --first int is linear step limit, second int is tree step limit
-proveSimLinearAndTree :: TapeSymbol s => Int -> Int -> Turing -> SkipBook s 
+proveSimLinearAndTree :: TapeSymbol s => Int -> Int -> Turing -> SkipBook s
   -> Skip Count s -> Either (Text, Maybe (Config Count s)) Count
 -- simulateViaDFS :: Int -> Int -> SkipBook Bit -> Skip Count Bit -> Either Text Natural 
-proveSimLinearAndTree linStep treeStep machine book skip 
+proveSimLinearAndTree linStep treeStep machine book skip
   = --force $ 
-  case simulateViaDFS linStep treeStep book skip of 
+  case simulateViaDFS linStep treeStep book skip of
     --TODO: this blurs the line of what the returned count means, between big steps and small steps
-    Right nat -> Right $ FinCount nat 
-    Left text -> case proveBySimulating linStep machine book skip of 
+    Right nat -> Right $ FinCount nat
+    Left text -> case proveBySimulating linStep machine book skip of
       --works if you comment out this error and return right, but HOW COULD THAT BE TRUE you should never hit this error
       --the reason for this is simulateViaDFS should guess the same as proveBySimulating as it's first deep path, and should only recurse onto 
       --other paths if that doesn't work
@@ -187,16 +187,16 @@ proveSimLinearAndTree linStep treeStep machine book skip
       --oh dear, maybe part of the issue is whether "simulateViaDFS" and "proveBySimulating" are using "big steps" or "little steps"? 
       --because the error occurs with count=467 which seems to be bigger than the callsite (guessAndProveWhatHappensNext), 
       --which calls with a limit of 200 afaict 
-      Right count -> error $ "what? count: " <> showP count <> " linstep:" <> showP linStep <> " treestep: " <> showP treeStep 
+      Right count -> error $ "what? count: " <> showP count <> " linstep:" <> showP linStep <> " treestep: " <> showP treeStep
                             <> "\nmachine was\n" <> showP machine <> "\nwe were proving:\n" <> showP skip
-                            <> "\ndfs failed because:" <> text 
-                            <> "\nbook was:\n" <> showP book 
-      res@(Left _) -> res 
+                            <> "\ndfs failed because:" <> text
+                            <> "\nbook was:\n" <> showP book
+      res@(Left _) -> res
 
 -- given a skip, replaces all occurences of a particular BoundVar with a particular Count
 replaceVarInSkip :: Skip Count s -> BoundVar -> Count -> Skip Count s
-replaceVarInSkip (Skip sConfig eSE hopCount halts) varIn countOut =
-    Skip newConfig newSE (replaceVarInCount hopCount) halts where
+replaceVarInSkip (Skip sConfig eSE hopCount) varIn countOut =
+    Skip newConfig newSE (replaceVarInCount hopCount) where
     newConfig = replaceVarInConfig sConfig
     newSE = replaceVarInSE eSE
     replaceVarInConfig (Config p ls c_point rs)
@@ -204,13 +204,21 @@ replaceVarInSkip (Skip sConfig eSE hopCount halts) varIn countOut =
         (replaceVarInList ls)
         c_point
         (replaceVarInList rs)
+    replaceVarInTape (ExpTape ls p rs)
+        = ExpTape
+        (replaceVarInList ls)
+        p
+        (replaceVarInList rs)
+    replaceVarInTP = \case
+        Middle tape -> Middle $ replaceVarInTape tape
+        Side d xs -> Side d $ replaceVarInList xs
     replaceVarInSE = \case
-        EndMiddle config -> EndMiddle $ replaceVarInConfig config
-        EndSide p d xs -> EndSide p d $ replaceVarInList xs
-
+      SkipStepped p tp -> SkipStepped p $ replaceVarInTP tp
+      SkipHalt tp -> SkipHalt $ replaceVarInTP tp
+      other -> other
     replaceVarInList :: [(s, Count)] -> [(s, Count)]
     replaceVarInList = fmap $ fmap replaceVarInCount
-    replaceVarInCount = replaceBoundVarInCount varIn countOut 
+    replaceVarInCount = replaceBoundVarInCount varIn countOut
 
 replaceBoundVarInCount :: BoundVar -> Count -> Count -> Count
 replaceBoundVarInCount varIn countOut (Count num symbolMap boundMap) =
@@ -224,46 +232,50 @@ replaceBoundVarInCount varIn countOut (Count num symbolMap boundMap) =
 -- the text tells you why you failed, and you might have failed via getting "stuck" on something, in which case we return that
 -- this linearly simulates forward, which sometimes gets you into a hole when you prove something that skips ahead, because 
 -- you can end up skipping past the thing you want. to solve this problem, I wrote simulateviadfs
-proveBySimulating :: forall s. (TapeSymbol s) => Int -> Turing -> SkipBook s 
+proveBySimulating :: forall s. (TapeSymbol s) => Int -> Turing -> SkipBook s
   -> Skip Count s -> Either (Text, Maybe (Config Count s)) Count
-proveBySimulating limit t book (Skip start goal _ _) = let 
-  ans = loop 0 (start ^. cstate) (second NotInfinity $ configToET start ^. _2) (finiteCount 0)
-  msg = "starting pos:\n" <> show (pretty start) <> "\nsucceeded: " <> show (has _Right ans)
-      <> "\nans:" <> showP ans 
-  in
+proveBySimulating limit t book (Skip start skipEnd _) = case skipEnd of
+  SkipHalt _ -> Left ("can't prove halt by induction", Nothing)
+  SkipUnknownEdge _ -> Left ("can't prove unknownedge by induction", Nothing)
+  SkipNonhaltProven _ -> Left ("can't prove nonhalt by induction", Nothing)
+  SkipStepped ph tp -> let
+    ans = loop 0 (start ^. cstate) (second NotInfinity $ configToET start ^. _2) (finiteCount 0)
+    msg = "starting pos:\n" <> show (pretty start) <> "\nsucceeded: " <> show (has _Right ans)
+        <> "\nans:" <> showP ans
+    in
     --force $ 
     --trace msg 
-    ans 
-    where
+    ans where
     -- four conditions: we've taken more steps than the limit,
     -- we've succeeded, stepping fails for some reason, or we continue 
     loop :: Int -> Phase -> ExpTape s InfCount -> Count -> Either (Text, Maybe (Config Count s)) Count
     loop numSteps p tape curCount
       -- | trace (Unsafe.init $ toString $ "steps:" <> show numSteps <> " count:" <> showP curCount <>
       --            " p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
-      | indMatch p tape goal = pure curCount
+      | indMatch p tape (ph, tp) = pure curCount
       | numSteps > limit = Left ("exceeded limit while simulating", Nothing)
       | otherwise = case skipStep t book p tape of
             Unknown e -> Left ("hit unknown edge" <> show e, Nothing)
             Stopped {} -> Left ("halted while simulating", Nothing)
+            NonhaltProven {} -> Left ("went forever while simulating", Nothing)
             MachineStuck -> let
                 stuckConfig = etToConfig p $ second deInfCount tape
                 msg = "machine stuck on step: " <> show numSteps
                   <> " in phase:" <> show p
-                  <> "\ngoal:" <> show (pretty goal) <> "\ncur tape:" <> dispExpTape tape
+                  <> "\ngoal:" <> show (pretty (ph, tp)) <> "\ncur tape:" <> dispExpTape tape
                 in
                 Left (msg, Just stuckConfig)
             Stepped Infinity _ _ _ _ _ -> Left ("hopped to infinity", Nothing)
             Stepped (NotInfinity hopsTaken) newPhase newTape _ _ _
                 -> loop (numSteps + 1) newPhase newTape (curCount <> hopsTaken)
-    indMatch :: Phase -> ExpTape s InfCount -> SkipEnd Count s -> Bool
-    indMatch cur_p et se = case bitraverse pure mbdeInfCount et of
+    indMatch :: Phase -> ExpTape s InfCount -> (Phase, TapePush Count s) -> Bool
+    indMatch cur_p et (goalPh, goalTP) = case bitraverse pure mbdeInfCount et of
         Nothing -> False
-        Just tape@(ExpTape ls point rs) -> case se of
-            EndMiddle (Config ph c_ls c_p c_rs)
-                -> cur_p == ph && ls == c_ls && point == c_p && rs == c_rs
-            EndSide goalPhase dir xs -> endSideTapeMatch dir xs tape &&
-                endSideTransMatch dir goalPhase t cur_p tape
+        Just tape@(ExpTape ls point rs) -> case goalTP of
+            Middle (ExpTape goal_ls goal_p goal_rs)
+                -> cur_p == goalPh && ls == goal_ls && point == goal_p && rs == goal_rs
+            Side dir xs -> endSideTapeMatch dir xs tape &&
+                endSideTransMatch dir goalPh t cur_p tape
       where
         endSideTapeMatch :: Dir -> [(s, Count)] -> ExpTape s Count -> Bool
         endSideTapeMatch L goal (ExpTape _ls point rs) = case getNewFinPoint goal of
@@ -282,28 +294,37 @@ proveBySimulating limit t book (Skip start goal _ _) = let
         mbdeInfCount (NotInfinity c) = Just c
 
 --TODO, it's really dumb we have to "deInfCount here"
-getNextConfigs :: forall s. (Ord s, Pretty s) => SkipBook s -> Config Count s -> [Config Count s]
-getNextConfigs book curConfig = first deInfCount . view (_2 . resConfig) <$> choices
+getNextConfigs :: forall s. (Ord s, Pretty s, Show s) 
+  => SkipBook s -> Config Count s -> [Config Count s]
+getNextConfigs book curConfig = first deInfCount <$> mapMaybe getConfig choices
  where
-  choices :: [(Skip Count s, SkipResult s InfCount)]
+  getConfig :: PartialStepResult InfCount s -> Maybe (Config InfCount s)
+  getConfig = \case
+    Stepped _ ph newTape _ _ _ -> Just $ etToConfig ph newTape
+    _ -> Nothing
+  choices :: [PartialStepResult InfCount s]
   --flip since sort gives smallest to largest by default but we want the largest skip first
-  choices = sortBy (flip skipFarthest) $ uncurry (getSkipsWhichApply book) (configToET $ first NotInfinity curConfig)
+  choices = sortBy (flip skipPrecedence)
+    $ snd <$> uncurry (getSkipsWhichApply book) (configToET $ first NotInfinity curConfig)
 
 --the text is why you failed, and the count is how many big steps 
-simulateViaDFS :: (Ord s, Pretty s) => Int -> Int -> SkipBook s -> Skip Count s 
-  -> Either Text Natural 
-simulateViaDFS stepLim depthLim book (Skip startConfig skipEnd _hops _halts) 
-  = case res of 
+simulateViaDFS :: (Ord s, Pretty s, Show s) => Int -> Int -> SkipBook s -> Skip Count s
+  -> Either Text Natural
+simulateViaDFS stepLim depthLim book (Skip startConfig skipEnd _hops)
+  = case res of
   Right (Success vs) -> Right $ fromIntegral $ length vs
   --the problem here is we sort of want some kind of like 'what did the DFS get stuck on' list 
   --but that's not something we have right now
   Right NoSuccess -> Left "dfs exhaustively searched with no results"
   Left message -> Left $ "failed dfs: " <> message
-  where 
-    res = case preview _EndMiddle skipEnd of 
+  where
+    target = case skipEnd of 
+      SkipStepped ph (Middle et) -> Just $ etToConfig ph et 
+      _ -> Nothing 
+    res = case target of
       Nothing -> Left "target skip did not endmiddle"
-      Just endConfig -> dfs stepLim depthLim (getNextConfigs book) (== endConfig) startConfig 
-    
+      Just endConfig -> dfs stepLim depthLim (getNextConfigs book) (== endConfig) startConfig
+
 transposeNE :: NonEmpty [a] -> [NonEmpty a]
 transposeNE (x :| xs) = getZipList $ (:|) <$> ZipList x <*> ZipList (transpose xs)
 
@@ -314,9 +335,9 @@ transposeOverTwoPairs :: NonEmpty (([a], [a]), ([a], [a])) -> (([NonEmpty a], [N
 transposeOverTwoPairs xs = bimapBoth (bimapBoth transposeNE) $ bimapBoth NE.unzip $ NE.unzip xs
 
 test :: NonEmpty [a] -> [NonEmpty a]
-test = sequenceA 
+test = sequenceA
 
-bifoldMapBoth :: (Bifoldable p, Monoid m) => (a -> m) -> p a a -> m 
+bifoldMapBoth :: (Bifoldable p, Monoid m) => (a -> m) -> p a a -> m
 bifoldMapBoth f = bifoldMap f f
 
 bitraverseBoth :: (Bitraversable p, Applicative f) => (a -> f b) -> p a a -> f (p b b)
@@ -339,7 +360,7 @@ showEvalN t x = trace (t <> "\n" <> show x) x
 showTapePhaseList :: [(Phase, ExpTape Bit InfCount)] -> String
 showTapePhaseList tapes = toString $ T.concat $ (\(p, x) -> dispPhase p <> " " <> dispExpTape x <> "\n") <$> tapes
 
-possibleSignatures :: forall s. Ord s 
+possibleSignatures :: forall s. Ord s
   => [(Phase, ExpTape s InfCount)] -> [(Phase, Signature s)]
 possibleSignatures hist = filter (\s -> --let msg = ("ixing: " <> showP s <> "\n in map:\n" <> show (sigFreqs)) in trace msg $
   sigFreqs ^?! ix s >= 3) tapeSignatures where
@@ -356,7 +377,7 @@ simplestNSigs n hist = take (fromIntegral n) $
 --given a history, guesses a "critical configuration" 
 -- a simple tape appearance the machine repeatedly returns to
 guessCriticalConfiguration :: Ord s => [(Phase, ExpTape s InfCount)] -> Either Text (Phase, Signature s)
-guessCriticalConfiguration hist = case possibleSignatures hist of 
+guessCriticalConfiguration hist = case possibleSignatures hist of
   [] -> Left "no possible criticalconfigs"
   xs -> Right $ minimumBy (compare `on` signatureComplexity . snd) xs
 
@@ -399,7 +420,7 @@ getSlicePair' startTape endTape disps start end = (startSlice, endSlice) where
 --given a tape history, a history of (relative) displacement, and a start and end point
 --obtain a slice of tape corresponding to everything the machine read / output at the start 
 --and end points respectively
-getSlicePair :: (Eq s) => [(Phase, ExpTape s InfCount)] -> [Int] -> Int -> Int 
+getSlicePair :: (Eq s) => [(Phase, ExpTape s InfCount)] -> [Int] -> Int -> Int
   -> (ExpTape s Count, ExpTape s Count)
 getSlicePair hist disps start end = getSlicePair' startTape endTape disps start end where
     startTape = hist ^?! ix start . _2
@@ -413,18 +434,18 @@ calcCommonSig :: (Eq s) => Signature s -> Signature s -> Maybe (Bool, Bool)
 calcCommonSig start end = -- trace ("commonsig-ing " <> show start <> " and " <> show end) $
   asum $ check <$> tf <*> tf where
     tf = [False, True]
-    check dl dr = do 
+    check dl dr = do
       let
-        lFunc = if dl then dropLeft else pure 
-        rFunc = if dr then dropRight else pure 
+        lFunc = if dl then dropLeft else pure
+        rFunc = if dr then dropRight else pure
       dropped_start <- lFunc =<< rFunc start
       if dropped_start == end then Just (dl, dr) else Nothing
-    dropLeft (Signature ls p rs) = do 
-      ls' <- viaNonEmpty init ls 
+    dropLeft (Signature ls p rs) = do
+      ls' <- viaNonEmpty init ls
       pure $ Signature ls' p rs
-    dropRight (Signature ls p rs) = do 
-      rs' <- viaNonEmpty init rs 
-      pure $ Signature ls p rs' 
+    dropRight (Signature ls p rs) = do
+      rs' <- viaNonEmpty init rs
+      pure $ Signature ls p rs'
 
 --if we have to drop one or both of of the end bits of the start signature, then to compensate we will add
 --a zero to the end signature in the places we drop the bits 
@@ -440,35 +461,35 @@ generalizeFromExamples slicePairs = undefined
 
 
 
-guessInductionHypothesis :: (Ord s, Pretty s) => TapeHist s InfCount -> DispHist 
+guessInductionHypothesis :: (Ord s, Pretty s) => TapeHist s InfCount -> DispHist
   -> Either Text (Skip Count s)
 guessInductionHypothesis th@(TapeHist hist) dh = do
   criticalConfig@(criticalPhase, _criticalSignature) <- guessCriticalConfiguration hist
-  let     
-    configIndicesAndConfigs = let ans = obtainConfigIndices hist criticalConfig in 
+  let
+    configIndicesAndConfigs = let ans = obtainConfigIndices hist criticalConfig in
       --trace ("configs were:\n" <> showP ans) 
       ans
   case guessInductionHypWithIndices th dh criticalPhase configIndicesAndConfigs of
-    Right ans -> Right ans 
+    Right ans -> Right ans
     --this is hacky and bad but it is necessary to guess right on trickyChristmasTree so I'll try it for now
     Left _msg -> guessInductionHypWithIndices th dh criticalPhase (Unsafe.tail configIndicesAndConfigs)
-  
-  
+
+
 
 guessInductionHypWithIndices :: (Pretty s, Eq s) => TapeHist s InfCount -> DispHist -> Phase -> [(Int, (Phase, ExpTape s InfCount))] -> Either Text (Skip Count s)
 guessInductionHypWithIndices (TapeHist hist) (DispHist disps) criticalPhase configIndicesAndConfigs =
   let
-    configIndices = let ans = fst <$> configIndicesAndConfigs in 
+    configIndices = let ans = fst <$> configIndicesAndConfigs in
       --trace ("configIndices were: " <> showP ans) 
       ans
     indexPairs = zipExact (U.init configIndices) (U.tail configIndices)
-    slicePairs = let ans = uncurry (getSlicePair hist disps) <$> indexPairs in 
+    slicePairs = let ans = uncurry (getSlicePair hist disps) <$> indexPairs in
       --trace ("slicepairs were:\n" <> showP ans) 
-      ans 
-    allSigs = let ans = fmap (bimapBoth tapeSignature) slicePairs in 
+      ans
+    allSigs = let ans = fmap (bimapBoth tapeSignature) slicePairs in
       --trace ("allsigs were: " <> showP ans) 
       ans
-  in do 
+  in do
   --only proceed from here if all the pairs have the same signature at both the start and the end
   if allEqual allSigs then Right () else Left "sigs were not all equal"
   --to finish from here, our goal is for each transition start -> end, make a bunch of pairs of counts 
@@ -492,19 +513,19 @@ guessInductionHypWithIndices (TapeHist hist) (DispHist disps) criticalPhase conf
     -- occurence index that was originally first
     transposePairs :: [([a], [b])] -> ([[a]], [[b]])
     transposePairs pairs = bimap transpose transpose (fst <$> pairs, snd <$> pairs)
-  thingsToGeneralizeList <- failMsg "list was empty" $ 
+  thingsToGeneralizeList <- failMsg "list was empty" $
     bitraverseBoth (traverse nonEmpty) $ transposePairs countPairListList
   --the pair here is over left and right, then the list is over the "signature dimension", and the internal
   --pair is over start -> finish
-  allThingsGeneralized <- failMsg "failed to generalize"  $ 
+  allThingsGeneralized <- failMsg "failed to generalize"  $
     bitraverseBoth (traverse generalizeFromCounts) thingsToGeneralizeList
   --we want to pull the pair from start -> finish out to the front, then have the left right pair, then have the 
   --"signature dimension"
   let startCounts = bimapBoth (fmap fst) allThingsGeneralized
       endCounts =  bimapBoth (fmap snd) allThingsGeneralized
       startConfig = combineIntoConfig criticalPhase startCounts startSig
-      endConfig = combineIntoConfig criticalPhase endCounts endSig
-      ans = Skip startConfig (EndMiddle endConfig) Empty False
+      (endPh, endTape) = configToET $ combineIntoConfig criticalPhase endCounts endSig
+      ans = Skip startConfig (SkipStepped endPh (Middle endTape)) Empty
       msg = "guessed " <> showP ans
   --force $
   --trace msg $
@@ -638,17 +659,17 @@ guessWhatHappensNext machine startConfig varToGeneralize
             --the problem with discarding the fst element of this pair, is that if you generalize (3,1) (4,2), then the first
             --the pair is (x + 2, x), but by discarding the first element, you're implcitly assuming it's x, more-or-less, so 
             --that ends up not working 
-            else let 
-              f = (FinCount <$> numsToSimulateAt) 
+            else let
+              f = (FinCount <$> numsToSimulateAt)
               s = cl
               m1 = "zipping:" <> showP f <> " " <> showP s
-              ans = 
+              ans =
                 --trace m1 $ 
                 first pure <$> generalizeFromCounts (neZipExact f s)
               msg = "generalized:" <> show (pretty cl) <> "\ngot\n" <> show (pretty ans)
-            in 
+            in
               -- trace msg 
-              ans 
+              ans
         {-algorithm:
         first, generalize all the counts to pairs, with the simnum we put in. you might think we're done now, and we just want the 
         second number of this pair. I also thought this, but that is not correct, because in the two pairs (x, x) (x + 2, x), that
@@ -658,7 +679,7 @@ guessWhatHappensNext machine startConfig varToGeneralize
         Third, map across all the pairs again, adding to both elements whatever it takes to get the first element to the maximum, and 
         then discarding the first element, to leave just the second element. 
         -}
-        bigTraverse = bitraverseBoth . bitraverseBoth . traverse 
+        bigTraverse = bitraverseBoth . bitraverseBoth . traverse
         --bigMap = bimapBoth . bimapBoth . fmap
         --transposedCountLists = bitraverseBoth (bitraverseBoth (traverse generalizeCL)) flippedCountLists
         res = do
@@ -672,18 +693,18 @@ guessWhatHappensNext machine startConfig varToGeneralize
                     ans
                 countLists :: NonEmpty (([Count], [Count]), ([Count], [Count]))
                 countLists = fmap (bimapBoth getCounts) slicedPairs
-                flippedCountLists = transposeOverTwoPairs countLists 
+                flippedCountLists = transposeOverTwoPairs countLists
             --after you slice them, they may no longer all be the same signature
             --for now, lets just assume they are
             guard $ list1AllEqual $ fmap (bimapBoth tapeSignature) slicedPairs
             countPairLists <- --trace ("flipcountls" <> showP flippedCountLists) 
               bigTraverse generalizeCL flippedCountLists
-            let listOfFirstElements = (bifoldMapBoth . bifoldMapBoth . foldMap) (maybeToList . fst) countPairLists 
+            let listOfFirstElements = (bifoldMapBoth . bifoldMapBoth . foldMap) (maybeToList . fst) countPairLists
                 --todo does this do the right thing
-                maxFirstElt = case listOfFirstElements of 
+                maxFirstElt = case listOfFirstElements of
                   [] -> error "empty list of first elements"
-                  (x : xs) -> maximum listOfFirstElements 
-            ((s_cls, s_crs), (e_cls, e_crs)) <- bigTraverse (resolveCountPair maxFirstElt) countPairLists 
+                  (x : xs) -> maximum listOfFirstElements
+            ((s_cls, s_crs), (e_cls, e_crs)) <- bigTraverse (resolveCountPair maxFirstElt) countPairLists
             --todo, we probably shouldn't get the start counts from the aggregator, because that is kind of bad, compared to 
             --getting them from the startConfig. the problem is, we also need to slice the startConfig somehow, and that's 
             --actually quite hard. 
@@ -702,13 +723,13 @@ guessWhatHappensNext machine startConfig varToGeneralize
                   -- we have the e_cls and the e_crs, and we have psb which is the final phase 
                   --and signature we're trying to generalize across, so we just need to write 
                   -- Signature Bit -> ([Count], [Count]) -> ExpTape Bit Count with zipExact
-                  (EndMiddle $ etToConfig e_ph $ zipSigToET endSig (e_cls, e_crs))
-                  (FinCount 100) False --TODO
-                msg = "guessedWhatsNext " <> showP skipOut 
+                  (SkipStepped e_ph $ Middle $ zipSigToET endSig (e_cls, e_crs))
+                  (FinCount 100)  --TODO
+                msg = "guessedWhatsNext " <> showP skipOut
             assert (endSig `isSubSignatureOf` sigToGeneralize) $
               --force $ trace msg $ 
               assert (isSameInAsOut skipOut) $
-              pure skipOut 
+              pure skipOut
 
 {- We're trying to get the first element of the pair to be target, which will require modifying 
 the second element, which we then return. if the first element is Nothing, it can be whatever and
@@ -716,18 +737,18 @@ thus we can just return the second element.
 To make the first element be equal to the target, we're going to try to substitute one variable 
 in the first element to be equal to some of the second variable 
 -}
-resolveCountPair :: Count -> (Maybe Count, Count) -> Maybe Count 
+resolveCountPair :: Count -> (Maybe Count, Count) -> Maybe Count
 resolveCountPair target = \case
   (Nothing, s) -> Just s
   (Just f@(OneVar n as k x), s) -> do
     let (Count m bs ys) = target --we're casing down here so we're lazy in target
         (_likes, _rL, remRight) = likeTerms (ZeroVar n as) (ZeroVar m bs)
-    countToMapTo <- (remRight <> Count 0 Empty ys) `divCount` k 
+    countToMapTo <- (remRight <> Count 0 Empty ys) `divCount` k
     let updateMap = one (x, countToMapTo)
-        updatedF = updateCount updateMap f 
+        updatedF = updateCount updateMap f
         updatedS = updateCount updateMap s
-        msg = "updated " <> showP (f, s) 
-          <> " to match " <> showP target 
+        msg = "updated " <> showP (f, s)
+          <> " to match " <> showP target
           <> " getting " <> showP (updatedF, updatedS)
     --trace msg $
     assert (updatedF == target) $ pure updatedS
@@ -741,7 +762,7 @@ thingContainsVar = getAny . bifoldMap (Any . countContainsVar) (const mempty) wh
         _notFin -> True
 
 
-guessAndProveWhatHappensNext :: Turing -> SkipBook Bit -> Config Count Bit 
+guessAndProveWhatHappensNext :: Turing -> SkipBook Bit -> Config Count Bit
   -> SymbolVar -> [(Skip Count Bit, SkipOrigin Bit)]
 guessAndProveWhatHappensNext machine book startConfig varToGeneralize
   = --trace ("trying to guess what happens after:\n" <> show (pretty startConfig)) $
@@ -766,8 +787,8 @@ guessAndProveWhatHappensNext machine book startConfig varToGeneralize
 -- else, see if they are generated by a function of the form x -> m * x + b 
 -- else give up 
 generalizeFromCounts :: NonEmpty (Count, Count) -> Maybe (Count, Count)
-generalizeFromCounts xs = force $ 
-  allEqualPair <|> additivePair <|> affinePair 
+generalizeFromCounts xs = force $
+  allEqualPair <|> additivePair <|> affinePair
   where
     allEqualPair :: Maybe (Count, Count)
     allEqualPair = guard (list1AllEqual xs) >> pure (head xs)
@@ -803,16 +824,16 @@ generalizeFromCounts xs = force $
             --todo, right now we use this case in guessWhatComesNext but we probably shouldn't
             --error "generalizeAddDiff should not be called on a zero integer"
     additivePair :: Maybe (Count, Count)
-    additivePair = let 
+    additivePair = let
       ans = differences >>= \case
-        ds@(d1 :| _rest) -> guard (list1AllEqual ds) >> pure (generalizeAddDiff d1) 
-      in 
+        ds@(d1 :| _rest) -> guard (list1AllEqual ds) >> pure (generalizeAddDiff d1)
+      in
       --trace ("add diff: " <> showP ans)
-      ans 
+      ans
     conformsToAffine :: Natural -> Int -> (Natural, Natural) -> Bool
     conformsToAffine m b (x, y) = fromIntegral x * fromIntegral m + b == fromIntegral y
     generalizeMulDiff :: Natural -> Int -> (Count, Count)
-    generalizeMulDiff m b = let 
+    generalizeMulDiff m b = let
       ans = if b >= 0
         then (newBoundVarBad, m `nTimes` newBoundVarBad <> finiteCount (fromIntegral b))
         --this is the line we need to change
@@ -820,19 +841,19 @@ generalizeFromCounts xs = force $
         --so given 2x - 1 we compute the smallest multiple of 2 bigger than 1 (1), called toMul
         -- and then x + toMul is like subtracting 2 * toMul, so we have to add that back on the 
         --other side, except for the b we are actually supposed to subtract
-        else let 
+        else let
           toMul = 1 + fromIntegral (-b) `div` m
           --do subtraction in int space and then go back to natural space
-          c = fromIntegral (fromIntegral (toMul * m) + b) 
-          in 
+          c = fromIntegral (fromIntegral (toMul * m) + b)
+          in
           (newBoundVarBad <> finiteCount toMul, m `nTimes` newBoundVarBad <> finiteCount c)
-      in 
+      in
       --trace ("mul diff: " <> showP ans)
       ans
     affinePair :: Maybe (Count, Count)
-    affinePair = do 
+    affinePair = do
       nps <- naturalPairs
-      guard (length nps >= 3) 
+      guard (length nps >= 3)
       case nps of
         (_pair :| []) -> Nothing
         --going for x -> m * x + b - we assume m > 0 but b can be any integer
@@ -844,9 +865,9 @@ generalizeFromCounts xs = force $
           --while we're going to subtract y1 from y2 but not divide by it so it just has to be at least 0
             m <- if (x2 > x1) && (y2 >= y1)
                 then (y2 - y1) `maybeDiv` (x2 - x1)
-                else if (x1 > x2) && (y1 >= y2) 
+                else if (x1 > x2) && (y1 >= y2)
                   then (y1 - y2) `maybeDiv` (x1 - x2)
-                  else Nothing 
+                  else Nothing
             let b :: Int = fromIntegral y1 - fromIntegral m * fromIntegral x1
             guard $ all (conformsToAffine m b) pairs
             pure $ generalizeMulDiff m b
@@ -869,62 +890,64 @@ generalizeFromInfCounts xs = infinityUnit <|> notInfinityCountPair where
     packageResult (Left ()) = (Infinity, Infinity)
     packageResult (Right tup) = bimapBoth NotInfinity tup
 
-varNotUsedInSkip :: Skip Count s -> BoundVar 
-varNotUsedInSkip skip = case S.lookupMax allInts of 
+varNotUsedInSkip :: Skip Count s -> BoundVar
+varNotUsedInSkip skip = case S.lookupMax allInts of
   Nothing -> BoundVar 0
   Just x -> BoundVar (x + 1)
-  where 
-  allInts = S.map getBoundVar allUsedVars 
-  allUsedVars = bifoldMap countUsedVars (const mempty) skip 
-  countUsedVars (Count _n _as xs) = keysSet xs 
+  where
+  allInts = S.map getBoundVar allUsedVars
+  allUsedVars = bifoldMap countUsedVars (const mempty) skip
+  countUsedVars (Count _n _as xs) = keysSet xs
 
 chainArbitrary :: forall s. (Eq s, Pretty s) => Skip Count s -> Either Text (Skip Count s)
-chainArbitrary skip@(Skip start end steps halts) = case end of 
-  EndSide _ph _dir _xs -> Left "endside" --TODO we can probably handle this
-  EndMiddle endConfig -> do 
-    (newStart, newEnd) <- matchConfigs start endConfig 
-    pure (Skip newStart (EndMiddle newEnd) Empty False) --TODO handle steps obviously
-  where 
-  newVar :: BoundVar 
-  newVar = varNotUsedInSkip skip 
+chainArbitrary skip@(Skip start end steps) = case end of
+  --EndSide _ph _dir _xs -> Left "endside" --TODO we can probably handle this
+  SkipStepped ph (Middle et) -> do
+    (newStart, newEnd) <- matchConfigs start $ etToConfig ph et
+    let (endPh, endTape) = configToET newEnd
+    pure (Skip newStart (SkipStepped endPh $ Middle endTape) Empty) --TODO handle steps obviously
+  _ -> Left "wasn't middle"
+  where
+  newVar :: BoundVar
+  newVar = varNotUsedInSkip skip
   matchConfigs :: Config Count s -> Config Count s -> Either Text (Config Count s, Config Count s)
-  matchConfigs c1@(Config ph ls p rs) c2@(Config ph2 xs q ys) = do 
-    let rom = showP c1 <> " " <> showP c2 
-    guardMsg (ph == ph2 && p == q) $ "phases or points not equal: " <> rom 
-    (newLs, newXs) <- matchLists ls xs 
+  matchConfigs c1@(Config ph ls p rs) c2@(Config ph2 xs q ys) = do
+    let rom = showP c1 <> " " <> showP c2
+    guardMsg (ph == ph2 && p == q) $ "phases or points not equal: " <> rom
+    (newLs, newXs) <- matchLists ls xs
     (newRs, newYs) <- matchLists rs ys
     pure (Config ph newLs p newRs, Config ph newXs p newYs)
   matchLists :: [(s, Count)] -> [(s, Count)] -> Either Text ([(s, Count)], [(s, Count)])
-  matchLists xs ys = do 
+  matchLists xs ys = do
     --maybeRes :: Either Text [((s, Count), (s, Count))]
     maybeRes <- traverse (uncurry matchPairs) (zip xs ys) --zip discards longer 
-    let leftover = case remainingLonger xs ys of 
+    let leftover = case remainingLonger xs ys of
           Left xs_left -> Start xs_left
           Right ys_left -> End ys_left
-    applyLeftover (unzip maybeRes, leftover) 
+    applyLeftover (unzip maybeRes, leftover)
   applyLeftover :: (([(s, Count)], [(s, Count)]), Leftover s) -> Either Text ([(s, Count)], [(s, Count)])
-  applyLeftover ((starts, ends), lo) = case lo of 
-    Start [] -> Right (starts, ends) 
+  applyLeftover ((starts, ends), lo) = case lo of
+    Start [] -> Right (starts, ends)
     End [] -> Right (starts, ends)
     Start [(s, FinCount n)] -> Right (starts ++ [(s, boundVarCount newVar n)], ends)
     End [(s, FinCount n)] -> Right (starts, ends ++ [(s, boundVarCount newVar n)])
-    _ -> Left $ "leftover was not a single finite thing: " <> showP lo 
+    _ -> Left $ "leftover was not a single finite thing: " <> showP lo
   matchPairs :: (s, Count) -> (s, Count) -> Either Text ((s, Count), (s, Count))
-  matchPairs (s, c) (t, d) = do 
-    guardMsg (s == t) "two bits didn't match" 
-    (c', d') <- matchCounts c d 
+  matchPairs (s, c) (t, d) = do
+    guardMsg (s == t) "two bits didn't match"
+    (c', d') <- matchCounts c d
     pure ((s, c'), (t, d'))
   --first one is start, second one is end
   matchCounts :: Count -> Count -> Either Text (Count, Count)
   matchCounts c d = let rom = showP c <> " and " <> showP d in -- "rest of message" 
-    if c == d then Right (c,d) else case (c,d) of 
+    if c == d then Right (c,d) else case (c,d) of
       --if we have a pair of counts like (x + 2, x + 5), every trip through, we increase the output by 3 (increaseAmt)
       -- so the total increase is 3 * y, for a "newVar" y, and that is the output below. 
-    (OneVar n as k x, OneVar m bs j y) -> do 
-      guardMsg (x == y) $ "vars didn't match: " <> rom 
+    (OneVar n as k x, OneVar m bs j y) -> do
+      guardMsg (x == y) $ "vars didn't match: " <> rom
       guardMsg (k == 1 && j == 1) $ "vars weren't both 1: " <> rom
-      increaseAmt <- failMsg "chaining didn't increase" $ subCountFromCount (ZeroVar m bs) (ZeroVar n as) 
-      case increaseAmt of 
+      increaseAmt <- failMsg "chaining didn't increase" $ subCountFromCount (ZeroVar m bs) (ZeroVar n as)
+      case increaseAmt of
         (FinCount incNat) -> let base =  OneVar n as 1 x in Right (base, base <> boundVarCount newVar incNat)
-        _ -> Left $ "amt of increase was not finite: " <> showP increaseAmt <> "\n" <> rom 
-    _ -> Left $ "couldn't match counts:" <> rom 
+        _ -> Left $ "amt of increase was not finite: " <> showP increaseAmt <> "\n" <> rom
+    _ -> Left $ "couldn't match counts:" <> rom

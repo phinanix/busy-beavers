@@ -15,9 +15,10 @@ import qualified Simple.Simulate as Simple (simulate, dispStartState, initState,
 import qualified Simple.Display as Simple (dispResult)
 import qualified Simple.Tape as Simple
 import Data.Map (restrictKeys)
-import SimulateSkip
+import SimulateSkip ( SkipBook, simulateOneTotalMachine )
 import Count
 import Numeric (showFFloat)
+import Util
 
 showOneMachine :: Turing -> Steps -> Text
 showOneMachine t n =
@@ -35,7 +36,7 @@ displayHist :: [(Phase, ExpTape Bit InfCount)] -> Text
 displayHist hist = T.concat $ dispPhaseET <$> hist
 
 displaySkipSimStep :: Turing -> Steps -> Doc ann
-displaySkipSimStep t steps = dispResult dispExpTape $ SimulateSkip.simulateOneTotalMachine steps t ^. _2
+displaySkipSimStep t steps = dispResult $ SimulateSkip.simulateOneTotalMachine steps t ^. _2
 
 displaySkipSimulation :: Turing -> Steps -> Doc ann
 displaySkipSimulation t limit =
@@ -43,7 +44,7 @@ displaySkipSimulation t limit =
 
 displaySkipStepAndSkip :: Turing -> Steps -> Doc ann
 displaySkipStepAndSkip t limit = case SimulateSkip.simulateOneTotalMachine limit t of
-  (lastSkip : _, res) -> dispResult dispExpTape res <> "\nresulted from the skip:" <> show (pretty lastSkip)
+  (lastSkip : _, res) -> dispResult res <> "\nresulted from the skip:" <> show (pretty lastSkip)
   ([], res) -> error ("there were no skips for some reason, res:\n" <> show res)
 
 displaySkipSimulationWithSkips :: Turing -> Steps -> Doc ann
@@ -65,22 +66,22 @@ displaySkipSimulationWithSkips t limit =
 --   <> displayGlueStepAndSkip t limit True 
 
 
-totalMachines :: Results a -> Int
+totalMachines :: Results c s -> Int
 totalMachines r = r ^. haltCount + r ^. provenForever + r ^. unproven
 
-dispUnprovenFraction :: Results a -> Text
+dispUnprovenFraction :: Results c s -> Text
 dispUnprovenFraction r = fromString $
   (showFFloat (Just 2) $ fromIntegral (100 * r ^. unproven) / fromIntegral (r^. provenForever + r^. unproven))  ""
 
-dispResults :: (a -> Text) -> Results a -> Text
-dispResults dispTape r = "checked: " <> show (totalMachines r) <> " machines.\n"
+dispResults :: (Pretty s, Pretty c, Show s, Show c) => Results c s -> Text
+dispResults r = "checked: " <> show (totalMachines r) <> " machines.\n"
   <> show (r ^. haltCount) <> " machines halted\n"
   <> "the most steps was " <> show (r ^? longestRun . _Just . _1) <> ", performed by\n"
   <> maybe "None" dispTuring (r ^? longestRun . _Just . _2)
-  <> "final tape: " <> show (fmap dispTape (r ^? mostOnes . _Just . _3)) <> "\n"
+  <> "final tape: " <> show (fmap showP (r ^? mostOnes . _Just . _3)) <> "\n"
   <> "the most ones was " <> show (r ^? mostOnes . _Just . _1) <> ", performed by\n"
   <> maybe "None" dispTuring (r ^? mostOnes . _Just . _2)
-  <> "final tape:" <> show (fmap dispTape (r ^? mostOnes . _Just . _3)) <> "\n"
+  <> "final tape:" <> show (fmap showP (r ^? mostOnes . _Just . _3)) <> "\n"
   <> show (r ^. provenForever) <> " machines were proven to run forever\n"
   <> show (r ^. haltUnreachable) <> " by lack of halt-reachability\n"
   <> show (r ^. cycledCount) <> " by cycling\n"
@@ -96,7 +97,7 @@ dispResults dispTape r = "checked: " <> show (totalMachines r) <> " machines.\n"
     --dispUnproven :: (Turing, Steps, Phase, a) -> Text
     dispUnproven (t, steps, p, finalTape) = "after: " <> show steps <> " steps,\n"
       <> dispTuring t <> "\nwas not shown to halt or run forever\n"
-      <> "final state: phase: " <> dispPhase p <> " tape: " <> dispTape finalTape <> "\n\n"
+      <> "final state: phase: " <> dispPhase p <> " tape: " <> showP finalTape <> "\n\n"
 
 tnfSignature :: Steps -> Turing -> [Edge]
 tnfSignature n t = ordNub duplicateEdgesList where

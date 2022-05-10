@@ -10,27 +10,41 @@ import Turing
 import Tape
 import HaltProof
 import Skip
+import ExpTape
+import Notation (dispTuring)
 
 
 -- s is symbol and a is the type of tape 
-data SimResult s a = Halted Steps a Int --this is steps taken and int is the total displacement
-               | Continue Steps Phase a Int 
+data SimResult c s = Halted Steps (FinalTape c s) --this is steps taken and int is the total displacement
+               | Continue Steps Phase (ExpTape s c) Int
                | ContinueForever (HaltProof s)
                | MachineStuckRes
-               deriving (Eq, Ord, Show, Functor, Generic)
-instance (NFData s, NFData a) => (NFData (SimResult s a))
-$(makePrisms ''SimResult)
+               deriving (Eq, Ord, Show, Generic)
+instance (NFData c, NFData s) => (NFData (SimResult c s))
+--this doesn't work for some bizarre reason, it gives some big kind error :c
+-- $(makePrisms ''SimResult)
 
-dispResult ::(Pretty s) => (a -> Text) -> SimResult s a -> Doc ann
-dispResult dispTape (Halted steps tape disp) = prettyText $ "After " <> show steps 
-  <> " steps, and " <> show disp <> " disp halted with tape: \n" <> dispTape tape
-dispResult dispTape (Continue steps phase tape disp) = prettyText $ "step: " <> showInt3Wide steps
-  <> " disp: " <> show disp 
+_Continue :: Prism' (SimResult c s) (Steps, Phase, ExpTape s c, Int)
+_Continue = prism' (\(a,b,c,d) -> Continue a b c d) (\case
+  Continue n ph a i -> Just (n, ph, a, i)
+  _ -> Nothing
+  )
+
+_MachineStuckRes :: Prism' (SimResult s a) ()
+_MachineStuckRes = prism' (const MachineStuckRes) (\case
+  MachineStuckRes -> Just ()
+  _ -> Nothing)
+
+dispResult :: (Pretty s, Pretty c, Show s, Show c) => SimResult c s -> Doc ann
+dispResult (Halted steps finalTape) = prettyText $ "After " <> show steps
+  <> " steps, halted with tape: \n" <> dispFinalTape finalTape
+dispResult (Continue steps phase tape disp) = prettyText $ "step: " <> showInt3Wide steps
+  <> " disp: " <> show disp
   <> " state: " <> show phase
-  <> " tape: " <> dispTape tape
-dispResult _ (ContinueForever proof) = prettyText "the machine will go forever via: "
+  <> " tape: " <> showP tape
+dispResult (ContinueForever proof) = prettyText "the machine will go forever via: "
   <> dispHaltProof proof
---dispResult _ (InductionGuess skip) = prettyText "we guessed this skip:\n" <> pretty skip 
+dispResult MachineStuckRes = prettyText "the machine got stuck!"
 
 --the results should be
 --  how many machines halted
@@ -39,10 +53,10 @@ dispResult _ (ContinueForever proof) = prettyText "the machine will go forever v
 --  how many ran forever, with which kind of proof
 --  how many ran out of time
 --  and keep a certain number thereof
-data Results a = Results
+data Results c s = Results
   { _haltCount :: Int
-    , _longestRun :: Maybe (Int, Turing, a)
-    , _mostOnes :: Maybe (Int, Turing, a)
+    , _longestRun :: Maybe (Int, Turing, FinalTape c s)
+    , _mostOnes :: Maybe (Int, Turing, FinalTape c s)
   , _provenForever :: Int
     , _haltUnreachable :: Int
     , _cycledCount :: Int
@@ -52,13 +66,13 @@ data Results a = Results
     , _skipInfinity :: Int
     , _linRecur :: Int
   , _unproven :: Int
-    , _unprovenExamples :: [(Turing, Steps, Phase, a)]
-  } deriving (Show, Eq, Ord, Generic, Functor)
-instance NFData a => NFData (Results a)
+    , _unprovenExamples :: [(Turing, Steps, Phase, ExpTape s c)]
+  } deriving (Show, Eq, Ord, Generic)
+instance (NFData s, NFData c) => NFData (Results c s)
 
 $(makeLenses ''Results)
 
-instance Eq a => AsEmpty (Results a) where
+instance (Eq s, Eq c) => AsEmpty (Results c s) where
   _Empty = only $ Results
     { _haltCount = 0
       , _longestRun = Nothing
@@ -78,8 +92,8 @@ instance Eq a => AsEmpty (Results a) where
 keepNum :: Int
 keepNum = 3
 
-addResult :: (Tapeable a) => Turing -> SimResult s a -> Results a -> Results a
-addResult turing (Halted steps tape _disp) r =
+addResult :: (Tapeable (FinalTape c s)) => Turing -> SimResult c s -> Results c s -> Results c s
+addResult turing (Halted steps tape) r =
   addHalter $ addLongest $ addOnesiest (ones tape) r where
     addLongest r = case r ^. longestRun of
       Nothing -> r & longestRun ?~ (steps, turing, tape)
@@ -95,13 +109,15 @@ addResult turing (ContinueForever proof) r =
     proof2lens (HaltUnreachable _) = haltUnreachable
     proof2lens (Cycle _ _) = cycledCount
     proof2lens (OffToInfinityN _ _) = infinityN
-    proof2lens (BackwardSearch) = backwardSearches
-    proof2lens (SkippedToInfinity _ _) = skipInfinity
-    proof2lens (LinRecur _ _) = linRecur 
+    proof2lens BackwardSearch = backwardSearches
+    proof2lens (SkippedToInfinity _) = skipInfinity
+    proof2lens (LinRecur _ _) = linRecur
     special BackwardSearch = --if r ^. backwardSearches > keepNum then id else
-      backwardExamples %~ ((:) turing)
+      backwardExamples %~ (:) turing
     special _ = id
 addResult turing (Continue steps phase tape _disp) r =
   let r' = r & unproven +~ 1 in
   if r' ^. unproven > keepNum then r'
     else r' & unprovenExamples %~ ((:) (turing, steps, phase, tape))
+addResult turing MachineStuckRes r
+  = error $ "machine: " <> dispTuring turing <> "got machinestuckres !"

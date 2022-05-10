@@ -68,7 +68,7 @@ collision (SimState steps slow fast) = steps > 1 && slow == fast
 
 getSteps :: SimState a -> (Steps, Steps)
 getSteps (SimState steps _ _) = (steps `div` 2, steps)
-
+{-
 -- step limit, machine, current state
 -- if we hit an unknown edge, we have to stop, and we return that. else we'll get to a result and return the result
 simulateOneMachine :: Int -> Turing -> SimState (Tape Bit) -> Either Edge (SimResult Bit (Tape Bit))
@@ -105,7 +105,7 @@ simulate limit startMachine = loop (startMachine, initSimState) [] Empty where
   recurse ((t,s) : xs) result = case staticAnalyze t of
     Just proof -> recurse xs $ addResult t (ContinueForever proof) result
     Nothing -> loop (t,s) xs result
-
+-}
 --halting analyses that can be performed without simulating the machine
 staticAnalyze :: Turing -> Maybe (HaltProof s)
 staticAnalyze = backwardSearch

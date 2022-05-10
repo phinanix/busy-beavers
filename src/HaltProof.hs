@@ -12,7 +12,7 @@ import Util
 import Config
 import Turing
 import Tape
-import Skip
+--import Skip ( prettyText, Skip )
 import Count
 
 --the type of proofs that a TM will not halt
@@ -29,14 +29,18 @@ import Count
 --   matches and proves the machine will consume an infinite amount of tape
 -- - LinRecur a b means the machine enters linrecurrence on step a and the length
 --   of the recurrence is b (a and b are measured in rule-steps right now)
+
+--TODO: I rather want to rework all of these to better be divided up among the different
+--methods and contain more info and stuff
 data HaltProof s
   = HaltUnreachable Phase
   | Cycle Steps Steps
   | OffToInfinityN Steps Dir
   | BackwardSearch
-  | SkippedToInfinity Steps (Skip Count s)
+--commenting out for now to fix a cyclic dependency, may need to move some things around
+  | SkippedToInfinity Steps --(Skip Count s)
   | LinRecur Steps Steps 
-  deriving (Eq, Ord, Show, Generic)
+  deriving (Eq, Ord, Show, Generic, Functor, Foldable, Traversable)
 instance (NFData s) => NFData (HaltProof s)
 
 mirrorHaltProof :: HaltProof s -> HaltProof s
@@ -51,10 +55,12 @@ dispHaltProof (Cycle start end) = prettyText $ "the machine cycled over " <> sho
 dispHaltProof (OffToInfinityN steps dir) = prettyText $ "the machine will continue off to the "
   <> show dir <> " forever after " <> show steps <> " steps"
 dispHaltProof BackwardSearch = prettyText "a backwards search implies the machine never halts"
-dispHaltProof (SkippedToInfinity steps skip) = prettyText ("after " <> show steps
+dispHaltProof (SkippedToInfinity steps) = prettyText ("after " <> show steps
   <> " steps, the machine applies the following skip which proves nonhalting:\n  ")
-  <> pretty skip
+  -- <> pretty skip
 
+instance (Pretty s) => Pretty (HaltProof s) where 
+  pretty = dispHaltProof 
 
 --runs a backward search from each halting state to see if it can reach a contradiction
 --if we show that all ways to halt don't have paths leading into them from valid tapes
