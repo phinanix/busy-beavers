@@ -102,13 +102,15 @@ dispExpTape (ExpTape ls point rs)
 
 instance (Pretty b, Pretty c) => Pretty (ExpTape b c) where 
   pretty = pretty . dispExpTape 
+  
+countPoint :: Num p => Bool -> p
+countPoint b = if b then 1 else 0
+countList :: [(Bit, InfCount)] -> Int
+countList = getSum . foldMap Sum . mapMaybe (\(Bit bit, c) -> guard bit $> infCountToInt c)
 
 instance Tapeable (ExpTape Bit InfCount) where
   ones (ExpTape ls (Bit point) rs) = countPoint point + countList ls + countList rs where
-    countPoint b = if b then 1 else 0
-    countList :: [(Bit, InfCount)] -> Int
-    countList = getSum . foldMap Sum . mapMaybe (\(Bit bit, c) -> guard bit $> infCountToInt c)
-
+    
 getNewPoint :: [(s, InfCount)] -> Either Text (s, [(s, InfCount)])
 getNewPoint [] = Left "tape Empty"
 getNewPoint xs@((b, Infinity) : _) = pure (b, xs)

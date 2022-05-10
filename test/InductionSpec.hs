@@ -27,21 +27,19 @@ checkerboardFalseGoal = Skip
     -- 0 (T, n+3) >
     --true for n = 1 but not n = 2
     (Config (Phase 0) [] (Bit False) [(Bit True, finiteCount 1), (Bit False, newBoundVar 0), (Bit True, finiteCount 2)])
-    (EndMiddle $ Config (Phase 0) [(Bit True, finiteCount 3 <> newBoundVar 0)] (Bit True) [])
+    (SkipStepped (Phase 0) $ Middle $ ExpTape [(Bit True, finiteCount 3 <> newBoundVar 0)] (Bit True) [])
     (finiteCount 0) --obviously this is fake for now 
-    False
 
 simple_sweeperGoal :: Skip Count Bit
 simple_sweeperGoal = Skip
   --  F >T< (T, n) F goes to 
   -- >T< (T, n+1)  F 
   (Config (Phase 2) [(Bit False, finiteCount 1)] (Bit True) [(Bit True, newBoundVar 0), (Bit False, finiteCount 1)])
-  (EndMiddle $ Config (Phase 2)
+  (SkipStepped (Phase 2) $ Middle $ ExpTape
       [] (Bit True) [(Bit True, finiteCount 1 <> newBoundVar 0), (Bit False, finiteCount 1)])
   (finiteCount 0) --obviously this is fake for now 
-  False
 
-beforeReplace :: Config Count Bit 
+beforeReplace :: Config Count Bit
 beforeReplace = Config (Phase 2) [(Bit False, symbolVarCount (SymbolVar 0) 1)] (Bit True) [(Bit True, One), (Bit False, One)]
 
 afterReplace :: Config Count Bit
@@ -67,8 +65,8 @@ spec = do
     it "fails to pvoe a thing that is false" $
       proveInductively 20 checkerboardSweeper (initBook checkerboardSweeper) checkerboardFalseGoal
       (BoundVar 0) `shouldSatisfy` (has _Left)
-    xit "proves a guess for the counter machine" $ 
-      let goal = fromJust $ either (const Nothing) Just $ makeIndGuess 100 weird3 in 
+    xit "proves a guess for the counter machine" $
+      let goal = fromJust $ either (const Nothing) Just $ makeIndGuess 100 weird3 in
         proveInductively 20 weird3 (initBook weird3) goal (BoundVar 0) `shouldBe` Left ("", Nothing)
   describe "replaceVarInSkip" $ do
     it "solves a simple case" $ do
@@ -110,34 +108,33 @@ spec = do
       -- at step 176, F (T, 5) F >F<
       -- at step 366, (T, 6)   F >F<
       --both phase 0
-       makeIndGuess 1000 weird3 `assertPrettySkip` (Skip
+       makeIndGuess 1000 weird3 `assertPrettySkip` Skip
         (Config (Phase 2) [(Bit False, c 1)] (Bit False) [(Bit True, Count 0 Empty (fromList [(BoundVar 0,Sum 1)])), (Bit False, c 1)])
-        (EndMiddle (Config (Phase 2) [] (Bit False) [(Bit True, Count 1 Empty (fromList [(BoundVar 0,Sum 1)])), (Bit False, c 1)]))
+        (SkipStepped (Phase 2) $ Middle (ExpTape [] (Bit False) [(Bit True, Count 1 Empty (fromList [(BoundVar 0,Sum 1)])), (Bit False, c 1)]))
         Empty
-        False)
         --this is of course only one reasonable guess, others would also be fine 
     it "guesses for a sweeper" $ do
       -- at step 15, F >F< (T, 3)
       -- at step 24, >F< (T, 4)
       --both phase 0
-      makeIndGuess 1000 simple_sweeper `assertPrettySkip` (Skip
+      makeIndGuess 1000 simple_sweeper `assertPrettySkip` Skip
         (Config (Phase 0) [(Bit False, c 1)] (Bit False) [(Bit True, Count 0 Empty (fromList [(BoundVar 0, Sum 1)])), (Bit False, c 1)])
-        (EndMiddle (Config (Phase 0) [] (Bit False) [(Bit True, Count 1 Empty (fromList [(BoundVar 0, Sum 1)])), (Bit False, c 1)]))
-        Empty False)
+        (SkipStepped (Phase 0) $ Middle (ExpTape [] (Bit False) [(Bit True, Count 1 Empty (fromList [(BoundVar 0, Sum 1)])), (Bit False, c 1)]))
+        Empty
     it "guesses for a second sweeper" $ do
       -- at step 6, F (T, 3) >F< F
       -- at step 15, (T, 5) >F<
       -- both phase 1 
-      makeIndGuess 1000 checkerboardSweeper `assertPrettySkip` (Skip
+      makeIndGuess 1000 checkerboardSweeper `assertPrettySkip` Skip
         (Config (Phase 1)
             [(Bit True, Count 0 Empty (fromList [(BoundVar 0, Sum 1)])), (Bit False, c 1)] (Bit False) [(Bit False, c 1)])
-        (EndMiddle (Config (Phase 1)
+        (SkipStepped (Phase 1) $ Middle (ExpTape
              [(Bit True, Count 2 Empty (fromList [(BoundVar 0, Sum 1)]))] (Bit False) []))
-        Empty False)
-  describe "replaceSymbolVarInConfig" $ do 
-    it "replaces in a simple example" $ do 
+        Empty
+  describe "replaceSymbolVarInConfig" $ do
+    it "replaces in a simple example" $ do
       replaceSymbolVarInConfig True beforeReplace (SymbolVar 0) (FinCount 5) `shouldBe` afterReplace
-  describe "calcCommonSig" $ do 
-    it "works on a real example" $ 
+  describe "calcCommonSig" $ do
+    it "works on a real example" $
       calcCommonSig (Signature [Bit False] (Bit False) [Bit True,Bit False]) (Signature [] (Bit False) [Bit True,Bit False])
         `shouldBe` Just (True, False)

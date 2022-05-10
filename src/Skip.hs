@@ -12,6 +12,7 @@ import ExpTape
 import Data.Bitraversable (Bitraversable)
 import Data.Bifoldable (Bifoldable)
 import HaltProof
+import Tape
 
 --when the machine halts, there are two ends of the tape plus a thing we push in the middle
 data FinalTape c s = FinalTape ([(s, c)], [(s, c)]) (TapePush c Bit)
@@ -27,6 +28,9 @@ instance (Pretty s, Pretty c, Show s, Show c) => Pretty (FinalTape c s) where
 
 instance Functor (FinalTape c) where 
   fmap f (FinalTape (ls,rs) tp) = FinalTape (first f <$> ls, first f <$> rs) tp 
+
+instance Tapeable (FinalTape InfCount Bit) where 
+  ones (FinalTape (ls,rs) tp) = countList ls + countList rs + ones tp 
 
 --a configuration of the machine's state - it is in a given phase, with the point of the tape and the stuff to the 
 --left and right looking as specified
@@ -67,6 +71,11 @@ instance Bitraversable TapePush where
   bitraverse f g = \case
     Side d xs -> Side d <$> bitraverse g f <%> xs
     Middle tape -> Middle <$> bitraverse g f tape
+
+instance Tapeable (TapePush InfCount Bit) where 
+  ones = \case 
+    Side _dir xs -> countList xs 
+    Middle et -> ones et 
 
 --at the end of a skip, you might've fallen off the L of the given pile of bits, or you might be in the middle of some 
 --known bits, which is a config

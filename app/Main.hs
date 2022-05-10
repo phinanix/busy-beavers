@@ -6,6 +6,7 @@ import Control.Lens
 import qualified Data.Text as T (length)
 import Data.Text.Read
 import System.IO (stdout, BufferMode(..))
+import Prettyprinter 
 
 import Turing
 import TuringExamples
@@ -22,10 +23,10 @@ import SimulationLoops (simulateManyBasicLoop)
 import MoreSimulationLoops
 
 
-simProgram :: (a -> Text) -> Results a -> IO ()
-simProgram display results = do
+simProgram :: (Pretty s, Pretty c, Show s, Show c) => Results c s  -> IO ()
+simProgram results = do
   hSetBuffering stdout NoBuffering
-  putTextLn $ dispResults display $ results
+  putTextLn $ dispResults results
   interact results where
   interact r = do
     putText "Would you like to run a machine listed above?\n If so, enter it's index, else hit enter to exit:"
@@ -96,10 +97,10 @@ main = do
   
   --let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] = indProveLoopMany 141 $ startMachine1 4
   let resultList 
-        :: [(Turing, SimResult Bit (ExpTape Bit InfCount))]
+        :: [(Turing, SimResult InfCount Bit)]
         = bestCurrentProveLoop 141 $ startMachine1 4
   --simProgram dispExpTape $ foldr (uncurry addResult) Empty resultList 
-  putTextLn $ dispResults dispExpTape $ foldr (uncurry addResult) Empty resultList 
+  putTextLn $ dispResults $ foldr (uncurry addResult) Empty resultList 
 
   -- let assertFails = checkLRAssertManyMachines 200 $ startMachine1 4
   -- for_ assertFails putTextLn 

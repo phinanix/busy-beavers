@@ -18,14 +18,14 @@ import Simulate
 import SimulateSkip
 
 --blindly assumes the Turing machine here is a total one 
-simulateBasicAndSkip :: Int -> Turing -> (SimResult Bit (Tape Bit), SimResult Bit SkipTape)
-simulateBasicAndSkip limit t = (normalRes, skipRes) where 
-    normalRes = case Simulate.simulateOneMachine limit t initSimState of 
-        Left e -> error $ show e <> " was not a known edge simulateBasicAndSkip"
-        Right res -> res 
-    skipRes = case SimulateSkip.simulateOneMachine limit t (initSkipState t) of 
-        (_, Left e) -> error $ show e <> " was not a known edge simulateBasicAndSkip 2"
-        (_, Right res) -> res
+-- simulateBasicAndSkip :: Int -> Turing -> (SimResult Bit (Tape Bit), SimResult Bit SkipTape)
+-- simulateBasicAndSkip limit t = (normalRes, skipRes) where 
+--     normalRes = case Simulate.simulateOneMachine limit t initSimState of 
+--         Left e -> error $ show e <> " was not a known edge simulateBasicAndSkip"
+--         Right res -> res 
+--     skipRes = case SimulateSkip.simulateOneMachine limit t (initSkipState t) of 
+--         (_, Left e) -> error $ show e <> " was not a known edge simulateBasicAndSkip 2"
+--         (_, Right res) -> res
 
 -- simulateBasicAndGlue :: Int -> Turing -> (SimResult (Tape Bit), SimResult SkipTape)
 -- simulateBasicAndGlue limit t = (normalRes, skipRes) where 
@@ -36,18 +36,18 @@ simulateBasicAndSkip limit t = (normalRes, skipRes) where
 --     (_, _, Left e) -> error $ show e <> " was not a known edge simulateBasicAndGlue 2"
 --     (_, _, Right res) -> res 
 
-twoThingsSimulatesSame :: SimResult Bit (Tape Bit) -> SimResult Bit SkipTape -> Expectation 
-twoThingsSimulatesSame normalRes skipRes = if normalSteps == skipSteps 
-        then normalRes `shouldBe` expTapeToTape <$> skipRes 
-        else pure () --skips don't always stop right at the limit
-        where 
-        normalSteps = normalRes ^? _Continue . _1 
-        skipSteps = skipRes ^? _Continue . _1 
+-- twoThingsSimulatesSame :: SimResult Bit (Tape Bit) -> SimResult Bit SkipTape -> Expectation 
+-- twoThingsSimulatesSame normalRes skipRes = if normalSteps == skipSteps 
+--         then normalRes `shouldBe` expTapeToTape <$> skipRes 
+--         else pure () --skips don't always stop right at the limit
+--         where 
+--         normalSteps = normalRes ^? _Continue . _1 
+--         skipSteps = skipRes ^? _Continue . _1 
 
-simulatesSameForAll :: (Int -> Turing -> (SimResult Bit (Tape Bit), SimResult Bit SkipTape)) 
-  -> Int -> Turing -> Expectation 
-simulatesSameForAll func limit t = for_ [0.. limit] 
-  (\i -> uncurry twoThingsSimulatesSame $ func i t)
+-- simulatesSameForAll :: (Int -> Turing -> (SimResult Bit (Tape Bit), SimResult Bit SkipTape)) 
+--   -> Int -> Turing -> Expectation 
+-- simulatesSameForAll func limit t = for_ [0.. limit] 
+--   (\i -> uncurry twoThingsSimulatesSame $ func i t)
 
 -- the point of this function is given a machine plus a skip we expect to hold for that machine, 
 -- to check that skip in fact holds for the machine by using naive simulation 
@@ -79,8 +79,8 @@ phase: 1  (T, 1) |>F<|(F, 0 + 1*x_0 ) (T, 1)
 skipEx :: Skip Count Bit
 skipEx = Skip 
   (Config (Phase 3) [(Bit True, One <> boundVarCount (BoundVar 0) 1)] (Bit True) [])
-  (EndMiddle $ Config (Phase 1) [(Bit True, One)] (Bit False) [(Bit False, boundVarCount (BoundVar 0) 1), (Bit True, One)])
-  Empty False
+  (SkipStepped  (Phase 1) $ Middle $ ExpTape [(Bit True, One)] (Bit False) [(Bit False, boundVarCount (BoundVar 0) 1), (Bit True, One)])
+  Empty
 --(F, inf) (T, 1) |>T<|(T, 7) (F, inf)
 tapeEx :: (Phase, ExpTape Bit InfCount)
 tapeEx = (Phase 3,
