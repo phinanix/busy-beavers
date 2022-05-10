@@ -21,6 +21,7 @@ import Glue
 import Simulate
 import SimulateSkip ( TwoBit(..) )
 import Tape
+import HaltProof (HaltProof(Cycle))
 {-
 because we're on the left of the twobit, we can split transitions into two groups:
 1) the transitions where we step left right away, where we need to make a skip for every
@@ -62,7 +63,7 @@ cycle: the machine enters the same state in steps n and m
 data ConditionEnd = UnknownEdge Edge
                   | FallRight Phase [Bit]
                   | ReachedLeftMost Phase Bit [Bit]
-                  | Cycle Natural Natural
+                  | CECycle Natural Natural
                   | Halts (Tape Bit)
 
   deriving (Eq, Ord, Show, Generic)
@@ -73,7 +74,7 @@ simulateUntilCondition t (ph, startTape) = loop startState 0 Empty where
   loop :: TMState (Tape Bit) -> Natural -> Map (TMState (Tape Bit)) Natural
     -> (Natural, ConditionEnd)
   loop curState curStep pastStateMap = case pastStateMap ^. at curState of
-    Just m -> (m, Cycle curStep m)
+    Just m -> (m, CECycle curStep m)
     Nothing -> let
       newMap = pastStateMap & at curState ?~ curStep
       newStep = curStep + 1
@@ -93,13 +94,14 @@ makeTwoBitSkip t (startPh, startT) = Skip skipStart skipEnd hops
   skipStart = etToConfig startPh $ etBitToTwoBit $ unFlattenET startT
   (hops, simEnd) = simulateUntilCondition t (startPh, startT)
   skipEnd = case simEnd of
-    UnknownEdge e -> error "unknownSkip"
+    UnknownEdge e -> SkipUnknownEdge e
     FallRight ph ls -> SkipStepped ph $ Side R $ rle $ pairBitList ls
     ReachedLeftMost ph p (r : rs) 
       -> SkipStepped ph $ Middle $ ExpTape [] (TwoBit p r) $ rle $ pairBitList rs
     ReachedLeftMost {} -> error "unreachable maketwobitskip"
-    Cycle n m -> error "cycleSkip"
-    Halts finalTape -> error "haltSkip"
+    --TODO: these numbers are wrong, as is >>
+    CECycle n m -> SkipNonhaltProven $ Cycle (fromIntegral n) (fromIntegral m)
+    Halts tape -> SkipHalt $ Middle $ unFlattenET tape
 
 
 unRLE :: [(s, Natural)] -> [s]
@@ -145,3 +147,6 @@ etTwoBitToBit (ExpTape lpairs (TwoBit p r) rpairs) = let
   in
   ExpTape (rle ls) p (rle rs)
 
+--the next thing to do to get this working is to make the `initskips` thing in simulate
+--polymorphic, and to start piping through the polymorphism more, as before, to be able
+--to do the usual simulation type stuff but with Twobit
