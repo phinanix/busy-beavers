@@ -19,7 +19,7 @@ import Count
 import Results
 import Glue
 import Simulate
-import SimulateSkip ( TwoBit(..) )
+import SimulateSkip ( TwoBit(..), SkipBook, addInitialSkipToBook )
 import Tape
 import HaltProof (HaltProof(Cycle))
 {-
@@ -103,6 +103,9 @@ makeTwoBitSkip t (startPh, startT) = Skip skipStart skipEnd hops
     CECycle n m -> SkipNonhaltProven $ Cycle (fromIntegral n) (fromIntegral m)
     Halts tape -> SkipHalt $ Middle $ unFlattenET tape
 
+initTwoBitBook :: Turing -> SkipBook TwoBit 
+initTwoBitBook t = appEndo (foldMap (Endo . addInitialSkipToBook) skips) Empty where 
+  skips = first FinCount . makeTwoBitSkip t . second flattenET <$> allInitTapes t
 
 unRLE :: [(s, Natural)] -> [s]
 unRLE = bind (\(s, n) -> genericReplicate n s)

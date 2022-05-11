@@ -80,8 +80,6 @@ instance Tapeable (TapePush InfCount Bit) where
 --at the end of a skip, you might've fallen off the L of the given pile of bits, or you might be in the middle of some 
 --known bits, which is a config
 data SkipEnd c s = SkipStepped Phase (TapePush c s)
-                --  EndSide Phase Dir [(s, c)] 
-                -- | EndMiddle (Config c s)
                  | SkipHalt (TapePush c Bit) --the machine halts and puts this out onto the tape
                  | SkipUnknownEdge Edge 
                  | SkipNonhaltProven (HaltProof s)  
