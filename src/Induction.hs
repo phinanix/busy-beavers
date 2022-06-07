@@ -57,8 +57,9 @@ Shortrange plan to get a thing which can prove the counter machine into main
 --we need the current step for the haltproof
 --we always return the new book
 --we return either a haltproof, or a text saying how we failed
-proveInductivelyIMeanIT :: Turing -> SkipBook Bit -> Steps -> TapeHist Bit InfCount -> DispHist
-    -> (SkipBook Bit, Either Text (Skip Count Bit))
+proveInductivelyIMeanIT :: (TapeSymbol s) => Turing -> SkipBook s -> Steps 
+    -> TapeHist s InfCount -> DispHist
+    -> (SkipBook s, Either Text (Skip Count s))
 proveInductivelyIMeanIT machine book curStep hist dispHist
   = --force $ 
   case guessInductionHypothesis hist dispHist of
@@ -76,12 +77,12 @@ proveInductivelyIMeanIT machine book curStep hist dispHist
 --the latter makes no progress if it proves 0 things, which is one way to abort
 --the former makes no progress if it gets stuck on the same thing as last time, which we note in order to track
 --we also as usual put a finite integer on the number of loops we can do, although hitting that would be pretty insane
-proveStrong :: Int -> Turing -> SkipBook Bit
- -> Skip Count Bit -> BoundVar -> (SkipBook Bit, Either Text (SkipOrigin Bit))
+proveStrong :: forall s. (TapeSymbol s) => Int -> Turing -> SkipBook s
+ -> Skip Count s -> BoundVar -> (SkipBook s, Either Text (SkipOrigin s))
 proveStrong loopLim machine book goal indVar = swapEither <$> loop 0 book Nothing where
   -- the skiporigin is one for specifically the goal 
   -- the text is "we failed"
-  loop :: Int -> SkipBook Bit -> Maybe (Config Count Bit) -> (SkipBook Bit, Either (SkipOrigin Bit) Text)
+  loop :: Int -> SkipBook s -> Maybe (Config Count s) -> (SkipBook s, Either (SkipOrigin s) Text)
   loop idx curBook mbLastStuck = --trace ("provestrong loop " <> show idx <> "\n") $
     if idx > loopLim then error "wow we exceeded looplim!" -- Right "limit exceeded" 
     else case proveInductively 100 machine curBook goal indVar of
@@ -112,9 +113,9 @@ simulates forward and sees if that works. This is good to be able to prove thing
 tree that just goes back and forth and we already know it skips blocks of 1s so we can just simulate for 
 a finite number of steps.
 -}
-proveSimply :: Int -> Turing -> SkipBook Bit -> Skip Count Bit
-  -> Either (Text, Maybe (Config Count Bit)) (SkipOrigin Bit)
-proveSimply limit t book goal = undefined
+-- proveSimply :: Int -> Turing -> SkipBook Bit -> Skip Count Bit
+  -- -> Either (Text, Maybe (Config Count Bit)) (SkipOrigin Bit)
+-- proveSimply limit t book goal = undefined
 
 --goal: make a thing that takes a skip that might apply to a certain machine, 
 --attempts to simulate forward to prove that skip using induction
@@ -426,7 +427,7 @@ getSlicePair hist disps start end = getSlicePair' startTape endTape disps start 
     startTape = hist ^?! ix start . _2
     endTape = hist ^?! ix end . _2
 
-getSlicePairC :: [(Phase, ExpTape Bit Count)] -> [Int] -> Int -> Int -> (ExpTape Bit Count, ExpTape Bit Count)
+getSlicePairC :: (Eq s) => [(Phase, ExpTape s Count)] -> [Int] -> Int -> Int -> (ExpTape s Count, ExpTape s Count)
 getSlicePairC hist = getSlicePair $ (fmap $ fmap $ second NotInfinity) hist
 
 --says whether by dropping one or both the left or the right bits of the start sig, we can reach the end sig
@@ -563,7 +564,7 @@ zipSigToET sig@(Signature b_ls p b_rs) pair@(c_ls, c_rs) = let
 
 --gets the simulation history and the displacement history
 --normally these are output backwards which is of course crazy so we fix them here 
-simForStepNumFromConfig :: Partial => Int -> Turing -> Config Count Bit -> (TapeHist Bit Count, DispHist)
+simForStepNumFromConfig :: (Partial, TapeSymbol s) => Int -> Turing -> Config Count s -> (TapeHist s Count, DispHist)
 simForStepNumFromConfig limit machine startConfig
     = (second deInfCount $ finalState ^. s_history, finalState ^. s_disp_history)
     where
@@ -598,7 +599,8 @@ a lot of the possible "guesswhathappensnext"s are true but are once again not pr
 we're going to return a list of them instead, in the hopes that one works
 for now, lets do all of the ones that have the same signature complexity as the minimum
 -}
-guessWhatHappensNext :: Turing -> Config Count Bit -> SymbolVar -> [Skip Count Bit]
+guessWhatHappensNext :: forall s. (TapeSymbol s) 
+  => Turing -> Config Count s -> SymbolVar -> [Skip Count s]
 guessWhatHappensNext machine startConfig varToGeneralize
  = mapMaybe generalizeOneSig (--force $ 
  toList sigsWhichOccurred) where
@@ -609,18 +611,18 @@ guessWhatHappensNext machine startConfig varToGeneralize
     pairsToSimulateAt :: NonEmpty (Int, Natural)
     pairsToSimulateAt = (\x -> (2000, x)) <$> numsToSimulateAt
     -- the simulation history and the displacement history
-    simsAtNums :: NonEmpty ([(Phase, ExpTape Bit Count)], [Int])
+    simsAtNums :: NonEmpty ([(Phase, ExpTape s Count)], [Int])
     simsAtNums = let
       ans = bimap getTapeHist getDispHist <$> ((\(x,y) -> simForStepNumFromConfig x machine
         $ replaceSymbolVarInConfig True startConfig varToGeneralize
         $ FinCount y) <$> pairsToSimulateAt)
-      msg = toString $ T.intercalate "startsim:\n" $ (\x -> "length: " <> show (length x) <> "\n" <> displayHist x) .
-        fmap (fmap (second NotInfinity)) . fst <$> toList ans
+      -- msg = toString $ T.intercalate "startsim:\n" $ (\x -> "length: " <> show (length x) <> "\n" <> displayHist x) .
+      --   fmap (fmap (second NotInfinity)) . fst <$> toList ans
       in
       --trace msg 
       ans
     --occurred in all simulations 
-    sigsWhichOccurred :: Set (Phase, Signature Bit)
+    sigsWhichOccurred :: Set (Phase, Signature s)
     sigsWhichOccurred = let
         (sig1 :| restSignatures) = fromList . fmap (fmap tapeSignature) . view _1 <$> simsAtNums
         ans = foldr S.intersection sig1 restSignatures
@@ -629,15 +631,15 @@ guessWhatHappensNext machine startConfig varToGeneralize
         -- $ trace msg 
         ans
     --generalizes an ending signature if possible
-    generalizeOneSig :: (Phase, Signature Bit) -> Maybe (Skip Count Bit)
+    generalizeOneSig :: (Phase, Signature s) -> Maybe (Skip Count s)
     generalizeOneSig psb@(_p, sigToGeneralize) = --force $ --trace ("generalizing\n" <> show sigToGeneralize)
       res where
-        munge :: [(Phase, ExpTape Bit Count)] -> (Int, (Phase, ExpTape Bit Count))
+        munge :: [(Phase, ExpTape s Count)] -> (Int, (Phase, ExpTape s Count))
         munge hist = case findIndex (\(p, t) -> (p, tapeSignature t) == psb) hist of
             Nothing -> error "there was nothing with a signature we checked is in everything"
             Just i -> (i, hist !! i)
         --for each hisory, the time at which the signature occured, and the simstate at that point
-        finalIndexAndConfig :: NonEmpty (Int, (Phase, ExpTape Bit Count))
+        finalIndexAndConfig :: NonEmpty (Int, (Phase, ExpTape s Count))
         finalIndexAndConfig = let
              ans = munge . view _1 <$>  simsAtNums
              msg = "final indices and configs\n" <> toString (T.intercalate "\n" $ toList $ show . pretty <$> ans)
@@ -683,7 +685,7 @@ guessWhatHappensNext machine startConfig varToGeneralize
         --bigMap = bimapBoth . bimapBoth . fmap
         --transposedCountLists = bitraverseBoth (bitraverseBoth (traverse generalizeCL)) flippedCountLists
         res = do
-            let slicedPairs :: NonEmpty (ExpTape Bit Count, ExpTape Bit Count)
+            let slicedPairs :: NonEmpty (ExpTape s Count, ExpTape s Count)
                 slicedPairs = let
                   ans = (\(i, (hist, disps)) -> getSlicePairC hist disps 0 i) <$>
                     neZipExact finalIndices simsAtNums
@@ -762,8 +764,8 @@ thingContainsVar = getAny . bifoldMap (Any . countContainsVar) (const mempty) wh
         _notFin -> True
 
 
-guessAndProveWhatHappensNext :: Turing -> SkipBook Bit -> Config Count Bit
-  -> SymbolVar -> [(Skip Count Bit, SkipOrigin Bit)]
+guessAndProveWhatHappensNext :: (TapeSymbol s) => Turing -> SkipBook s -> Config Count s
+  -> SymbolVar -> [(Skip Count s, SkipOrigin s)]
 guessAndProveWhatHappensNext machine book startConfig varToGeneralize
   = --trace ("trying to guess what happens after:\n" <> show (pretty startConfig)) $
     mapMaybe getProof $ zipExact goodGuesses proofAttempts

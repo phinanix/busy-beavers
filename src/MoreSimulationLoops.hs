@@ -57,7 +57,9 @@ then we change the return type of proveInd to return the new skip if possible
 then we write a function which runs proveInd, if it succeeds uses chainArbitrary, 
 and then checks whether the skip runs forever
 -}
-proveByInd :: SimOneAction Bit
+
+
+proveByInd :: (TapeSymbol s) => SimOneAction s
 proveByInd machine state = --force $ --trace ("proveByInd on:\n" <> showP machine) $ 
  case eTProof of
   Left _msg -> Right newState
@@ -76,6 +78,8 @@ proveByInd machine state = --force $ --trace ("proveByInd on:\n" <> showP machin
   eTProof = let ans = flip skipAppliesForeverInHist hist =<< eTArbSkip in
     --trace ("etproof:\n" <> show ans) 
     ans
+{-# SPECIALISE proveByInd :: SimOneAction Bit #-}
+{-# SPECIALISE proveByInd :: SimOneAction TwoBit #-}
 
 proveSimply :: (TapeSymbol s) => SimOneAction s
 proveSimply machine state = case mbProof of
@@ -87,6 +91,8 @@ proveSimply machine state = case mbProof of
     first fst $ proveBySimulating 100 machine (state ^. s_book) indHyp
     arbSkip <- chainArbitrary indHyp
     skipAppliesForeverInHist arbSkip (state ^. s_history)
+{-# SPECIALISE proveSimply :: SimOneAction Bit #-}
+{-# SPECIALISE proveSimply :: SimOneAction TwoBit #-}
 
 {-
 goal: write a function which runs 1) LR 2) cycle finding 3) end-of-tape
@@ -102,6 +108,7 @@ proveByLR _machine state = case maybeProof of
   maybeProof = detectLinRecurrence (state ^. s_history) (state ^. s_readshift_history)
 
 {-# SPECIALISE proveByLR :: SimOneAction Bit #-}
+{-# SPECIALISE proveByLR :: SimOneAction TwoBit #-}
 
 proveLRLoop :: Int -> Turing -> OneLoopRes Bit
 proveLRLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit

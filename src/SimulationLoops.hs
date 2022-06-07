@@ -217,6 +217,7 @@ simulateStepPartial limit machine (SimState ph tape book steps skipTrace hist hi
         hist histSet (counter + 1) (curDisp + fromJust newDisp) dispHist (addToRRSH rs rsHist)
 
 {-# SPECIALISE simulateStepPartial :: Int -> SimMultiAction Bit #-}
+{-# SPECIALISE simulateStepPartial :: Int -> SimMultiAction TwoBit #-}
 
 -- gluePreviousTwoSkips :: (TapeSymbol s) => SimState s -> SimState s
 -- gluePreviousTwoSkips state = state & s_book .~ newBook where
@@ -258,8 +259,8 @@ checkSeenBefore _machine state = case seenBeforeProof state of
   where
   histEnt = (state ^. s_phase, state ^. s_tape)
   curStepCount = state ^. s_steps
-
 {-# SPECIALISE checkSeenBefore :: SimOneAction Bit #-}
+{-# SPECIALISE checkSeenBefore :: SimOneAction TwoBit #-}
 
 
 --applies the skip to everything in the list, checks if any of them have just 

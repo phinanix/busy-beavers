@@ -26,6 +26,7 @@ import Skip
 import Util
 import Display
 import SimulationLoops
+import MoreSimulationLoops
 
 {-
 OneShot either fails, or hits an unknown edge requesting it to be defined (after 
@@ -62,7 +63,7 @@ outerLoop tacticList startMachine = loop [(startMachine, 0)] [] where
       -> [(Turing, SimResult InfCount s)]
   loop [] res = res
   loop ((tm, n) : todos) curRes = case tacticList V.!? n of
-    -- TODO: how to get a "we failed" result
+    -- TODO: how to get a "we failed" result / let's do a better one than this
     Nothing -> let newRes = Continue 0 (Phase 0) (initExpTape blank) 0 in
       loop todos ((tm, newRes) : curRes)
     Just (OneShot f) -> case f tm of
@@ -77,23 +78,54 @@ tacticBackwardSearch :: Tactic s
 tacticBackwardSearch = OneShot (fmap (Right . ContinueForever) . backwardSearch)
 
 --int is the limit on number of steps
+--todo we want to be able to run something right before we give up
 simLoop :: forall s. (TapeSymbol s)
-  => Int 
+  => Int
   -> NonEmpty (SimMultiAction s)
   -> Turing
-  -> ([Turing], [SimResult InfCount s])
-simLoop bigStepLimit updateFuncs startMachine = undefined where 
+  -> ([Turing], [(Turing, SimResult InfCount s)])
+simLoop bigStepLimit updateFuncs startMachine 
+  = loop (startMachine, 0, initSkipState startMachine) [] ([], [])
+  where
   bigUpdateFunc :: Turing -> SimState s -> MultiResult s (SimState s)
   bigUpdateFunc machine = foldl1 (>=>) ((&) machine <$> updateFuncs)
   loop :: (Turing, Int, SimState s) -> [(Turing, Int, SimState s)]
     -> ([Turing], [(Turing, SimResult InfCount s)])
     -> ([Turing], [(Turing, SimResult InfCount s)])
-  loop cur@(curMachine, curBigStep, curState) todo resSoFar@(unsolved, solved) 
-    = if curBigStep >= bigStepLimit 
+  loop cur@(curMachine, curBigStep, curState) todo resSoFar@(unsolved, solved)
+    = if curBigStep >= bigStepLimit
       then recurse todo (curMachine : unsolved, solved)
-      else case uncurry bigUpdateFunc cur of 
+      else case bigUpdateFunc curMachine curState of
+        NewState newState -> loop (curMachine, curBigStep + 1, newState) todo resSoFar
+        Result result -> recurse todo (unsolved, (curMachine, result) : solved)
+        UnknownEdge e -> let
+          candidateMachines = branchOnEdge e curMachine
+          in
+          recurse ((makeNewState e cur <$> candidateMachines) <> todo) resSoFar
+  makeNewState :: Edge -> (Turing, Int, SimState s) -> Turing -> (Turing, Int, SimState s)
+  makeNewState edge (_oldM, bigStep, oldState) machine
+    = (machine, bigStep, oldState & s_book %~ updateBook edge machine)
   recurse :: [(Turing, Int, SimState s)]
     -> ([Turing], [(Turing, SimResult InfCount s)])
     -> ([Turing], [(Turing, SimResult InfCount s)])
-  recurse [] results = results 
-  recurse (next : todos) results = loop next todos results 
+  recurse [] results = results
+  recurse (next : todos) results = loop next todos results
+
+
+basicSimLoop :: Tactic Bit 
+basicSimLoop = Simulation $ simLoop 150 $ simulateStepPartial maxInt :| 
+  (liftOneToMulti <$> [checkSeenBefore, liftModifyState recordHist, 
+  liftModifyState recordDispHist,
+  runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof,
+  runIfCond (atRightOfTape . view s_tape) attemptOtherEndOfTapeProof
+  ])
+
+twoBitSimLoop :: Tactic TwoBit 
+twoBitSimLoop = Simulation $ simLoop 50 $ simulateStepPartial maxInt :| 
+  (liftOneToMulti <$> [checkSeenBefore
+  , liftModifyState recordHist
+  , liftModifyState recordDispHist
+  , runAtCount 10 proveByLR
+  , runAtCount 40 proveSimply
+  , runAtCount 45 proveByInd
+  ])
