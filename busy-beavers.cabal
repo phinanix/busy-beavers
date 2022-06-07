@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 2b631f9a1feea2dc7dcd2db4f1d0107eb77f1fab5be4a0440423c0f3a5ebd9c5
+-- hash: ae3b09c5f5dbed285d03baf29170cd9056511a9252b3307f2e1716623f9f23a9
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -39,6 +39,7 @@ library
       LinRecurrence
       MoreSimulationLoops
       Notation
+      OuterLoop
       Results
       Simple.Display
       Simple.Simulate
@@ -111,6 +112,7 @@ library
     , relude
     , safe
     , text
+    , vector
     , witherable
   default-language: Haskell2010
 

@@ -57,17 +57,17 @@ spec = do
      transposeNE ([1,2] :| [[3,4],[5,6]]) `shouldBe` [1 :| [3,5], 2 :| [4,6]]
   describe "proveInductively" $ do
     it "proves a simple thing" $
-      proveInductively 20 simple_sweeper (initBook simple_sweeper) simple_sweeperGoal (BoundVar 0)
-      `shouldBe` Right (Induction (initBook simple_sweeper) 20)
+      proveInductively 20 simple_sweeper (initBookBit simple_sweeper) simple_sweeperGoal (BoundVar 0)
+      `shouldBe` Right (Induction (initBookBit simple_sweeper) 20)
     xit "proves a counter machine counts" $
-      proveInductively 20 weird3 (initBook weird3) weird3Goal (BoundVar 0)
-      `shouldBe` Right (Induction (initBook weird3) 20)
+      proveInductively 20 weird3 (initBookBit weird3) weird3Goal (BoundVar 0)
+      `shouldBe` Right (Induction (initBookBit weird3) 20)
     it "fails to pvoe a thing that is false" $
-      proveInductively 20 checkerboardSweeper (initBook checkerboardSweeper) checkerboardFalseGoal
+      proveInductively 20 checkerboardSweeper (initBookBit checkerboardSweeper) checkerboardFalseGoal
       (BoundVar 0) `shouldSatisfy` (has _Left)
     xit "proves a guess for the counter machine" $
       let goal = fromJust $ either (const Nothing) Just $ makeIndGuess 100 weird3 in
-        proveInductively 20 weird3 (initBook weird3) goal (BoundVar 0) `shouldBe` Left ("", Nothing)
+        proveInductively 20 weird3 (initBookBit weird3) goal (BoundVar 0) `shouldBe` Left ("", Nothing)
   describe "replaceVarInSkip" $ do
     it "solves a simple case" $ do
       3 `shouldBe` 3

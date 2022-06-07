@@ -109,22 +109,16 @@ class (Ord s, Show s, Pretty s) => TapeSymbol s where
   getPoint :: s -> Bit -- the thing under the machinehead at the point
   toBits :: s -> [Bit]
   fromBits :: [Bit] -> ([s], [Bit]) --the second list is the one remaining
-
-instance TapeSymbol Bit where
-  blank = Bit False
-  getPoint = id
-  toBits x = [x]
-  fromBits = (,[])
-
-instance TapeSymbol TwoBit where
-  blank = TwoBit (Bit False) (Bit False)
-  --for now, we're going with the "you're always on the left part of the symbol" take
-  getPoint (TwoBit x _) = x
-  toBits = \case TwoBit bit bit' -> [bit, bit']
-  fromBits = \case
-    --I need the type ([x], y) -> x -> ([x], y)
-    (x: y : rest) -> first (TwoBit x y :) $ fromBits rest
-    tail -> ([], tail)
+  --given a turing machine, how do you create a list of skips sufficient to 
+  --cover all possible situations
+  initBook :: Turing -> SkipBook s
+  --given an edge which has just been defined in a given turing machine, take the 
+  --skipbook before that edge was defined and give me the skipbook after the edge
+  --was defined 
+  --the default implementation just uses initBook; and updateBook is just
+  --giving the ability to provide something more optimized than that
+  updateBook :: Edge -> Turing -> SkipBook s -> SkipBook s
+  updateBook _e tm _oldBook = initBook tm 
 
 --the data type storing various proven skips associated with a machine
 --the "Phase, s" is the Phase on start and the "s" that the point is made of
@@ -416,8 +410,8 @@ addInitialSkipToBook skip = addSkipToBook skip Initial
 addMultipleToBook :: (Ord s) => [(Skip Count s, SkipOrigin s)] -> SkipBook s -> SkipBook s
 addMultipleToBook xs book = foldr (uncurry addSkipToBook) book xs
 
-initBook :: Turing -> SkipBook Bit
-initBook (Turing _n trans) = appEndo (foldMap (Endo . addInitialSkipToBook) skips) Empty where
+initBookBit :: Turing -> SkipBook Bit
+initBookBit (Turing _n trans) = appEndo (foldMap (Endo . addInitialSkipToBook) skips) Empty where
   skips = foldMap (uncurry initTransSkip) $ assocs trans
 
 initTwoBitBook :: Turing -> SkipBook TwoBit
@@ -425,6 +419,24 @@ initTwoBitBook t = undefined
 
 lookupSkips :: (Ord s) => (Phase, s) -> SkipBook s -> Set (Skip Count s)
 lookupSkips (p, s) book = keysSet $ book ^. atE (p, s)
+
+instance TapeSymbol Bit where
+  blank = Bit False
+  getPoint = id
+  toBits x = [x]
+  fromBits = (,[])
+  initBook = initBookBit
+
+instance TapeSymbol TwoBit where
+  blank = TwoBit (Bit False) (Bit False)
+  --for now, we're going with the "you're always on the left part of the symbol" take
+  getPoint (TwoBit x _) = x
+  toBits = \case TwoBit bit bit' -> [bit, bit']
+  fromBits = \case
+    --I need the type ([x], y) -> x -> ([x], y)
+    (x: y : rest) -> first (TwoBit x y :) $ fromBits rest
+    tail -> ([], tail)
+  initBook = initTwoBitBook 
 
 --if the machine halts, pick that one, else pick the one that goes farther
 -- skipFarthest :: (Eq s, Eq c, Eq c')
@@ -496,13 +508,14 @@ pickBestSkip = \case
 
 type SkipTape = ExpTape Bit InfCount
 
-skipStateFromPhTape :: Turing -> Phase -> ExpTape Bit InfCount  -> SimState Bit
+skipStateFromPhTape :: (TapeSymbol s) 
+  => Turing -> Phase -> ExpTape s InfCount  -> SimState s
 skipStateFromPhTape t ph tape = SimState ph tape (initBook t) 0 []
   (ReverseTapeHist [(ph, tape)]) (one ((Phase 0,tape), 0)) 0 0
   (ReverseDispHist [0]) (ReverseReadShiftHist [])
 
-initSkipState :: Turing -> SimState Bit
-initSkipState t = skipStateFromPhTape t (Phase 0) (initExpTape (Bit False))
+initSkipState :: (TapeSymbol s) => Turing -> SimState s
+initSkipState t = skipStateFromPhTape t (Phase 0) (initExpTape blank)
 
 simulateOneMachine :: Int -> Turing -> SimState Bit
   -> ([Skip Count Bit], Either Edge (SimResult InfCount Bit))
@@ -529,8 +542,8 @@ simulateOneMachine limit t = \case
 simulateOneTotalMachine :: Int -> Turing -> ([Skip Count Bit], SimResult InfCount Bit)
 simulateOneTotalMachine limit machine = (^?! _Right) <$> simulateOneMachine limit machine (initSkipState machine)
 
-updateBook :: Edge -> Turing -> SkipBook Bit -> SkipBook Bit
-updateBook edge (Turing _ trans) book =
+updateBookBit :: Edge -> Turing -> SkipBook Bit -> SkipBook Bit
+updateBookBit edge (Turing _ trans) book =
   let newSkips = initTransSkip edge (trans ^?! ix edge) in
     foldr addInitialSkipToBook book newSkips
 

@@ -28,6 +28,7 @@ library:
   - containers
   - lens
   - monoidal-containers
+  - vector
   - mtl
   - prettyprinter
   - relude

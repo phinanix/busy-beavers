@@ -25,6 +25,23 @@ import Display
 import Safe.Partial
 import Notation
 
+{-
+We'd like to update this module to have two layers of concepts: 
+1) the "inner" layer is a simulation, which is made up of a number of simulation actions
+   and simulates a machine running on the tape for some distance. Once it reaches the end of
+   the simulation, it has a list of "finalization" actions to take. It also has the ability 
+   to branch on an undefined edge and then replaces the currently running machine with all
+   possibile instantations of that machine. As a result, a given simulation takes in a 
+   machine, and returns a list of either simulation results, or machines to simulate 
+   further. There may be several simulation tactics that do different things. 
+
+2) the "outer" layer: this is a lightweight framework that runs a number of "tactics" after 
+   one another, where each tactic (roughly) returns a Maybe (SimResult). Once a result is 
+   obtained, then that machine is done and we move onto the next machine. While the tactics
+   so far have failed, we try each additional tactic in order. We want some way to get a 
+   "failure" result if no tactics work, as well.  
+
+-}
 
 type SimOneAction s = Turing -> SimState s -> Either (SimResult InfCount s) (SimState s)
 
@@ -66,19 +83,20 @@ simOneFromStartLoop :: NonEmpty (SimOneAction Bit) -> Turing -> OneLoopRes Bit
 simOneFromStartLoop updateFuncs startMachine
   = simulateOneMachineOuterLoop updateFuncs startMachine (initSkipState startMachine)
 
-simulateManyMachinesOuterLoop :: (Turing -> Maybe (HaltProof Bit))
-  -> NonEmpty (SimMultiAction Bit)
+simulateManyMachinesOuterLoop :: forall s. (TapeSymbol s) 
+  => (Turing -> Maybe (HaltProof s))
+  -> NonEmpty (SimMultiAction s)
   -> Turing
-  -> [(Turing, SimResult InfCount Bit)]
+  -> [(Turing, SimResult InfCount s)]
 simulateManyMachinesOuterLoop staticAnal updateFuncs startMachine
   = loop (startMachine, startState) [] []
   where
-  startState :: SimState Bit
+  startState :: SimState s
   startState = initSkipState startMachine
-  bigUpdateFunc :: Turing -> SimState Bit -> MultiResult Bit (SimState Bit)
+  bigUpdateFunc :: Turing -> SimState s -> MultiResult s (SimState s)
   bigUpdateFunc machine = foldl1 (>=>) ((&) machine <$> updateFuncs)
-  loop :: (Turing, SimState Bit) -> [(Turing, SimState Bit)]
-    -> [(Turing, SimResult InfCount Bit)] -> [(Turing, SimResult InfCount Bit)]
+  loop :: (Turing, SimState s) -> [(Turing, SimState s)]
+    -> [(Turing, SimResult InfCount s)] -> [(Turing, SimResult InfCount s)]
   loop cur@(curMachine, curState) todo !prevRes = --trace (show $ machineToNotation curMachine) $ --force $
    case uncurry bigUpdateFunc cur of
     NewState newState -> loop (curMachine, newState) todo prevRes
@@ -96,9 +114,9 @@ simulateManyMachinesOuterLoop staticAnal updateFuncs startMachine
         (newMachines, reses) = partitionEithers $ uncurry makeRes <$> zip candidateMachines mbProofs
       in
         recurse ((makeNewState e curState <$> newMachines) <> todo) (reses <> prevRes)
-  makeNewState :: Edge -> SimState Bit -> Turing -> (Turing, SimState Bit)
+  makeNewState :: Edge -> SimState s -> Turing -> (Turing, SimState s)
   makeNewState edge state machine = (machine, state & s_book %~ updateBook edge machine)
-  recurse :: [(Turing, SimState Bit)] -> [(Turing, SimResult InfCount Bit)] -> [(Turing, SimResult InfCount Bit)]
+  recurse :: [(Turing, SimState s)] -> [(Turing, SimResult InfCount s)] -> [(Turing, SimResult InfCount s)]
   --recurse todos results | trace ("length todos: " <> show (length todos) <> " length results: " <> show (length results) <> " and last result" <> show (viaNonEmpty head results))    False = undefined
   recurse [] results = --trace "recursed empty" 
     results
