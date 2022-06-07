@@ -36,7 +36,7 @@ import Display
 import Safe.Partial
 import HaltProof
 import Glue
-
+import TapeSymbol
 
 --given a list, sorts it and uses this to find whether it contains a duplicate
 hasPair :: (Ord a) => [a] -> Maybe (Int, Int)

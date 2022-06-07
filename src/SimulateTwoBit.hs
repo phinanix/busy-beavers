@@ -19,7 +19,7 @@ import Count
 import Results
 import Glue
 import Simulate
-import SimulateSkip ( TwoBit(..), SkipBook, addInitialSkipToBook )
+import TapeSymbol
 import Tape
 import HaltProof (HaltProof(Cycle))
 {-

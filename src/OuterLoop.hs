@@ -20,13 +20,32 @@ import ExpTape
 import Count
 import HaltProof
 import Results
-import Glue
 import SimulateSkip
-import Skip
-import Util
-import Display
+import TapeSymbol
 import SimulationLoops
 import MoreSimulationLoops
+
+{- 7 June 22 overall state
+the tactics are coming along nicely, I'm super excited to have a TwoBit simulation tactic
+
+the main remaining obstacle to using that to crush my enemies is that we currently aren't 
+polymorphic over tactic types in outerloop, and to fix that we need to rework SimResult 
+somewhat I think; or put it in a box that doesn't know about the type or something
+
+relatedly, I would like to cleanup simresult. I think I would like to go through and make an 
+explicit list of all the ways my program can prove a machine runs forever, and make HaltProof
+exactly match that list. 
+
+To generalize SimResult, it seems like what we need is essentially a tape-symbol agnostic way
+to say "here is a tape we ended with", or "here is a skip". 
+Which it seems like we can do with a wrapper type using an existential. 
+
+A random other point is that it's going to be interesting figuring out how to make all the 
+polymorphic things specialize when we don't have the output type. It seem like we'll probably 
+just have to use VisibleTypeApplication. 
+
+high priority todo: finish initBookTwoBit (it's very close I think)
+-}
 
 {-
 OneShot either fails, or hits an unknown edge requesting it to be defined (after 

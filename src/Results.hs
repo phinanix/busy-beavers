@@ -12,17 +12,32 @@ import HaltProof
 import Skip
 import ExpTape
 import Notation (dispTuring)
-
+import TapeSymbol
+import Mystery
 
 -- s is symbol and a is the type of tape 
 data SimResult c s = Halted Steps (FinalTape c s) --this is steps taken and int is the total displacement
                | Continue Steps Phase (ExpTape s c) Int
                | ContinueForever (HaltProof s)
+               --the reason this is still in, is that in proveByInd / induction in general 
+               --the machine might get stuck and we don't know a better way to handle that
+               --yet 
                | MachineStuckRes
                deriving (Eq, Ord, Show, Generic)
 instance (NFData c, NFData s) => (NFData (SimResult c s))
 --this doesn't work for some bizarre reason, it gives some big kind error :c
 -- $(makePrisms ''SimResult)
+
+newtype SwitchTape c s = Switch (ExpTape s c) deriving (Eq, Ord, Show)
+
+data MysteryResult c = MHalted Steps (Mystery TapeSymbol (FinalTape c))
+               | MContinue Steps Phase (Mystery TapeSymbol (SwitchTape c)) Int
+               | MContinueForever (Mystery TapeSymbol HaltProof)
+               --the reason this is still in, is that in proveByInd / induction in general 
+               --the machine might get stuck and we don't know a better way to handle that
+               --yet 
+               | MMachineStuckRes
+               deriving (Eq, Ord, Show, Generic)
 
 _Continue :: Prism' (SimResult c s) (Steps, Phase, ExpTape s c, Int)
 _Continue = prism' (\(a,b,c,d) -> Continue a b c d) (\case
@@ -119,5 +134,5 @@ addResult turing (Continue steps phase tape _disp) r =
   let r' = r & unproven +~ 1 in
   if r' ^. unproven > keepNum then r'
     else r' & unprovenExamples %~ ((:) (turing, steps, phase, tape))
-addResult turing MachineStuckRes r
+addResult turing MachineStuckRes _r
   = error $ "machine: " <> dispTuring turing <> "got machinestuckres !"

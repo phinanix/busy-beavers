@@ -11,6 +11,7 @@ import ExpTape
 import Skip 
 import Glue
 import SimulateSkip
+import TapeSymbol 
 
 skipA :: Skip Count Bit 
 skipA = Skip 

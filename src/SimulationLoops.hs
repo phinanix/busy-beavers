@@ -6,6 +6,7 @@ import Control.Lens
 import Data.List (maximumBy, foldl1, maximum, minimum)
 import Data.List.NonEmpty (inits)
 import Safe.Exact
+import Safe.Partial
 import Prettyprinter
 import qualified Data.List.NonEmpty as NE ((<|))
 import qualified Data.Set as S
@@ -22,8 +23,8 @@ import Util
 import Control.Exception (assert)
 import Relude.Unsafe ((!!))
 import Display
-import Safe.Partial
 import Notation
+import TapeSymbol
 
 {-
 We'd like to update this module to have two layers of concepts: 

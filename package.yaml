@@ -26,6 +26,7 @@ library:
   source-dirs: src
   dependencies:
   - containers
+  - constraints
   - lens
   - monoidal-containers
   - vector
@@ -112,6 +113,7 @@ default-extensions:
   - PartialTypeSignatures
   - PatternSynonyms
   - PolyKinds
+  - QuantifiedConstraints
   - QuasiQuotes
   - RankNTypes
   - ScopedTypeVariables

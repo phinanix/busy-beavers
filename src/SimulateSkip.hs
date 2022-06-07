@@ -21,6 +21,7 @@ import HaltProof
 import Results
 import Glue
 import Simulate (initSimState)
+import TapeSymbol
 
 {-
 Morning of 9 May 22
@@ -86,43 +87,6 @@ data PartialStepResult c s = Unknown Edge
                          | NonhaltProven (HaltProof s)
                          | MachineStuck
                         deriving (Eq, Ord, Show, Generic)
-
-data SkipOrigin s = Initial --from an atomic transition of the machine 
-                  | Glued (Skip Count s) (Skip Count s) --from gluing together the two skips in question in order
-                  | GlueStepRange Steps Steps --gluing together all skips used in a given range of steps
-                  | Induction (SkipBook s) Int --from stepping forward the given number of times, with the given skipbook
-                  | InductionHypothesis
-                  deriving (Eq, Ord, Show, Generic)
-instance (NFData s) => NFData (SkipOrigin s)
-
-data TwoBit = TwoBit Bit Bit deriving (Eq, Ord, Show, Generic)
-instance (NFData TwoBit)
-
-dispTwoBit :: TwoBit -> Text
-dispTwoBit (TwoBit x y) = "|" <> dispBit x <> dispBit y <> "|"
-
-instance Pretty TwoBit where
-  pretty = pretty . dispTwoBit
-
-class (Ord s, Show s, Pretty s) => TapeSymbol s where
-  blank :: s
-  getPoint :: s -> Bit -- the thing under the machinehead at the point
-  toBits :: s -> [Bit]
-  fromBits :: [Bit] -> ([s], [Bit]) --the second list is the one remaining
-  --given a turing machine, how do you create a list of skips sufficient to 
-  --cover all possible situations
-  initBook :: Turing -> SkipBook s
-  --given an edge which has just been defined in a given turing machine, take the 
-  --skipbook before that edge was defined and give me the skipbook after the edge
-  --was defined 
-  --the default implementation just uses initBook; and updateBook is just
-  --giving the ability to provide something more optimized than that
-  updateBook :: Edge -> Turing -> SkipBook s -> SkipBook s
-  updateBook _e tm _oldBook = initBook tm 
-
---the data type storing various proven skips associated with a machine
---the "Phase, s" is the Phase on start and the "s" that the point is made of
-type SkipBook s = Map (Phase,  s) (Map (Skip Count s) (SkipOrigin s))
 
 --which of these newtypes your history is tracks whether the history is forwards (element 0 is the first thing that happend)
 --or reverse (element 0 is the most recent thing that happened)
@@ -361,82 +325,9 @@ packageResult skip@(Skip s e hopCount) tape (boundVs, tapeSides@(newLs, newRs))
       updateInfCount m (NotInfinity c) = updateCountToInf m c
 --we want to be able to apply a skip of counts to an ExpTape _ Count but also a
 --skip of counts to an ExpTape _ Nat
-
---the skip that results from the atomic transition given an edge leading to a
---transition of the specified Phase, Bit, Dir
-oneStepSkip :: Edge -> Phase -> Bit -> Dir -> Skip Count Bit
-oneStepSkip (p, b) q c d = Skip
-  (Config p [] b [])
-  (SkipStepped q (Side d [(c, finiteCount 1)]))
-  (finiteCount 1)
-
---the skip that results from an atomic transition which transitions a phase to itself
---writing the given bit and dir
-infiniteSkip :: Edge -> Bit -> Dir -> Skip Count Bit
-infiniteSkip (p, b) c L = Skip
-  -- (Config p [] (b, Side (newBoundVar 0) R) [])
-  (Config p [(b, newBoundVar 0)] b [])
-  -- the plus one is because there is x bits to our left plus one we are pointed to 
-  (SkipStepped p (Side L [(c, One <> newBoundVar 0)]))
-  (One <> newBoundVar 0)
-
-infiniteSkip (p, b) c R = Skip
-  -- (Config p [] (b, Side (newBoundVar 0) L) [])
-  (Config p [] b [(b, newBoundVar 0)])
-  (SkipStepped p (Side R [(c, One <> newBoundVar 0)]))
-  (One <> newBoundVar 0)
-
-initTransSkip :: Edge -> Trans -> Set (Skip Count Bit)
---we need to modify this skip so that it's halt question is true
---a halting machine is assumed to write True and go left 
---(and not change phase, but conceptually it is now in "haltphase")
-initTransSkip (p, b) Halt = one $ Skip
-  (Config p [] b [])
-  (SkipHalt (Side L [(Bit True, finiteCount 1)]))
-  (finiteCount 1)
-initTransSkip e@(p, _b) (Step q c d) | p == q = fromList
-  [ oneStepSkip e q c d
-  , infiniteSkip e c d
-  ]
-initTransSkip e (Step q c d) = one $ oneStepSkip e q c d
-
-addSkipToBook :: (Ord s) => Skip Count s -> SkipOrigin s -> SkipBook s -> SkipBook s
-addSkipToBook skip origin = atE (skip^.start.cstate, skip^.start.c_point)
-  . at skip ?~ origin
-
-addInitialSkipToBook :: (Ord s) => Skip Count s -> SkipBook s -> SkipBook s
-addInitialSkipToBook skip = addSkipToBook skip Initial
-
-addMultipleToBook :: (Ord s) => [(Skip Count s, SkipOrigin s)] -> SkipBook s -> SkipBook s
-addMultipleToBook xs book = foldr (uncurry addSkipToBook) book xs
-
-initBookBit :: Turing -> SkipBook Bit
-initBookBit (Turing _n trans) = appEndo (foldMap (Endo . addInitialSkipToBook) skips) Empty where
-  skips = foldMap (uncurry initTransSkip) $ assocs trans
-
-initTwoBitBook :: Turing -> SkipBook TwoBit
-initTwoBitBook t = undefined
-
 lookupSkips :: (Ord s) => (Phase, s) -> SkipBook s -> Set (Skip Count s)
 lookupSkips (p, s) book = keysSet $ book ^. atE (p, s)
 
-instance TapeSymbol Bit where
-  blank = Bit False
-  getPoint = id
-  toBits x = [x]
-  fromBits = (,[])
-  initBook = initBookBit
-
-instance TapeSymbol TwoBit where
-  blank = TwoBit (Bit False) (Bit False)
-  --for now, we're going with the "you're always on the left part of the symbol" take
-  getPoint (TwoBit x _) = x
-  toBits = \case TwoBit bit bit' -> [bit, bit']
-  fromBits = \case
-    --I need the type ([x], y) -> x -> ([x], y)
-    (x: y : rest) -> first (TwoBit x y :) $ fromBits rest
-    tail -> ([], tail)
-  initBook = initTwoBitBook 
 
 --if the machine halts, pick that one, else pick the one that goes farther
 -- skipFarthest :: (Eq s, Eq c, Eq c')

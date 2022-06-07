@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ae3b09c5f5dbed285d03baf29170cd9056511a9252b3307f2e1716623f9f23a9
+-- hash: 8cf84ef0ffe1fad8115934995a13a09d39a6a82c0653bd04f104427243162107
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -38,6 +38,7 @@ library
       Induction
       LinRecurrence
       MoreSimulationLoops
+      Mystery
       Notation
       OuterLoop
       Results
@@ -50,6 +51,7 @@ library
       SimulationLoops
       Skip
       Tape
+      TapeSymbol
       Turing
       TuringExamples
       Util
@@ -87,6 +89,7 @@ library
       PartialTypeSignatures
       PatternSynonyms
       PolyKinds
+      QuantifiedConstraints
       QuasiQuotes
       RankNTypes
       ScopedTypeVariables
@@ -101,6 +104,7 @@ library
   build-depends:
       QuickCheck
     , base
+    , constraints
     , containers
     , either
     , hspec
@@ -152,6 +156,7 @@ executable busy-beavers-exe
       PartialTypeSignatures
       PatternSynonyms
       PolyKinds
+      QuantifiedConstraints
       QuasiQuotes
       RankNTypes
       ScopedTypeVariables
@@ -221,6 +226,7 @@ test-suite busy-beavers-test
       PartialTypeSignatures
       PatternSynonyms
       PolyKinds
+      QuantifiedConstraints
       QuasiQuotes
       RankNTypes
       ScopedTypeVariables

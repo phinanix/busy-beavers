@@ -15,7 +15,8 @@ import qualified Simple.Simulate as Simple (simulate, dispStartState, initState,
 import qualified Simple.Display as Simple (dispResult)
 import qualified Simple.Tape as Simple
 import Data.Map (restrictKeys)
-import SimulateSkip ( SkipBook, simulateOneTotalMachine )
+import TapeSymbol
+import SimulateSkip ( simulateOneTotalMachine )
 import Count
 import Numeric (showFFloat)
 import Util

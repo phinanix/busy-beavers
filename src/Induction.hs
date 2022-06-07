@@ -28,13 +28,11 @@ import ExpTape
 import Turing
 import SimulateSkip
 import SimulationLoops
-import Display
 import Safe.Partial
-import HaltProof
 import Glue
 import Data.Bifoldable (Bifoldable)
 import Graphs
-import Data.Bitraversable
+import TapeSymbol
 
 {-
 27 Nov 21 

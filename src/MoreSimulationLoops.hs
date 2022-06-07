@@ -18,6 +18,7 @@ import SimulationLoops
 import Util
 import HaltProof
 import LinRecurrence
+import TapeSymbol
 
 attemptInductionGuess :: Turing -> SimState Bit
   -> Either (SimResult InfCount Bit) (SimState Bit)

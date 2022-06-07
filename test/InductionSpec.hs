@@ -19,7 +19,7 @@ import Results
 import HaltProof
 import MoreSimulationLoops
 import Util
-
+import TapeSymbol
 
 checkerboardFalseGoal :: Skip Count Bit
 checkerboardFalseGoal = Skip
