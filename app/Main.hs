@@ -21,6 +21,8 @@ import SimulateSkip
 import Display
 import SimulationLoops (simulateManyBasicLoop)
 import MoreSimulationLoops
+import Util
+import OuterLoop
 
 
 simProgram :: (Pretty s, Pretty c, Show s, Show c) => Results c s  -> IO ()
@@ -98,9 +100,10 @@ main = do
   --let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] = indProveLoopMany 141 $ startMachine1 4
   let resultList 
         :: [(Turing, SimResult InfCount Bit)]
-        = bestCurrentProveLoop 141 $ startMachine1 4
+        = bestCurrentProveLoop 141 $ startMachine1 3
   --simProgram dispExpTape $ foldr (uncurry addResult) Empty resultList 
-  putTextLn $ dispResults $ foldr (uncurry addResult) Empty resultList 
+  --putTextLn $ dispResults $ foldr (uncurry addResult) Empty resultList 
+  traverse_ putPretty $ getContinues $ outerLoop basicTacticVector (startMachine1 3)
 
   -- let assertFails = checkLRAssertManyMachines 200 $ startMachine1 4
   -- for_ assertFails putTextLn 

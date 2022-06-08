@@ -24,6 +24,7 @@ import TapeSymbol
 import SimulationLoops
 import MoreSimulationLoops
 import SimulateTwoBit (TwoBit)
+import Mystery
 
 {- 7 June 22 overall state
 the tactics are coming along nicely, I'm super excited to have a TwoBit simulation tactic
@@ -46,6 +47,33 @@ just have to use VisibleTypeApplication.
 
 high priority todo: finish initBookTwoBit (it's very close I think) update: I had done this, 
 but left the undefined one in a different file >>
+
+-------- update end of day:
+I did the MVP version of being polymorphic over tactic types, and thus have a very basic 
+version working. 
+12 machines of size 3 remain
+checkboard (TT -> TF <-) II
+goalpost (T^n -> TF^n <-) II
+normal sweeper (???) TR1TR0FL2___FR0TL2 II(I - doublespeed)I
+counter (TF / TT) I
+both sides sweeper II
+counter (T / F) ?? I
+I figure the "counter machine TF/TT" not working is because I still need to get 
+the "move one square, while staying in the same state, means you eat a whole RLE of symbols"
+going, which is fine, I can just use chainArbitrary? Probably? if not I can definitely just
+get that up easily enough. 
+
+The confusing part is only the 2 checkerboards and the TF/TT counter depend on that, the 
+other 9 unproven machines, should just be proveable? with current methods? which should eat
+normal sweepers for breakfast and were specifically fine-tuned to beat counter machines. 
+So I need more investigation about why they don't work for those. 
+
+Other todos: the code is really slow for some reason :/. Displaying the results in a better
+format is high priority, the current one is garbage. Run on n=4, since that often does a 
+better job fuzzing than n=3, and also once n=3 works for real make n=4 work. Though if we 
+hit all the above machines, I would think we'd get most of the n=4 stuff for free, not 100% 
+of it. We'll at least need ThreeBit for full n=4, and I'll probably just go straight for k-bit
+because that's going to have to happen eventually. 
 -}
 
 {-
@@ -58,8 +86,16 @@ the best I've got for now). It defines some number of edges, as it desires, whic
 finish it, and returns it in the [Turing], or finishes it and returns it in the
 second list. 
 -}
-data Tactic s = OneShot (Turing -> Maybe (Either Edge (SimResult InfCount s)))
-              | Simulation (Turing -> ([Turing], [(Turing, SimResult InfCount s)]))
+data Tactic 
+  = OneShot (Turing -> Maybe (Either Edge (Mystery TapeSymbol (SimResult InfCount))))
+  | Simulation (Turing -> ([Turing], [(Turing, Mystery TapeSymbol (SimResult InfCount))]))
+
+oneShot :: (TapeSymbol s) => (Turing -> Maybe (Either Edge (SimResult InfCount s))) -> Tactic 
+oneShot f = OneShot $ fmap (fmap Mystery) . f
+
+simulation :: (TapeSymbol s) 
+  => (Turing -> ([Turing], [(Turing, SimResult InfCount s)])) -> Tactic
+simulation f = Simulation $ fmap (fmap (fmap Mystery)) . f 
 
 {-TODO: the whole point is to support tactics with more than one type of symbol
      my guess is we end up supporting this by substantially reworking the 
@@ -73,18 +109,19 @@ TODO2: when a tactic fails, I think we want it to be able to say some things
   log" or something, but I'm not sure it makes sense to go straight there. 
   
 -}
-outerLoop :: forall s. (TapeSymbol s)
-  => V.Vector (Tactic s) -> Turing -> [(Turing, SimResult InfCount s)]
+outerLoop :: V.Vector Tactic -> Turing -> [(Turing, Mystery TapeSymbol (SimResult InfCount))]
 outerLoop tacticList startMachine = loop [(startMachine, 0)] [] where
   -- the int is which tactic they are currently on
   loop :: [(Turing, Int)]
   -- results obtained so far 
-      -> [(Turing, SimResult InfCount s)]
-      -> [(Turing, SimResult InfCount s)]
+      -> [(Turing, Mystery TapeSymbol (SimResult InfCount))]
+      -> [(Turing, Mystery TapeSymbol (SimResult InfCount))]
   loop [] res = res
-  loop ((tm, n) : todos) curRes = case tacticList V.!? n of
+  loop ((tm, n) : todos) curRes 
+    = trace ("remTodo: " <> show (length todos) <> " len res: " <> show (length curRes)) $ 
+    case tacticList V.!? n of
     -- TODO: how to get a "we failed" result / let's do a better one than this
-    Nothing -> let newRes = Continue 0 (Phase 0) (initExpTape blank) 0 in
+    Nothing -> let newRes = Mystery $ Continue 0 (Phase 0) (initExpTape (Bit False)) 0 in
       loop todos ((tm, newRes) : curRes)
     Just (OneShot f) -> case f tm of
       Nothing -> loop ((tm, n+1): todos) curRes
@@ -94,8 +131,8 @@ outerLoop tacticList startMachine = loop [(startMachine, 0)] [] where
     Just (Simulation f) -> case f tm of
       (newTMs, newRes) -> loop (((,n+1) <$> newTMs) ++ todos) (newRes ++ curRes)
 
-tacticBackwardSearch :: Tactic s
-tacticBackwardSearch = OneShot (fmap (Right . ContinueForever) . backwardSearch)
+tacticBackwardSearch :: Tactic
+tacticBackwardSearch = oneShot @Bit (fmap (Right . ContinueForever) . backwardSearch)
 
 --int is the limit on number of steps
 --todo we want to be able to run something right before we give up
@@ -132,20 +169,43 @@ simLoop bigStepLimit updateFuncs startMachine
   recurse (next : todos) results = loop next todos results
 
 
-basicSimLoop :: Tactic Bit 
-basicSimLoop = Simulation $ simLoop 150 $ simulateStepPartial maxInt :| 
+basicSimLoop :: Tactic 
+basicSimLoop = simulation $ simLoop 150 $ simulateStepPartial maxInt :| 
   (liftOneToMulti <$> [checkSeenBefore, liftModifyState recordHist, 
   liftModifyState recordDispHist,
   runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof,
   runIfCond (atRightOfTape . view s_tape) attemptOtherEndOfTapeProof
   ])
 
-twoBitSimLoop :: Tactic TwoBit 
-twoBitSimLoop = Simulation $ simLoop 50 $ simulateStepPartial maxInt :| 
+twoBitSimLoop :: Tactic
+twoBitSimLoop = simulation @TwoBit $ simLoop 150 $ simulateStepPartial maxInt :| 
   (liftOneToMulti <$> [checkSeenBefore
   , liftModifyState recordHist
   , liftModifyState recordDispHist
   , runAtCount 10 proveByLR
   , runAtCount 40 proveSimply
   , runAtCount 45 proveByInd
+  , runAtCount 145 proveByLR
+  , runAtCount 146 proveSimply
+  , runAtCount 147 proveByInd
   ])
+
+basicTacticVector :: V.Vector Tactic 
+basicTacticVector = V.fromList [basicSimLoop, twoBitSimLoop, tacticBackwardSearch]
+
+countSimResType :: [Mystery TapeSymbol (SimResult c)] -> (Int, Int, Int, Int) 
+countSimResType inp = foldr myPlus (0,0,0,0) (fmap whichCat inp) where 
+
+  myPlus (a,b,c,d) (x,y,z,w) = (a+x, b+y, c+z, d+w)
+  whichCat :: Mystery TapeSymbol (SimResult c) -> (Int, Int, Int, Int) 
+  whichCat (Mystery f) = case f of 
+    Halted _ _ -> (1,0,0,0)
+    Continue _ _ _ _ -> (0,1,0,0)
+    ContinueForever _ -> (0,0,1,0)
+    MachineStuckRes -> (0,0,0,1)
+
+getContinues :: [(Turing, Mystery TapeSymbol (SimResult c))] -> [Turing]
+getContinues = fmap fst . filter isContinue where 
+  isContinue :: (Turing, Mystery TapeSymbol (SimResult c)) -> Bool
+  isContinue (_, Mystery (Continue {})) = True 
+  isContinue _ = False 

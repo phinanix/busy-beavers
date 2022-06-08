@@ -18,7 +18,7 @@ import Skip
 import Count
 import Results
 import Glue
-import Simulate
+import Simulate (TMState(..), PartialStepResult(..))
 import TapeSymbol
 import Tape
 import HaltProof (HaltProof(Cycle))
@@ -68,12 +68,37 @@ data ConditionEnd = UnknownEdge Edge
 
   deriving (Eq, Ord, Show, Generic)
 instance NFData ConditionEnd
+
+data PartialTapeResult s = PTUnknown Edge | PTStopped (Tape s) | PTStepped (TMState (Tape s)) 
+  --which side you fell off; the point; the other side
+  | PTFellOff Dir Phase [s]
+
+simStep :: Turing -> TMState (Tape Bit) -> PartialTapeResult Bit
+simStep (Turing _ trans ) (TMState p (Tape ls bit rs))
+  = case trans ^. at (p, bit) of
+    Nothing -> PTUnknown (p,bit)
+    --we assume WLOG that the machine goes left and writes True when it halts
+    --Phase -1 is for "halted"
+    Just Halt -> case ls of 
+      [] -> PTFellOff L (Phase (-1)) (Bit True : rs)
+      l : ls' -> PTStopped (Tape ls' l (Bit True : rs))
+    Just (Step q newBit L) -> case ls of 
+      [] -> PTFellOff L q (newBit : rs)
+      l : ls' -> PTStepped (TMState q $ Tape ls' l (newBit : rs))
+    Just (Step q newBit R) -> case rs of 
+      [] -> PTFellOff R q (newBit : ls) 
+      r : rs' -> PTStepped (TMState q $ Tape (newBit : ls) r rs')
+
+
 simulateUntilCondition :: Turing -> (Phase, Tape Bit) -> (Natural, ConditionEnd)
 simulateUntilCondition t (ph, startTape) = loop startState 0 Empty where
-  startState = TMState ph startTape
+  startState = let ans = TMState ph startTape in 
+    --trace ("machine: " <> showP t <> "\nstartState" <> showP ans)
+    ans
   loop :: TMState (Tape Bit) -> Natural -> Map (TMState (Tape Bit)) Natural
     -> (Natural, ConditionEnd)
-  loop curState curStep pastStateMap = case pastStateMap ^. at curState of
+  loop curState curStep pastStateMap = 
+    case pastStateMap ^. at curState of
     Just m -> (m, CECycle curStep m)
     Nothing -> let
       newMap = pastStateMap & at curState ?~ curStep
@@ -82,11 +107,14 @@ simulateUntilCondition t (ph, startTape) = loop startState 0 Empty where
     --the tape it assumes that there is an infinite bank of trues there but we 
     --want to fall off the end of the tape
      in case simStep t curState of
-       Unknown e -> (curStep, UnknownEdge e)
-       Stopped _ finalTape -> (newStep, Halts finalTape)
-       Stepped _ newState@(TMState newPh newTape) -> case newTape of
+       PTUnknown e -> (curStep, UnknownEdge e)
+       PTStopped finalTape -> (newStep, Halts finalTape)
+       PTStepped newState@(TMState newPh newTape) -> --trace ("count: " <> show curStep <> "\nstate:" <> showP newState) $ 
+        case newTape of
          Tape [] p rs -> (newStep, ReachedLeftMost newPh p rs)
          _ -> loop newState newStep newMap
+       PTFellOff R newPh ls -> (newStep, FallRight newPh ls)
+       PTFellOff L _ _ -> error (showP t <> "fell off the left somehow")
 
 makeTwoBitSkip :: Turing -> (Phase, Tape Bit) -> Skip Natural TwoBit
 makeTwoBitSkip t (startPh, startT) = Skip skipStart skipEnd hops
@@ -98,7 +126,7 @@ makeTwoBitSkip t (startPh, startT) = Skip skipStart skipEnd hops
     FallRight ph ls -> SkipStepped ph $ Side R $ rle $ pairBitList ls
     ReachedLeftMost ph p (r : rs) 
       -> SkipStepped ph $ Middle $ ExpTape [] (TwoBit p r) $ rle $ pairBitList rs
-    ReachedLeftMost {} -> error "unreachable maketwobitskip"
+    ReachedLeftMost {} -> error $ "unreachable maketwobitskip:\n" <> showP t <> show startT <> show simEnd
     --TODO: these numbers are wrong, as is >>
     CECycle n m -> SkipNonhaltProven $ Cycle (fromIntegral n) (fromIntegral m)
     Halts tape -> SkipHalt $ Middle $ unFlattenET tape

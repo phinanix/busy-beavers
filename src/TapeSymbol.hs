@@ -32,7 +32,7 @@ instance (NFData s) => NFData (SkipOrigin s)
 type SkipBook s = Map (Phase,  s) (Map (Skip Count s) (SkipOrigin s))
 
 
-class (Ord s, Show s, Pretty s) => TapeSymbol s where
+class (Ord s, Show s, Pretty s, Typeable s) => TapeSymbol s where
   blank :: s
   getPoint :: s -> Bit -- the thing under the machinehead at the point
   toBits :: s -> [Bit]

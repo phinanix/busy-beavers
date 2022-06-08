@@ -2,6 +2,7 @@ module Simulate where
 
 import Relude
 import Control.Lens
+import Prettyprinter
 
 import Util
 import Config
@@ -24,6 +25,9 @@ instance NFData a => NFData (TMState a)
 
 initTMState :: TMState (Tape Bit)
 initTMState = TMState (Phase 0) (Tape [] (Bit False) [])
+
+instance Pretty a => Pretty (TMState a) where 
+  pretty (TMState p t)= showP p <> " | " <> showP t 
 
 data PartialStepResult a = Unknown Edge | Stopped Dir a | Stepped Dir (TMState a)
 

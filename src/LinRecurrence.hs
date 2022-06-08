@@ -152,7 +152,8 @@ detectLinRecurrence :: forall s. (HasCallStack, TapeSymbol s, Pretty s)
   -> ReadShiftHist 
   -> Maybe (HaltProof s)
 detectLinRecurrence hist@(TapeHist thList) rshist@(ReadShiftHist rshList) 
-  = viaNonEmpty head $ catMaybes allMaybeProofs
+  = --trace ("len hist: " <> show (length thList) <> " recent tape " <> showP (Unsafe.last thList)) $ 
+    viaNonEmpty head $ catMaybes allMaybeProofs
   where
   checkForRecur :: (Int, Int)
     -> (Phase, ExpTape s InfCount) 
@@ -205,7 +206,6 @@ detectLinRecurrence hist@(TapeHist thList) rshist@(ReadShiftHist rshList)
   genIndicesAtDist :: Int -> Int -> [(Int, Int)]
   genIndicesAtDist lenHist dist 
     = (\x -> (x, x + dist)) <$> [0, 1 .. (lenHist -1) - dist] 
-  --TODO, I think this assert probably has an off by one in it?
   allMaybeProofs = let msg = "lengths:" <> show (length thList, length rshList)
     in 
     --trace msg $ 

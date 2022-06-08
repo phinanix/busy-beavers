@@ -3,8 +3,10 @@ module Tape where
 import Relude
 import Relude.Unsafe as Unsafe (init, last)
 import Control.Lens
+import Prettyprinter 
 
 import Turing
+import Util
 
 data Tape s = Tape
   { left :: [s]
@@ -41,6 +43,9 @@ dispTape (Tape ls h rs) = dispBits (reverse ls) <> ">" <> dispBit h <> "<" <> di
   dispBits [] = ""
   dispBits bits = mconcat ((\i -> dispBit i <> " ") <$> Unsafe.init bits)
     <> dispBit (Unsafe.last bits)
+
+instance Pretty (Tape Bit) where 
+  pretty = prettyText . dispTape 
 
 --a class for things like tapes where you can count the ones
 class Tapeable tape where

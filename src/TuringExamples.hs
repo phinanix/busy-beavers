@@ -48,6 +48,10 @@ simple_sweeper = unm "TR1___FL2FR1TL2TL0"
 checkerboardSweeper :: Turing
 checkerboardSweeper = unm "TR1FL2FL2TR0TLHTL0"
 
+--writes TF one way then TT other way infinitely
+checkerBoard2 :: Turing
+checkerBoard2 = unm "TR1FL2TL1TR0___TL0"
+
 goesLeftForever :: Turing
 goesLeftForever = unm "TL1___TL0TLH"
 
