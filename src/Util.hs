@@ -104,3 +104,13 @@ myRecLength counter = \case
 
 prettyText :: Text -> Doc ann
 prettyText = pretty
+
+-- unsnoc :: [a] -> Maybe ([a], a)
+-- unsnoc = \case 
+--   [] -> Nothing 
+--   (x : xs) -> let 
+--     ne = x :| xs
+--     i = init ne 
+--     l = last ne 
+--     in 
+--       Just (i,l)

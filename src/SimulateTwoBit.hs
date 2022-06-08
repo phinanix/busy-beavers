@@ -130,7 +130,7 @@ makeTwoBitSkip t (startPh, startT) = Skip skipStart skipEnd hops
     Halts tape -> SkipHalt $ Middle $ unFlattenET tape
 
 initTwoBitBook :: Turing -> SkipBook TwoBit 
-initTwoBitBook t = appEndo (foldMap (Endo . addInitialSkipToBook) skips) Empty where 
+initTwoBitBook t = addChainedToBook $ appEndo (foldMap (Endo . addInitialSkipToBook) skips) Empty where 
   skips = first FinCount . makeTwoBitSkip t . second flattenET <$> allInitTapes t
 
 unRLE :: [(s, Natural)] -> [s]

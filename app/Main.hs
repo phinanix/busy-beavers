@@ -98,9 +98,9 @@ main = do
   -- simProgram dispTape results
   
   --let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] = indProveLoopMany 141 $ startMachine1 4
-  let resultList 
-        :: [(Turing, SimResult InfCount Bit)]
-        = bestCurrentProveLoop 141 $ startMachine1 3
+  -- let resultList 
+  --       :: [(Turing, SimResult InfCount Bit)]
+  --       = bestCurrentProveLoop 141 $ startMachine1 3
   --simProgram dispExpTape $ foldr (uncurry addResult) Empty resultList 
   --putTextLn $ dispResults $ foldr (uncurry addResult) Empty resultList 
   traverse_ putPretty $ getContinues $ outerLoop basicTacticVector (startMachine1 3)

@@ -210,8 +210,8 @@ twoBitSimLoop = simulation @TwoBit $ simLoop 150 $ simulateStepPartial maxInt :|
   , liftModifyState recordHist
   , liftModifyState recordDispHist
   , runAtCount 10 proveByLR
-  , runAtCount 40 proveSimply
-  , runAtCount 45 proveByInd
+  -- , runAtCount 40 proveSimply
+  -- , runAtCount 45 proveByInd
   , runAtCount 145 proveByLR
   , runAtCount 146 proveSimply
   , runAtCount 147 proveByInd

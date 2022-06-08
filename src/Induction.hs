@@ -129,15 +129,15 @@ proveInductively :: forall s. (TapeSymbol s)
   -> Either (Text, Maybe (Config Count s)) (SkipOrigin s)
 proveInductively limit t book goal indVar = let
   ans =  -- <> "using book\n" <> show (pretty book)) $
-    --force $
+    force $
     case baseCase of
       Left res -> Left $ first ("failed base: " <>) res
       Right _ -> case indCase of
         Left res -> Left $ first ("failed ind: " <>) res
         Right _ ->  pure origin
-  msg = ("trying to prove:\n" <> show (pretty goal)) <> "\ngot res" <> show ans
-    in --force $
-      -- trace msg $
+  msg = ("trying to prove:\n" <> show (pretty goal)) <> "\ngot res" <> showP ans <> "\nEOM\n"
+    in force $
+      trace msg $
       assert (isSameInAsOut goal) ans
     where
     origin :: SkipOrigin s
@@ -461,7 +461,7 @@ generalizeFromExamples slicePairs = undefined
 
 
 
-guessInductionHypothesis :: (Ord s, Pretty s) => TapeHist s InfCount -> DispHist
+guessInductionHypothesis :: (TapeSymbol s) => TapeHist s InfCount -> DispHist
   -> Either Text (Skip Count s)
 guessInductionHypothesis th@(TapeHist hist) dh = do
   criticalConfig@(criticalPhase, _criticalSignature) <- guessCriticalConfiguration hist
@@ -470,7 +470,7 @@ guessInductionHypothesis th@(TapeHist hist) dh = do
       --trace ("configs were:\n" <> showP ans) 
       ans
   case guessInductionHypWithIndices th dh criticalPhase configIndicesAndConfigs of
-    Right ans -> Right ans
+    Right ans -> trace ("guessed indhyp:\n" <> showP ans) $ Right ans
     --this is hacky and bad but it is necessary to guess right on trickyChristmasTree so I'll try it for now
     Left _msg -> guessInductionHypWithIndices th dh criticalPhase (Unsafe.tail configIndicesAndConfigs)
 

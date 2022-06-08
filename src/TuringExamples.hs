@@ -169,6 +169,13 @@ scoots a single false from one side of the block of trues to the other
 trickyChristmasTree :: Turing 
 trickyChristmasTree = unm "TR1TR0TL2FL0___TL3FR0FL1"
 
+{-
+this is a rightward growing counting machine that counts in FF / FT 
+(ie 6 is 011 = (FF)(FT)(FT)) and briefly sets everything to T when doing a reset
+-}
+lastSize3 :: Turing 
+lastSize3 = unm "TR1___TL2TR0FR0FL2"
+
 machineList :: [Turing]
 machineList = [weird3, almostweird3, fullsim_not_halt3, bb3, simple_sweeper, 
   checkerboardSweeper, goesLeftForever, binaryCounterTFTT, machineBreaksIndGuess, 

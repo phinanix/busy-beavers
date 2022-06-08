@@ -71,7 +71,7 @@ proveByInd machine state = --force $ --trace ("proveByInd on:\n" <> showP machin
   dispHist =  state ^. s_disp_history
   (newbook, eTSkip) = let ans = proveInductivelyIMeanIT machine (state ^. s_book) (state ^. s_steps) hist dispHist
     in
-      --trace ("etskip:\n" <> showP (ans ^. _2)) 
+      trace ("etskip:\n" <> showP (ans ^. _2)) 
       ans
   newState = state & s_book .~ newbook
   eTArbSkip = let ans = chainArbitrary =<< eTSkip in
@@ -85,13 +85,13 @@ proveByInd machine state = --force $ --trace ("proveByInd on:\n" <> showP machin
 
 proveSimply :: (TapeSymbol s) => SimOneAction s
 proveSimply machine state = case mbProof of
-  Left _txt -> Right state
+  Left txt -> trace (toString $ "provesimply failed because: " <> txt <> "\nEOM\n") $ Right state
   Right hp -> Left $ ContinueForever hp
   where
   mbProof = do
     indHyp <- guessInductionHypothesis (state ^. s_history) (state ^. s_disp_history)
     first fst $ proveBySimulating 100 machine (state ^. s_book) indHyp
-    arbSkip <- chainArbitrary indHyp
+    arbSkip <- trace ("indhyp suceeded") $ chainArbitrary indHyp
     skipAppliesForeverInHist arbSkip (state ^. s_history)
 {-# SPECIALISE proveSimply :: SimOneAction Bit #-}
 {-# SPECIALISE proveSimply :: SimOneAction TwoBit #-}
