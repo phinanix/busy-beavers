@@ -19,6 +19,7 @@ import Util
 import HaltProof
 import LinRecurrence
 import TapeSymbol
+import SimulateTwoBit (TwoBit)
 
 attemptInductionGuess :: Turing -> SimState Bit
   -> Either (SimResult InfCount Bit) (SimState Bit)

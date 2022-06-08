@@ -101,9 +101,6 @@ initBookBit :: Turing -> SkipBook Bit
 initBookBit (Turing _n trans) = appEndo (foldMap (Endo . addInitialSkipToBook) skips) Empty where
   skips = foldMap (uncurry initTransSkip) $ assocs trans
 
-initTwoBitBook :: Turing -> SkipBook TwoBit
-initTwoBitBook t = undefined
-
 
 instance TapeSymbol Bit where
   blank = Bit False
@@ -111,28 +108,6 @@ instance TapeSymbol Bit where
   toBits x = [x]
   fromBits = (,[])
   initBook = initBookBit
-
-data TwoBit = TwoBit Bit Bit deriving (Eq, Ord, Show, Generic)
-instance (NFData TwoBit)
-
-dispTwoBit :: TwoBit -> Text
-dispTwoBit (TwoBit x y) = "|" <> dispBit x <> dispBit y <> "|"
-
-instance Pretty TwoBit where
-  pretty = pretty . dispTwoBit
-
-
-instance TapeSymbol TwoBit where
-  blank = TwoBit (Bit False) (Bit False)
-  --for now, we're going with the "you're always on the left part of the symbol" take
-  getPoint (TwoBit x _) = x
-  toBits = \case TwoBit bit bit' -> [bit, bit']
-  fromBits = \case
-    --I need the type ([x], y) -> x -> ([x], y)
-    (x: y : rest) -> first (TwoBit x y :) $ fromBits rest
-    tail -> ([], tail)
-  initBook = initTwoBitBook 
-
 
 showMT :: (forall x. Show x => Show (f x)) => Mystery TapeSymbol f -> String 
 showMT (Mystery f) = Text.Show.show f 

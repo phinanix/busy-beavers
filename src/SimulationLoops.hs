@@ -25,6 +25,7 @@ import Relude.Unsafe ((!!))
 import Display
 import Notation
 import TapeSymbol
+import SimulateTwoBit (TwoBit)
 
 {-
 We'd like to update this module to have two layers of concepts: 

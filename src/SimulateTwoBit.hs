@@ -153,3 +153,26 @@ etTwoBitToBit (ExpTape lpairs (TwoBit p r) rpairs) = let
 --the next thing to do to get this working is to make the `initskips` thing in simulate
 --polymorphic, and to start piping through the polymorphism more, as before, to be able
 --to do the usual simulation type stuff but with Twobit
+
+
+data TwoBit = TwoBit Bit Bit deriving (Eq, Ord, Show, Generic)
+instance (NFData TwoBit)
+
+dispTwoBit :: TwoBit -> Text
+dispTwoBit (TwoBit x y) = "|" <> dispBit x <> dispBit y <> "|"
+
+instance Pretty TwoBit where
+  pretty = pretty . dispTwoBit
+
+
+instance TapeSymbol TwoBit where
+  blank = TwoBit (Bit False) (Bit False)
+  --for now, we're going with the "you're always on the left part of the symbol" take
+  getPoint (TwoBit x _) = x
+  toBits = \case TwoBit bit bit' -> [bit, bit']
+  fromBits = \case
+    --I need the type ([x], y) -> x -> ([x], y)
+    (x: y : rest) -> first (TwoBit x y :) $ fromBits rest
+    tail -> ([], tail)
+  initBook = initTwoBitBook 
+

@@ -16,7 +16,6 @@ import qualified Data.Set as S
 import qualified Data.Vector as V
 
 import Turing
-import ExpTape
 import Count
 import HaltProof
 import Results
@@ -24,6 +23,7 @@ import SimulateSkip
 import TapeSymbol
 import SimulationLoops
 import MoreSimulationLoops
+import SimulateTwoBit (TwoBit)
 
 {- 7 June 22 overall state
 the tactics are coming along nicely, I'm super excited to have a TwoBit simulation tactic
@@ -44,7 +44,8 @@ A random other point is that it's going to be interesting figuring out how to ma
 polymorphic things specialize when we don't have the output type. It seem like we'll probably 
 just have to use VisibleTypeApplication. 
 
-high priority todo: finish initBookTwoBit (it's very close I think)
+high priority todo: finish initBookTwoBit (it's very close I think) update: I had done this, 
+but left the undefined one in a different file >>
 -}
 
 {-
