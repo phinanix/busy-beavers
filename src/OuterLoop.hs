@@ -74,6 +74,30 @@ better job fuzzing than n=3, and also once n=3 works for real make n=4 work. Tho
 hit all the above machines, I would think we'd get most of the n=4 stuff for free, not 100% 
 of it. We'll at least need ThreeBit for full n=4, and I'll probably just go straight for k-bit
 because that's going to have to happen eventually. 
+
+midnight:08 update:
+the 2 checkerboard and FF/FT counter, are the only two that remain after I put 
+  , runAtCount 145 proveByLR
+  , runAtCount 146 proveSimply
+  , runAtCount 147 proveByInd
+in the single bit tactics, previously those weren't there because I forgot >>
+so everything is as expected and we're super close!
+Also, I checked, and chainArbitrary handles some of what we need it to, but we need it to be
+able to chain 
+
+in 2 steps we turn
+phase: 0  |>|FT|<|
+into:
+phase: 0 (|TT|, 1) |>
+
+to make 
+
+in 2x steps we turn
+phase: 0  |>|FT|<| (|FT|, x)
+into:
+phase: 0 (|TT|, x + 1) |>
+
+but it doesn't do that yet. Should be pretty straightforward to handle though
 -}
 
 {-
@@ -175,6 +199,9 @@ basicSimLoop = simulation $ simLoop 150 $ simulateStepPartial maxInt :|
   liftModifyState recordDispHist,
   runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof,
   runIfCond (atRightOfTape . view s_tape) attemptOtherEndOfTapeProof
+  , runAtCount 145 proveByLR
+  , runAtCount 146 proveSimply
+  , runAtCount 147 proveByInd
   ])
 
 twoBitSimLoop :: Tactic

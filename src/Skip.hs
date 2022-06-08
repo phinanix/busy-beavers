@@ -180,7 +180,6 @@ instance Pretty s => Pretty (SkipEnd Count s) where
 instance Pretty s => Pretty (Skip Count s) where
   pretty (Skip s e c) = prettyText "in " <> pretty (dispCount c) <> prettyText " steps we turn\n"
     <> pretty s <> prettyText "\ninto: \n" <> pretty e
-    <> prettyText "\n displacement of: "
 
 instance Pretty ReadShift where 
   pretty (ReadShift l r s) = prettyText $ "RS l " <> show l 
