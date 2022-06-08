@@ -16,14 +16,12 @@ import qualified Data.List.NonEmpty as NE
 import Relude.Extra (bimapBoth)
 import Relude.Foldable (Bitraversable)
 import qualified Relude.Unsafe as Unsafe
-import Safe.Exact
+
 import Control.Exception (assert)
 import Relude.Unsafe ((!!))
 import qualified Relude.Unsafe as U
 import Data.Bifoldable (Bifoldable)
-import Graphs
-import Data.Bitraversable
-import Data.Maybe 
+
 
 import Util
 import Count
@@ -31,11 +29,7 @@ import Skip
 import ExpTape
 import Turing
 import SimulateSkip
-import SimulationLoops
-import Display
-import Safe.Partial
 import HaltProof
-import Glue
 import TapeSymbol
 
 --given a list, sorts it and uses this to find whether it contains a duplicate

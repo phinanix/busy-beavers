@@ -9,8 +9,6 @@ import Turing
 import Notation 
 import ExpTape
 import Results
-import Skip
-import Simulate
 import qualified Simple.Simulate as Simple (simulate, dispStartState, initState, SimResult(..))
 import qualified Simple.Display as Simple (dispResult)
 import qualified Simple.Tape as Simple

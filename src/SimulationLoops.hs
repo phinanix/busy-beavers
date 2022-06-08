@@ -8,6 +8,8 @@ import Data.List.NonEmpty (inits)
 import Safe.Exact
 import Safe.Partial
 import Prettyprinter
+import Control.Exception (assert)
+import Relude.Unsafe ((!!))
 import qualified Data.List.NonEmpty as NE ((<|))
 import qualified Data.Set as S
 
@@ -16,14 +18,9 @@ import ExpTape
 import Count
 import HaltProof
 import Results
-import Glue
 import SimulateSkip
 import Skip
 import Util
-import Control.Exception (assert)
-import Relude.Unsafe ((!!))
-import Display
-import Notation
 import TapeSymbol
 import SimulateTwoBit (TwoBit)
 

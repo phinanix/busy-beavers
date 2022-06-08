@@ -5,15 +5,12 @@ import Control.Lens
 import Prettyprinter
 
 import Util
-import Config
 import Turing
 import Tape
 import HaltProof
 import Skip
 import ExpTape
 import Notation (dispTuring)
-import TapeSymbol
-import Mystery
 
 -- s is symbol and a is the type of tape 
 data SimResult c s = Halted Steps (FinalTape c s) --this is steps taken and int is the total displacement

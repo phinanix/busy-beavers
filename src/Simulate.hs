@@ -8,11 +8,7 @@ import Util
 import Config
 import Turing
 import Tape
-import ExpTape
-import Skip
-import Count
 import HaltProof
-import Results
 
 --Pieces: turing machines with unknown edges
 -- a simulator that does the usual simulate forward, while branching on unknown edges, according to

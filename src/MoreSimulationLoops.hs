@@ -4,15 +4,15 @@ import Relude
 import qualified Relude.Unsafe as Unsafe
 import Control.Lens
 import Prettyprinter
+import Control.Exception (assert)
+
 import qualified Data.Map as M
 
 import Turing
-import ExpTape
 import Count
 import Results
 import SimulateSkip
 import Skip
-import Control.Exception (assert)
 import Induction
 import SimulationLoops
 import Util
