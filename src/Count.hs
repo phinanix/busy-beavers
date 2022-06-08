@@ -422,3 +422,23 @@ instance Filterable Equations where
   mapMaybe fm (Equations (Right (eqns, a))) = Equations $ (eqns,) <$> maybe (Left "wither") Right (fm a)
   mapMaybe _ (Equations (Left m)) = Equations $ Left m 
 
+updateCount :: Map BoundVar Count -> Count -> Count 
+updateCount m (Count n as xs) = Count n as Empty 
+  <> foldMap (updateVar m) (assocs xs) where 
+    updateVar :: Map BoundVar Count -> (BoundVar, Sum Natural) -> Count 
+    updateVar m (x, Sum n) = n `nTimes` getVar m x 
+    getVar :: Map BoundVar Count -> BoundVar -> Count 
+    getVar m x = case m^.at x of 
+      Just c -> c 
+      Nothing -> boundVarCount x 1
+
+updateCountToInf :: Map BoundVar InfCount -> Count -> InfCount
+updateCountToInf m (Count n as (MonoidalMap xs))
+  = NotInfinity (Count n as Empty) <> foldMap (updateVar m) (M.assocs xs) where
+  updateVar :: Map BoundVar InfCount -> (BoundVar, Sum Natural) -> InfCount
+  updateVar m (x, Sum n) = n `nTimes` getVar m x
+  getVar :: Map BoundVar InfCount -> BoundVar -> InfCount
+  getVar m x = case m^.at x of
+    Just c -> c
+    Nothing -> error $ show m <> "\n" <> show x
+      <> " a bound var wasn't mapped"

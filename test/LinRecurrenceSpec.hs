@@ -36,4 +36,4 @@ spec = do
     it "doesn't find a recurrence for a halting machine" $ 
       getRecurRes 12 bb3 `shouldBe` Nothing
     it "doesn't find a recurrence for a counting machine" $
-      getRecurRes 500 binaryCounterTFTT `shouldBe` Nothing 
+      getRecurRes 250 binaryCounterTFTT `shouldBe` Nothing 

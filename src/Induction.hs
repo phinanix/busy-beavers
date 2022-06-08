@@ -6,6 +6,7 @@ import Data.Map.Monoidal (assocs, keysSet)
 import qualified Data.Map as M
 import qualified Data.Text as T (concat, intercalate)
 import qualified Data.Set as S
+
 import Prettyprinter
 import Data.Either.Combinators
 
@@ -19,27 +20,18 @@ import Safe.Exact
 import Control.Exception (assert)
 import Data.Foldable
 import Relude.Unsafe ((!!))
+import Safe.Partial
+import Data.Bifoldable (Bifoldable)
+
 import qualified Relude.Unsafe as U
 
 import Util
 import Count
 import Skip
 import ExpTape
-    ( dispExpTape,
-      getCounts,
-      getNewFinPoint,
-      isSubSignatureOf,
-      signatureComplexity,
-      sliceExpTape,
-      tapeSignature,
-      ExpTape(ExpTape, point),
-      Signature(..) )
 import Turing
 import SimulateSkip
 import SimulationLoops
-import Safe.Partial
-import Glue
-import Data.Bifoldable (Bifoldable)
 import Graphs
 import TapeSymbol
 
@@ -899,12 +891,4 @@ generalizeFromInfCounts xs = infinityUnit <|> notInfinityCountPair where
     packageResult (Left ()) = (Infinity, Infinity)
     packageResult (Right tup) = bimapBoth NotInfinity tup
 
-varNotUsedInSkip :: Skip Count s -> BoundVar
-varNotUsedInSkip skip = case S.lookupMax allInts of
-  Nothing -> BoundVar 0
-  Just x -> BoundVar (x + 1)
-  where
-  allInts = S.map getBoundVar allUsedVars
-  allUsedVars = bifoldMap countUsedVars (const mempty) skip
-  countUsedVars (Count _n _as xs) = keysSet xs
 

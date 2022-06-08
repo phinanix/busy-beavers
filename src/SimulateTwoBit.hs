@@ -16,8 +16,6 @@ import Turing
 import ExpTape
 import Skip
 import Count
-import Results
-import Glue
 import Simulate (TMState(..), PartialStepResult(..))
 import TapeSymbol
 import Tape

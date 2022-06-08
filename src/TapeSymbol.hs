@@ -12,17 +12,13 @@ import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 
 import Util
-import Config
 import Count
 import Turing
-import Tape
-import HaltProof
 import Skip
-import ExpTape
 import Notation (dispTuring)
 import Mystery
 import Glue (Leftover (..), remainingLonger)
---import Induction
+
 
 
 data SkipOrigin s = Initial --from an atomic transition of the machine 
@@ -192,7 +188,7 @@ chainArbitrary skip@(Skip start end steps) = case end of
     _ -> Left $ "couldn't match counts:" <> rom
     
 addChainedToBook :: SkipBook Bit -> SkipBook Bit
-addChainedToBook sb = undefined where
+addChainedToBook sb = addMultipleToBook newSkipAndOrigins sb where
   allSkips = M.keys =<< M.elems sb
   mbChained = chainArbitrary <$> allSkips
   makeMBskipOrigin = \case 

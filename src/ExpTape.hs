@@ -4,15 +4,15 @@ import Relude
 import qualified Relude.Unsafe as Unsafe (init)
 import Control.Lens
 import Prettyprinter
+import Data.Bitraversable (Bitraversable)
+import Control.Exception (assert)
+import Relude.Extra (bimapBoth)
+import Safe.Partial
 
 import Turing
 import Count
 import Tape
-import Data.Bitraversable (Bitraversable)
-import Control.Exception (assert)
 import Util
-import Relude.Extra (bimapBoth)
-import Safe.Partial
 
 data ExpTape s c = ExpTape
   { left :: [(s, c)]

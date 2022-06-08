@@ -12,8 +12,6 @@ import Util
 import Config
 import Turing
 import Tape
---import Skip ( prettyText, Skip )
-import Count
 
 --the type of proofs that a TM will not halt
 -- - HaltUnreachable means the Halt state is never transitioned to from the current state

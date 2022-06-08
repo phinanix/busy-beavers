@@ -19,7 +19,6 @@ import Skip
 import Count
 import HaltProof
 import Results
-import Glue
 import Simulate (initSimState)
 import TapeSymbol
 

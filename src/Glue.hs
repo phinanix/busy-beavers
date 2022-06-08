@@ -1,7 +1,7 @@
 module Glue where
+
 import Relude
 import Relude.Extra (bimapBoth)
-import Control.Monad.Error.Class
 import Control.Lens
 import qualified Data.Map.Strict as M (assocs)
 import Data.Map.Monoidal (deleteFindMin, singleton, assocs, MonoidalMap (MonoidalMap), intersectionWith, unionWith)
@@ -10,7 +10,6 @@ import Util
 import Count
 import Skip hiding (HeadMatch(..))
 import ExpTape
-import Turing
 import Prettyprinter
 
 
@@ -64,26 +63,6 @@ remainingLonger xs ys = if length xs < length ys
   then Right (drop (length xs) ys) 
   else Left (drop (length ys) xs)
 
-updateCount :: Map BoundVar Count -> Count -> Count 
-updateCount m (Count n as xs) = Count n as Empty 
-  <> foldMap (updateVar m) (assocs xs) where 
-    updateVar :: Map BoundVar Count -> (BoundVar, Sum Natural) -> Count 
-    updateVar m (x, Sum n) = n `nTimes` getVar m x 
-    getVar :: Map BoundVar Count -> BoundVar -> Count 
-    getVar m x = case m^.at x of 
-      Just c -> c 
-      Nothing -> boundVarCount x 1
-
-updateCountToInf :: Map BoundVar InfCount -> Count -> InfCount
-updateCountToInf m (Count n as (MonoidalMap xs))
-  = NotInfinity (Count n as Empty) <> foldMap (updateVar m) (M.assocs xs) where
-  updateVar :: Map BoundVar InfCount -> (BoundVar, Sum Natural) -> InfCount
-  updateVar m (x, Sum n) = n `nTimes` getVar m x
-  getVar :: Map BoundVar InfCount -> BoundVar -> InfCount
-  getVar m x = case m^.at x of
-    Just c -> c
-    Nothing -> error $ show m <> "\n" <> show x
-      <> " a bound var wasn't mapped"
 
 updateConfig :: Map BoundVar Count -> Config Count s -> Config Count s 
 updateConfig map (Config p ls point rs) = Config p (updateCount map <$$> ls) point (updateCount map <$$> rs) 

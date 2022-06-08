@@ -4,13 +4,13 @@ import Relude hiding (mapMaybe)
 import Control.Lens
 import Witherable
 import Prettyprinter
+import Data.Bitraversable (Bitraversable)
+import Data.Bifoldable (Bifoldable)
 
 import Turing 
 import Count
 import Util
 import ExpTape
-import Data.Bitraversable (Bitraversable)
-import Data.Bifoldable (Bifoldable)
 import HaltProof
 import Tape
 
