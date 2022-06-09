@@ -485,7 +485,7 @@ guessInductionHypWithIndices (TapeHist hist) (DispHist disps) criticalPhase conf
       ans
     indexPairs = zipExact (U.init configIndices) (U.tail configIndices)
     slicePairs = let ans = uncurry (getSlicePair hist disps) <$> indexPairs in
-      --trace ("slicepairs were:\n" <> showP ans) 
+      trace ("slicepairs were:\n" <> showP ans) 
       ans
     allSigs = let ans = fmap (bimapBoth tapeSignature) slicePairs in
       --trace ("allsigs were: " <> showP ans) 

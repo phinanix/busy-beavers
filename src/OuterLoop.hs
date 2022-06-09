@@ -101,6 +101,15 @@ but it doesn't do that yet. Should be pretty straightforward to handle though
 
 8 June 22 
 Amanda suggests using colors in trace statements
+Amanda, full of good ideas, suggested I write this down. I'm having a problem where 
+  lastsize3 has the wrong induction hypothesis guessed, because it's using TwoBit Skips
+  which mean that displacement isn't the right way to calculate what parts of the tape
+  we have read (we need readshifts instead). I thought I rewrote that part of the code 
+  (guessInductionHypothesis) to use readshifts instead of raw displacements, but I 
+  haven't. After more investigation, I learned that I am (afaict) correctly tracking the 
+  ReadShiftHistory, but then it just gets ignored by guessInductionHypothesis. It should
+  be pretty straightforward to rewrite guessInductionHypothesis to append all the ReadShifts
+  together instead of using the displacements. 
 -}
 
 {-
