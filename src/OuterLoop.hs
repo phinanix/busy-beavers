@@ -98,6 +98,9 @@ into:
 phase: 0 (|TT|, x + 1) |>
 
 but it doesn't do that yet. Should be pretty straightforward to handle though
+
+8 June 22 
+Amanda suggests using colors in trace statements
 -}
 
 {-

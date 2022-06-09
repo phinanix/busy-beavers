@@ -262,7 +262,8 @@ proveBySimulating limit t book (Skip start skipEnd _) = case skipEnd of
                 stuckConfig = etToConfig p $ second deInfCount tape
                 msg = "machine stuck on step: " <> show numSteps
                   <> " in phase:" <> show p
-                  <> "\ngoal:" <> show (pretty (ph, tp)) <> "\ncur tape:" <> dispExpTape tape
+                  <> "\ncur tape:" <> dispExpTape tape
+                  <> "\ngoal:" <> show (pretty (ph, tp)) 
                 in
                 Left (msg, Just stuckConfig)
             Stepped Infinity _ _ _ _ _ -> Left ("hopped to infinity", Nothing)
