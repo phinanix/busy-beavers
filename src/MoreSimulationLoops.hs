@@ -24,7 +24,7 @@ import SimulateTwoBit (TwoBit)
 attemptInductionGuess :: Turing -> SimState Bit
   -> Either (SimResult InfCount Bit) (SimState Bit)
 attemptInductionGuess machine state = trace "attempted" $
-  case guessInductionHypothesis hist dispHist of
+  case guessInductionHypothesis hist rsHist of
     Left msg -> traceShow msg $ Right state
     --try to prove the skip by induction 
     Right skip -> trace ("guessed a skip:\n" <> show (pretty skip)) $
@@ -34,7 +34,7 @@ attemptInductionGuess machine state = trace "attempted" $
           addSkipToStateOrInf skip skipOrigin state
   where
     hist =  state ^. s_history
-    dispHist = state ^. s_disp_history
+    rsHist = state ^. s_readshift_history
 
 --Note! this function is outdated
 indGuessLoop ::  Int -> Turing -> OneLoopRes Bit
@@ -68,8 +68,8 @@ proveByInd machine state = --force $ --trace ("proveByInd on:\n" <> showP machin
   Right hp -> Left $ ContinueForever hp
   where
   hist = state ^. s_history
-  dispHist =  state ^. s_disp_history
-  (newbook, eTSkip) = let ans = proveInductivelyIMeanIT machine (state ^. s_book) (state ^. s_steps) hist dispHist
+  rsHist =  state ^. s_readshift_history
+  (newbook, eTSkip) = let ans = proveInductivelyIMeanIT machine (state ^. s_book) (state ^. s_steps) hist rsHist
     in
       trace ("etskip:\n" <> showP (ans ^. _2)) 
       ans
@@ -89,7 +89,7 @@ proveSimply machine state = case mbProof of
   Right hp -> Left $ ContinueForever hp
   where
   mbProof = do
-    indHyp <- guessInductionHypothesis (state ^. s_history) (state ^. s_disp_history)
+    indHyp <- guessInductionHypothesis (state ^. s_history) (state ^. s_readshift_history)
     first fst $ proveBySimulating 100 machine (state ^. s_book) indHyp
     arbSkip <- trace ("indhyp suceeded") $ chainArbitrary indHyp
     skipAppliesForeverInHist arbSkip (state ^. s_history)

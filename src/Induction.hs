@@ -57,11 +57,11 @@ Shortrange plan to get a thing which can prove the counter machine into main
 --we always return the new book
 --we return either a haltproof, or a text saying how we failed
 proveInductivelyIMeanIT :: (TapeSymbol s) => Turing -> SkipBook s -> Steps 
-    -> TapeHist s InfCount -> DispHist
+    -> TapeHist s InfCount -> ReadShiftHist
     -> (SkipBook s, Either Text (Skip Count s))
-proveInductivelyIMeanIT machine book curStep hist dispHist
+proveInductivelyIMeanIT machine book curStep hist rsHist
   = --force $ 
-  case guessInductionHypothesis hist dispHist of
+  case guessInductionHypothesis hist rsHist of
     Left msg -> (book, Left $ "failed to guessIndHyp:\n" <> msg)
     Right indHyp -> let (newBook, tOrOrigin) = proveStrong 5 machine book indHyp (BoundVar 0) in
       case tOrOrigin of
@@ -82,7 +82,7 @@ proveStrong loopLim machine book goal indVar = swapEither <$> loop 0 book Nothin
   -- the skiporigin is one for specifically the goal 
   -- the text is "we failed"
   loop :: Int -> SkipBook s -> Maybe (Config Count s) -> (SkipBook s, Either (SkipOrigin s) Text)
-  loop idx curBook mbLastStuck = --trace ("provestrong loop " <> show idx <> "\n") $
+  loop idx curBook mbLastStuck = trace ("provestrong loop " <> show idx <> "\n") $
     if idx > loopLim then error "wow we exceeded looplim!" -- Right "limit exceeded" 
     else case proveInductively 100 machine curBook goal indVar of
       Right skipOrigin -> (curBook, Left skipOrigin)
@@ -388,6 +388,23 @@ obtainConfigIndices :: (Eq s) => [(Phase, ExpTape s InfCount)] -> (Phase, Signat
 obtainConfigIndices hist config
     = filter (\(_, (p, tape)) -> (p, tapeSignature tape) == config) $ zip [0, 1 .. ] hist
 
+--given a tape history and a readshift history corresponding to what was read at each 
+--transition, plus two indicies, obtain the slices that were read + written from the 
+--beginning to the end
+getReadShiftSlicePair :: (Eq s) => [(Phase, ExpTape s InfCount)] -> [ReadShift] -> Int -> Int 
+  -> (ExpTape s Count, ExpTape s Count)
+getReadShiftSlicePair hist rSs start end = (startSlice, endSlice) where 
+    startTape = hist ^?! ix start . _2
+    endTape = hist ^?! ix end . _2
+    (ReadShift lenL lenR shiftDist) = mconcat (slice start (end-1) rSs)
+    startSlice = sliceExpTape startTape lenL lenR 
+    --because if you go 5 steps right, you need to slice 5 less distance to the right and
+    --5 more distance left
+    endSlice = sliceExpTape endTape (lenL - shiftDist) (lenR - shiftDist)
+
+getReadShiftSlicePairC :: (Eq s) => [(Phase, ExpTape s Count)] -> [ReadShift] -> Int -> Int -> (ExpTape s Count, ExpTape s Count) 
+getReadShiftSlicePairC hist = getReadShiftSlicePair ((fmap $ fmap $ second NotInfinity) hist) 
+
 --given a list of displacements and a start and end index, return the maximum 
 --left and rightward displacements that occured between the two indices, inclusive 
 maximumDisplacement :: Partial => [Int] -> Int -> Int -> (Int, Int)
@@ -462,29 +479,29 @@ generalizeFromExamples slicePairs = undefined
 
 
 
-guessInductionHypothesis :: (TapeSymbol s) => TapeHist s InfCount -> DispHist
+guessInductionHypothesis :: (TapeSymbol s) => TapeHist s InfCount -> ReadShiftHist
   -> Either Text (Skip Count s)
-guessInductionHypothesis th@(TapeHist hist) dh = do
+guessInductionHypothesis th@(TapeHist hist) rsh = do
   criticalConfig@(criticalPhase, _criticalSignature) <- guessCriticalConfiguration hist
   let
     configIndicesAndConfigs = let ans = obtainConfigIndices hist criticalConfig in
       --trace ("configs were:\n" <> showP ans) 
       ans
-  case guessInductionHypWithIndices th dh criticalPhase configIndicesAndConfigs of
+  case guessInductionHypWithIndices th rsh criticalPhase configIndicesAndConfigs of
     Right ans -> trace ("guessed indhyp:\n" <> showP ans) $ Right ans
     --this is hacky and bad but it is necessary to guess right on trickyChristmasTree so I'll try it for now
-    Left _msg -> guessInductionHypWithIndices th dh criticalPhase (Unsafe.tail configIndicesAndConfigs)
+    Left _msg -> guessInductionHypWithIndices th rsh criticalPhase (Unsafe.tail configIndicesAndConfigs)
 
 
 
-guessInductionHypWithIndices :: (Pretty s, Eq s) => TapeHist s InfCount -> DispHist -> Phase -> [(Int, (Phase, ExpTape s InfCount))] -> Either Text (Skip Count s)
-guessInductionHypWithIndices (TapeHist hist) (DispHist disps) criticalPhase configIndicesAndConfigs =
+guessInductionHypWithIndices :: (Pretty s, Eq s) => TapeHist s InfCount -> ReadShiftHist -> Phase -> [(Int, (Phase, ExpTape s InfCount))] -> Either Text (Skip Count s)
+guessInductionHypWithIndices (TapeHist hist) (ReadShiftHist rsHist) criticalPhase configIndicesAndConfigs =
   let
     configIndices = let ans = fst <$> configIndicesAndConfigs in
       --trace ("configIndices were: " <> showP ans) 
       ans
     indexPairs = zipExact (U.init configIndices) (U.tail configIndices)
-    slicePairs = let ans = uncurry (getSlicePair hist disps) <$> indexPairs in
+    slicePairs = let ans = uncurry (getReadShiftSlicePair hist rsHist) <$> indexPairs in
       trace ("slicepairs were:\n" <> showP ans) 
       ans
     allSigs = let ans = fmap (bimapBoth tapeSignature) slicePairs in
@@ -564,9 +581,9 @@ zipSigToET sig@(Signature b_ls p b_rs) pair@(c_ls, c_rs) = let
 
 --gets the simulation history and the displacement history
 --normally these are output backwards which is of course crazy so we fix them here 
-simForStepNumFromConfig :: (Partial, TapeSymbol s) => Int -> Turing -> Config Count s -> (TapeHist s Count, DispHist)
+simForStepNumFromConfig :: (Partial, TapeSymbol s) => Int -> Turing -> Config Count s -> (TapeHist s Count, ReadShiftHist)
 simForStepNumFromConfig limit machine startConfig
-    = (second deInfCount $ finalState ^. s_history, finalState ^. s_disp_history)
+    = (second deInfCount $ finalState ^. s_history, finalState ^. s_readshift_history)
     where
     (startPh, startTape) = second (second NotInfinity) $ configToET startConfig
     actionList = simulateStepUntilUnknown limit :| [liftModifyState recordHist, liftModifyState recordDispHist]
@@ -611,9 +628,9 @@ guessWhatHappensNext machine startConfig varToGeneralize
     pairsToSimulateAt :: NonEmpty (Int, Natural)
     pairsToSimulateAt = (\x -> (2000, x)) <$> numsToSimulateAt
     -- the simulation history and the displacement history
-    simsAtNums :: NonEmpty ([(Phase, ExpTape s Count)], [Int])
+    simsAtNums :: NonEmpty ([(Phase, ExpTape s Count)], [ReadShift])
     simsAtNums = let
-      ans = bimap getTapeHist getDispHist <$> ((\(x,y) -> simForStepNumFromConfig x machine
+      ans = bimap getTapeHist getReadShiftHist <$> ((\(x,y) -> simForStepNumFromConfig x machine
         $ replaceSymbolVarInConfig True startConfig varToGeneralize
         $ FinCount y) <$> pairsToSimulateAt)
       -- msg = toString $ T.intercalate "startsim:\n" $ (\x -> "length: " <> show (length x) <> "\n" <> displayHist x) .
@@ -687,7 +704,9 @@ guessWhatHappensNext machine startConfig varToGeneralize
         res = do
             let slicedPairs :: NonEmpty (ExpTape s Count, ExpTape s Count)
                 slicedPairs = let
-                  ans = (\(i, (hist, disps)) -> getSlicePairC hist disps 0 i) <$>
+                  -- TODO: getting pairs via displacement doesn't work with TwoBits, update it
+                  -- to use ReadShifts!
+                  ans = (\(i, (hist, rSs)) -> getReadShiftSlicePairC hist rSs 0 i) <$>
                     neZipExact finalIndices simsAtNums
                   msg = "slicedPairs were:\n" <> show (pretty ans)
                   in

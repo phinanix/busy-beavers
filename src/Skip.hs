@@ -141,6 +141,8 @@ instance Bitraversable Skip where
   bitraverse f g (Skip c se hop)
     = Skip <$> bitraverse f g c <*> bitraverse f g se <*> f hop
 
+--(neg left, pos right, 0 current head pos)
+--I think this means len_l is always <=0, len_r >=0
 data ReadShift = ReadShift {_len_l :: Steps, _len_r :: Steps, _shift_dist :: Steps}
   deriving (Eq, Ord, Show, Generic)
 instance NFData ReadShift 
