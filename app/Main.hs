@@ -103,7 +103,9 @@ main = do
   --       = bestCurrentProveLoop 141 $ startMachine1 3
   --simProgram dispExpTape $ foldr (uncurry addResult) Empty resultList 
   --putTextLn $ dispResults $ foldr (uncurry addResult) Empty resultList 
-  traverse_ putPretty $ getContinues $ outerLoop basicTacticVector (startMachine1 3)
+  let continues = getContinues $ outerLoop basicTacticVector (startMachine1 3)
+  putText $ "there were: " <> show (length continues) <> " machines unproven:"
+  traverse_ putPretty continues
 
   -- let assertFails = checkLRAssertManyMachines 200 $ startMachine1 4
   -- for_ assertFails putTextLn 

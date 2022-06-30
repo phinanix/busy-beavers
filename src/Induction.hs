@@ -82,11 +82,11 @@ proveStrong loopLim machine book goal indVar = swapEither <$> loop 0 book Nothin
   -- the skiporigin is one for specifically the goal 
   -- the text is "we failed"
   loop :: Int -> SkipBook s -> Maybe (Config Count s) -> (SkipBook s, Either (SkipOrigin s) Text)
-  loop idx curBook mbLastStuck = trace ("provestrong loop " <> show idx <> "\n") $
+  loop idx curBook mbLastStuck = force $ trace ("provestrong loop " <> show idx <> "\n") $
     if idx > loopLim then error "wow we exceeded looplim!" -- Right "limit exceeded" 
     else case proveInductively 100 machine curBook goal indVar of
       Right skipOrigin -> (curBook, Left skipOrigin)
-      Left (msg, maybeStuckConfig) -> --trace ("stuck on:\n" <> show (pretty maybeStuckConfig) <> "\nbecause:\n" <> toString msg) $
+      Left (msg, maybeStuckConfig) -> trace ("provestrong stuck on:\n" <> show (pretty maybeStuckConfig) <> "\nbecause:\n" <> toString msg) $
         if has _Just mbLastStuck && mbLastStuck == maybeStuckConfig
           then (curBook, Right $ "got stuck on same thing twice:\n" <> show (pretty mbLastStuck))
         else if (thingContainsVar <$> maybeStuckConfig) == Just False
@@ -165,6 +165,7 @@ proveInductively limit t book goal indVar = let
         --force 
         -- $ trace msg
         ans
+      --there's one machine that needs this to be 1 and one which needs it to be 2
     indGoal :: Skip Count s
     indGoal = goalPlusX 1
     newSymbolVar :: SymbolVar --TODO: this is obviously incredibly unsafe
@@ -263,7 +264,7 @@ proveBySimulating limit t book (Skip start skipEnd _) = case skipEnd of
                 msg = "machine stuck on step: " <> show numSteps
                   <> " in phase:" <> show p
                   <> "\ncur tape:" <> dispExpTape tape
-                  <> "\ngoal:" <> show (pretty (ph, tp)) 
+                  <> "\ngoal:" <> show (pretty (ph, tp)) <> "\nend of goal" 
                 in
                 Left (msg, Just stuckConfig)
             Stepped Infinity _ _ _ _ _ -> Left ("hopped to infinity", Nothing)
