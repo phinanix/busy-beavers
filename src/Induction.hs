@@ -106,6 +106,19 @@ isSameInAsOut (Skip start end _) = addUp start == addUp end
     addUp :: (Bifoldable b) => b c s -> c
     addUp = bifoldMap id (const mempty)
 
+--TODO: this is obviously a huge kludge. hopefully the smarter second version of the algorithm
+--won't have this issue
+proveInductively :: forall s. (TapeSymbol s)
+  => Int -> Turing -> SkipBook s
+  -> Skip Count s -> BoundVar
+  -> Either (Text, Maybe (Config Count s)) (SkipOrigin s)
+proveInductively limit t book goal indVar 
+  = case proveInductivelyWithX 0 limit t book goal indVar of 
+    Right so -> Right so 
+    Left stuck -> case proveInductivelyWithX 1 limit t book goal indVar of 
+      Right so -> Right so 
+      Left _stuckAgain -> Left stuck --we want the first stuckness, not the second one, usually
+
 {-
 A function which is sort of like `proveInductively`, but it doesn't actually do induction.
 It just brute simulates forward and sees if that works. This is good to be able to prove
@@ -116,18 +129,22 @@ skips blocks of 1s so we can just simulate for a finite number of (big) steps.
   -- -> Either (Text, Maybe (Config Count Bit)) (SkipOrigin Bit)
 -- proveSimply limit t book goal = undefined
 
+
 --goal: make a thing that takes a skip that might apply to a certain machine, 
 --attempts to simulate forward to prove that skip using induction
--- the first int is the limit on the number of steps to take before giving up 
+-- the first int is the "number to add to X" when trying to prove the indhyp. 
+--it's a huge kludge and hopefully I can get rid of it soon
+-- the second int is the limit on the number of steps to take before giving up 
 --the (skip bit) input is the goal to be proven, 
 -- the BoundVar is the variable on which we are going to do induction
 --returns Left with an error message, and the config we got stuck on 
 --or Right with success
-proveInductively :: forall s. (TapeSymbol s)
-  => Int -> Turing -> SkipBook s
+
+proveInductivelyWithX :: forall s. (TapeSymbol s)
+  => Natural -> Int -> Turing -> SkipBook s
   -> Skip Count s -> BoundVar
   -> Either (Text, Maybe (Config Count s)) (SkipOrigin s)
-proveInductively limit t book goal indVar = let
+proveInductivelyWithX xPlus limit t book goal indVar = let
   ans =  -- <> "using book\n" <> show (pretty book)) $
     force $
     case baseCase of
@@ -135,7 +152,8 @@ proveInductively limit t book goal indVar = let
       Right _ -> case indCase of
         Left res -> Left $ first ("failed ind: " <>) res
         Right _ ->  pure origin
-  msg = ("trying to prove:\n" <> show (pretty goal)) <> "\ngot res" <> showP ans <> "\nEOM\n"
+  msg = ("trying to prove:\n" <> show (pretty goal)) <> "\ngot res"
+           <> showP ans <> "\nEOM\n"
     in force $
       trace msg $
       assert (isSameInAsOut goal) ans
@@ -147,7 +165,7 @@ proveInductively limit t book goal indVar = let
     baseGoal :: Skip Count s
     baseGoal = replaceVarInSkip goal indVar $ finiteCount 1 --TODO, should be 1
     setStepCount steps skip = skip & hops .~ FinCount steps
-    goalPlusX x = --setStepCount 100 $ 
+    goalPlusX x = setStepCount (120 + x) $ 
       replaceVarInSkip goal indVar $ FinCount x <> symbolVarCount newSymbolVar 1
     indCase :: Either (Text, Maybe (Config Count s)) Count
     --this doesn't actually add the inductive hypothesis to the book!
@@ -159,7 +177,7 @@ proveInductively limit t book goal indVar = let
     indHyp :: Skip Count s
     indHyp = let
         --TODO: make the hypothesis be 0 and the goal be 1 again
-        ans = goalPlusX 0
+        ans = goalPlusX xPlus
         msg = "indHyp is:\n" <> show (pretty ans)
       in
         --force 
@@ -167,7 +185,7 @@ proveInductively limit t book goal indVar = let
         ans
       --there's one machine that needs this to be 1 and one which needs it to be 2
     indGoal :: Skip Count s
-    indGoal = goalPlusX 1
+    indGoal = goalPlusX (xPlus + 1)
     newSymbolVar :: SymbolVar --TODO: this is obviously incredibly unsafe
     newSymbolVar = SymbolVar 0
 

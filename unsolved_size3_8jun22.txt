@@ -1,3 +1,10 @@
+22jun 
 TR1FL2FL2TR0___TL0
 TR1___TL2TR0FR0FL2
 TR1FL2TL1TR0___TL0
+9jul 
+not proven under 0/1 or 0/2 (because it needs to go "below x" at one point),
+proven under 1/2
+TR1___TL2TR0FR0FL2 (same as second one above)
+not proven under 1/2, proven under 0/1 and 0/2
+TR1TL2FL0FR1TL0___ (different FF / TF counter) 
