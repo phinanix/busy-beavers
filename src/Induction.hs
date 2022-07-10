@@ -107,10 +107,10 @@ isSameInAsOut (Skip start end _) = addUp start == addUp end
     addUp = bifoldMap id (const mempty)
 
 {-
-A function which is sort of like `proveInductively`, but it doesn't actually do induction. It just brute 
-simulates forward and sees if that works. This is good to be able to prove things like the 1^n christmas 
-tree that just goes back and forth and we already know it skips blocks of 1s so we can just simulate for 
-a finite number of steps.
+A function which is sort of like `proveInductively`, but it doesn't actually do induction.
+It just brute simulates forward and sees if that works. This is good to be able to prove
+things like the 1^n christmas tree that just goes back and forth and we already know it 
+skips blocks of 1s so we can just simulate for a finite number of (big) steps.
 -}
 -- proveSimply :: Int -> Turing -> SkipBook Bit -> Skip Count Bit
   -- -> Either (Text, Maybe (Config Count Bit)) (SkipOrigin Bit)

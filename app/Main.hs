@@ -97,7 +97,9 @@ main = do
   -- let results = Simulate.simulate 100 $ startMachine1 4
   -- simProgram dispTape results
   
-  --let resultList :: [(Turing, SimResult (ExpTape Bit InfCount))] = indProveLoopMany 141 $ startMachine1 4
+  --let resultList
+  --       :: [(Turing, SimResult (ExpTape Bit InfCount))] 
+  --       = indProveLoopMany 141 $ startMachine1 4
   -- let resultList 
   --       :: [(Turing, SimResult InfCount Bit)]
   --       = bestCurrentProveLoop 141 $ startMachine1 3
