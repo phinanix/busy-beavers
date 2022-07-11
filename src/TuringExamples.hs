@@ -176,11 +176,30 @@ this is a rightward growing counting machine that counts in FF / FT
 lastSize3 :: Turing 
 lastSize3 = unm "TR1___TL2TR0FR0FL2"
 
+{-
+takes O(n^2) time to increase the size of the tape by O(1)
+outer loop: 
+(T, n) >F<
+TT (F, n-2) >F<
+inner loop:
+FF (T, n) >F<
+F (T, n+1)>F<
+and
+TT F (T, n) >F<
+(T, n+3) >F<
+I discovered this machine when it made the "assert" in proveSimLinearAndTree fail; 
+uncovering the bug where DFS and proveBySimulating were doing different things because
+the sorting of skips was not unique - if two skips took the same number of steps, then
+they could be sorted in either order. 
+-}
+bouncerInBouncer :: Turing
+bouncerInBouncer = unm "TR1FL2FL0FR1TR0TR3TL0___"
+
 machineList :: [Turing]
 machineList = [weird3, almostweird3, fullsim_not_halt3, bb3, simple_sweeper, 
   checkerboardSweeper, goesLeftForever, binaryCounterTFTT, machineBreaksIndGuess, 
   false_backward_search, not_halt3, jumps_to_end, loop2, bb2,
-  some_kind_of_bincounter]
+  some_kind_of_bincounter, bouncerInBouncer]
 
 instance Arbitrary Turing where 
   arbitrary = elements machineList 

@@ -195,8 +195,9 @@ proveSimLinearAndTree :: (HasCallStack, TapeSymbol s) => Int -> Int -> Turing ->
   -> Skip Count s -> Either (Text, Maybe (Config Count s)) Natural
 -- simulateViaDFS :: Int -> Int -> SkipBook Bit -> Skip Count Bit -> Either Text Natural 
 proveSimLinearAndTree linStep treeStep machine book skip
-  = force $ 
-  trace ("--------\n\n\n\n\n-----------\ntrying to prove: " <> showP skip) $
+  = 
+    --force $ 
+  --trace ("--------\n\n\n\n\n-----------\ntrying to prove: " <> showP skip) $
   --TODO: why is it linStep treeStep fed as the limits to simulateViaDFS
   --a node in DFS is a big step, so the nat output here is a big step
   case simulateViaDFS linStep treeStep book skip of
@@ -215,14 +216,10 @@ proveSimLinearAndTree linStep treeStep machine book skip
       --I investigated a bit more and this seems likely to be true, yes. there are two skips with value "100" 
       --and they are probably just randomly applied in different orders for no particularly good reason
       --steps here is a big step
-      Right steps -> trace ("err:\nmachine was\n" <> showP machine <> "\nwe were proving:\n" <> showP skip <> "\nend err\n") $ 
-        error "boom"
-        --  Right steps
-
-        --  error $ "what? steps: " <> showP steps <> " linstep:" <> showP linStep <> " treestep: " <> showP treeStep
-        --                     <> "\nmachine was\n" <> showP machine <> "\nwe were proving:\n" <> showP skip
-        --                     <> "\ndfs failed because:" <> text
-        --                     <> "\nbook was:\n" <> showP book
+      Right steps -> error $ "what? steps: " <> showP steps <> " linstep:" <> showP linStep <> " treestep: " <> showP treeStep
+                            <> "\nmachine was\n" <> showP machine <> "\nwe were proving:\n" <> showP skip
+                            <> "\ndfs failed because:" <> text
+                            <> "\nbook was:\n" <> showP book
       res@(Left _) -> res
 
 -- given a skip, replaces all occurences of a particular BoundVar with a particular Count
@@ -282,8 +279,8 @@ proveBySimulating limit t book (Skip start skipEnd _) = case skipEnd of
     -- we've succeeded, stepping fails for some reason, or we continue 
     loop :: Natural -> Phase -> ExpTape s InfCount -> Count -> Either (Text, Maybe (Config Count s)) Natural
     loop numSteps p tape curCount
-       | trace (Unsafe.init $ toString $ "PS: steps:" <> show numSteps <> " count:" <> showP curCount <>
-                  " p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
+      --  | trace (Unsafe.init $ toString $ "PS: steps:" <> show numSteps <> " count:" <> showP curCount <>
+      --             " p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
       | indMatch p tape (ph, tp) = pure numSteps 
       | numSteps > limit = Left ("exceeded limit while simulating", Nothing)
       | otherwise = case skipStep t book p tape of
@@ -329,7 +326,7 @@ proveBySimulating limit t book (Skip start skipEnd _) = case skipEnd of
 --TODO, it's really dumb we have to "deInfCount here"
 getNextConfigs :: forall s. (Ord s, Pretty s, Show s) 
   => SkipBook s -> Config Count s -> [Config Count s]
-getNextConfigs book curConfig = f ans
+getNextConfigs book curConfig = ans
  where
   f = if any thingContainsVar skipsUsed then trace msg else id 
   msg = ("skips used:\n" <> showP skipsUsed)

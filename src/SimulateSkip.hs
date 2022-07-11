@@ -340,7 +340,7 @@ lookupSkips (p, s) book = keysSet $ book ^. atE (p, s)
 -- skipFarthest (_, res1) (_, res2) = compare (res1 ^. hopsTaken) (res2 ^. hopsTaken)
 
 --
-skipPrecedence :: (Eq s) 
+skipPrecedence :: (Ord s) 
   => PartialStepResult InfCount s
   -> PartialStepResult InfCount s
   -> Ordering
@@ -354,7 +354,9 @@ skipPrecedence res1 res2 = case (res1, res2) of
   (_, NonhaltProven _) -> LT 
   (Stopped {}, _) -> GT
   (_, Stopped {}) -> LT
-  (Stepped c _ _ _ _ _, Stepped d _ _ _ _ _) -> compare c d
+  (res1@(Stepped c _ _ _ _ _), res2@(Stepped d _ _ _ _ _)) -> case compare c d of 
+    EQ -> compare res1 res2 
+    notEQ -> notEQ 
   (Stepped {}, Unknown _) -> GT
   (Unknown _, Stepped {}) -> LT
   (Unknown e, Unknown f) -> compare e f
@@ -386,7 +388,7 @@ getSkipsWhichApply book p tape@(ExpTape _ls bit _rs)
       in --trace msg 
         appliedSkips
 
-pickBestSkip :: (Eq s) => [(Skip Count s, PartialStepResult InfCount s)]
+pickBestSkip :: (Ord s) => [(Skip Count s, PartialStepResult InfCount s)]
   -> PartialStepResult InfCount s
 pickBestSkip = \case
   [] -> MachineStuck --TODO :: can we generate this message somewhere better?
