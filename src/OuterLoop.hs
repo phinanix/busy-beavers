@@ -25,6 +25,7 @@ import SimulationLoops
 import MoreSimulationLoops
 import SimulateTwoBit (TwoBit)
 import Mystery
+import ExpTape
 
 {- 7 June 22 overall state
 the tactics are coming along nicely, I'm super excited to have a TwoBit simulation tactic
@@ -154,7 +155,7 @@ outerLoop tacticList startMachine = loop [(startMachine, 0)] [] where
       -> [(Turing, Mystery TapeSymbol (SimResult InfCount))]
   loop [] res = res
   loop ((tm, n) : todos) curRes 
-    = trace ("remTodo: " <> show (length todos) <> " len res: " <> show (length curRes)) $ 
+    = trace ("remTodo: " <> show (length todos)) $ -- <> " len res: " <> show (length curRes)) $ 
     case tacticList V.!? n of
     -- TODO: how to get a "we failed" result / let's do a better one than this
     Nothing -> let newRes = Mystery $ Continue 0 (Phase 0) (initExpTape (Bit False)) 0 in
@@ -178,7 +179,17 @@ simLoop :: forall s. (TapeSymbol s)
   -> Turing
   -> ([Turing], [(Turing, SimResult InfCount s)])
 simLoop bigStepLimit updateFuncs startMachine 
-  = loop (startMachine, 0, initSkipState startMachine) [] ([], [])
+  = simLoopFromTape bigStepLimit updateFuncs startMachine (Phase 0) (initExpTape blank)
+
+simLoopFromTape :: forall s. (TapeSymbol s)
+  => Int
+  -> NonEmpty (SimMultiAction s)
+  -> Turing
+  -> Phase
+  -> ExpTape s InfCount 
+  -> ([Turing], [(Turing, SimResult InfCount s)])
+simLoopFromTape bigStepLimit updateFuncs startMachine startPhase startTape
+  = loop (startMachine, 0, skipStateFromPhTape startMachine startPhase startTape) [] ([], [])
   where
   bigUpdateFunc :: Turing -> SimState s -> MultiResult s (SimState s)
   bigUpdateFunc machine = foldl1 (>=>) ((&) machine <$> updateFuncs)
@@ -229,8 +240,15 @@ twoBitSimLoop = simulation @TwoBit $ simLoop 150 $ simulateStepPartial maxInt :|
   , runAtCount 147 proveByInd
   ])
 
+twoBitDispLoop :: TapeSymbol s => Turing -> ([Turing], [(Turing, SimResult InfCount s)])
+twoBitDispLoop = simLoop 150 $ simulateStepPartial maxInt :| 
+  (liftOneToMulti <$> [
+    liftModifyState recordHist
+  , liftModifyState recordDispHist
+  ])
+ 
 basicTacticVector :: V.Vector Tactic 
-basicTacticVector = V.fromList [basicSimLoop, twoBitSimLoop, tacticBackwardSearch]
+basicTacticVector = V.fromList [basicSimLoop, twoBitSimLoop] --, tacticBackwardSearch]
 
 countSimResType :: [Mystery TapeSymbol (SimResult c)] -> (Int, Int, Int, Int) 
 countSimResType inp = foldr myPlus (0,0,0,0) (fmap whichCat inp) where 

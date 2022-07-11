@@ -9,6 +9,7 @@ import qualified Data.Set as S
 import Prettyprinter
 import Data.Either.Combinators
 import Safe.Exact
+import Util
 
 
 --NoSuccess means we explored the whole graph and proved there are no success nodes in it
@@ -19,7 +20,7 @@ data SearchResult v = NoSuccess | Success [v] deriving (Eq, Ord, Show, Generic)
 will search to at most the depthLimit from the start, and will see at most nodeLimit nodes
 searches from the given vertex to try to find "success" nodes. 
 -}
-dfs :: forall v. (Ord v) => Int -> Int -> (v -> [v]) -> (v -> Bool) -> v -> Either Text (SearchResult v)
+dfs :: forall v. (Pretty v, Ord v) => Int -> Int -> (v -> [v]) -> (v -> Bool) -> v -> Either Text (SearchResult v)
 dfs depthLimit nodeLimit getAdjacent isSuccess startVertex = munge $ loop True Empty [] [(0, startVertex)] where 
   munge :: (Bool, Either Text [v]) -> Either Text (SearchResult v)
   munge = \case 
@@ -34,7 +35,7 @@ dfs depthLimit nodeLimit getAdjacent isSuccess startVertex = munge $ loop True E
   loop searchWasExhaustive explored curPath stack = if length explored > nodeLimit then (False, Left "hit nodelimit") else 
     case stack of 
       [] -> (searchWasExhaustive, Left "ran out of things to search")
-      (vDepth, v) : vs -> let newPath = takeExact vDepth curPath ++ [v] in 
+      (vDepth, v) : vs -> trace ("exploring: " <> showP v) $ let newPath = takeExact vDepth curPath ++ [v] in 
         if isSuccess v 
           then (searchWasExhaustive, Right newPath)
           else let 

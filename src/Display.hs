@@ -18,6 +18,8 @@ import SimulateSkip ( simulateOneTotalMachine )
 import Count
 import Numeric (showFFloat)
 import Util
+import OuterLoop
+import SimulationLoops
 
 showOneMachine :: Turing -> Steps -> Text
 showOneMachine t n =
@@ -114,3 +116,13 @@ tnfPrecursors steps t@(Turing n trans) = Turing n <$> restrictKeys trans <$> edg
 
 dispSkipBook :: SkipBook Bit -> Text
 dispSkipBook skips = foldMap (\s -> show (pretty s) <> "\n") $ fold skips
+
+displayMacro :: (TapeSymbol s) => Int -> Turing -> Phase -> ExpTape s InfCount -> Int  
+displayMacro limit machine startPhase startTape = length newM + length provedM where 
+  (newM, provedM) = simLoopFromTape limit actions machine startPhase startTape
+  actions = simulateStepPartial maxInt :| 
+    (liftOneToMulti <$> [
+      liftModifyState recordHist
+    , liftModifyState recordDispHist
+    ])
+  

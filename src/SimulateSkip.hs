@@ -162,6 +162,7 @@ instance (Pretty s) => Pretty (SkipOrigin s) where
   pretty (GlueStepRange first second) = "a skip resulting from glueing all skips used in the step range"
     <> show first <> " to " <> show second
   pretty InductionHypothesis = "a skip which is our current induction hypothesis"
+  pretty (ChainedFrom x) = "a skip which was chained from this skip:\n" <> pretty x <> "\n-----\n"
 
 --displacement is measured in the count of "s", not in the count of atomic symbols
 -- data SkipResult s c = Skipped

@@ -227,7 +227,7 @@ addChainedToBook sb = addMultipleToBook newSkipAndOrigins sb where
     _ -> Nothing 
   newSkipAndOrigins = let ans = mapMaybe makeMBskipOrigin $ zipExact allSkips mbChained 
     in 
-    trace ("added " <> mconcat (showP . fst <$> ans))
+    --trace ("added " <> mconcat (showP . fst <$> ans))
     ans
 
 instance TapeSymbol Bit where

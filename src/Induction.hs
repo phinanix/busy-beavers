@@ -82,11 +82,11 @@ proveStrong loopLim machine book goal indVar = swapEither <$> loop 0 book Nothin
   -- the skiporigin is one for specifically the goal 
   -- the text is "we failed"
   loop :: Int -> SkipBook s -> Maybe (Config Count s) -> (SkipBook s, Either (SkipOrigin s) Text)
-  loop idx curBook mbLastStuck = force $ trace ("provestrong loop " <> show idx <> "\n") $
+  loop idx curBook mbLastStuck = --force $ trace ("provestrong loop " <> show idx <> "\n") $
     if idx > loopLim then error "wow we exceeded looplim!" -- Right "limit exceeded" 
     else case proveInductively 100 machine curBook goal indVar of
       Right skipOrigin -> (curBook, Left skipOrigin)
-      Left (msg, maybeStuckConfig) -> trace ("provestrong stuck on:\n" <> show (pretty maybeStuckConfig) <> "\nbecause:\n" <> toString msg) $
+      Left (msg, maybeStuckConfig) -> --trace ("provestrong stuck on:\n" <> show (pretty maybeStuckConfig) <> "\nbecause:\n" <> toString msg) $
         if has _Just mbLastStuck && mbLastStuck == maybeStuckConfig
           then (curBook, Right $ "got stuck on same thing twice:\n" <> show (pretty mbLastStuck))
         else if (thingContainsVar <$> maybeStuckConfig) == Just False
@@ -108,7 +108,7 @@ isSameInAsOut (Skip start end _) = addUp start == addUp end
 
 --TODO: this is obviously a huge kludge. hopefully the smarter second version of the algorithm
 --won't have this issue
-proveInductively :: forall s. (TapeSymbol s)
+proveInductively :: forall s. (HasCallStack, TapeSymbol s)
   => Int -> Turing -> SkipBook s
   -> Skip Count s -> BoundVar
   -> Either (Text, Maybe (Config Count s)) (SkipOrigin s)
@@ -140,13 +140,13 @@ skips blocks of 1s so we can just simulate for a finite number of (big) steps.
 --returns Left with an error message, and the config we got stuck on 
 --or Right with success
 
-proveInductivelyWithX :: forall s. (TapeSymbol s)
+proveInductivelyWithX :: forall s. (HasCallStack, TapeSymbol s)
   => Natural -> Int -> Turing -> SkipBook s
   -> Skip Count s -> BoundVar
   -> Either (Text, Maybe (Config Count s)) (SkipOrigin s)
 proveInductivelyWithX xPlus limit t book goal indVar = let
   ans =  -- <> "using book\n" <> show (pretty book)) $
-    force $
+    --force $
     case baseCase of
       Left res -> Left $ first ("failed base: " <>) res
       Right _ -> case indCase of
@@ -154,20 +154,21 @@ proveInductivelyWithX xPlus limit t book goal indVar = let
         Right _ ->  pure origin
   msg = ("trying to prove:\n" <> show (pretty goal)) <> "\ngot res"
            <> showP ans <> "\nEOM\n"
-    in force $
-      trace msg $
+    in 
+      force $
+      --trace msg $
       assert (isSameInAsOut goal) ans
     where
     origin :: SkipOrigin s
     origin = Induction book limit
-    baseCase :: Either (Text, Maybe (Config Count s)) Count
+    baseCase :: Either (Text, Maybe (Config Count s)) Natural
     baseCase = proveSimLinearAndTree limit limit t book baseGoal
     baseGoal :: Skip Count s
     baseGoal = replaceVarInSkip goal indVar $ finiteCount 1 --TODO, should be 1
     setStepCount steps skip = skip & hops .~ FinCount steps
     goalPlusX x = setStepCount (120 + x) $ 
       replaceVarInSkip goal indVar $ FinCount x <> symbolVarCount newSymbolVar 1
-    indCase :: Either (Text, Maybe (Config Count s)) Count
+    indCase :: Either (Text, Maybe (Config Count s)) Natural
     --this doesn't actually add the inductive hypothesis to the book!
     indCase = --trace "\nstarting ind\n" $ 
       --deepseq indHyp $
@@ -190,15 +191,17 @@ proveInductivelyWithX xPlus limit t book goal indVar = let
     newSymbolVar = SymbolVar 0
 
 --first int is linear step limit, second int is tree step limit
-proveSimLinearAndTree :: TapeSymbol s => Int -> Int -> Turing -> SkipBook s
-  -> Skip Count s -> Either (Text, Maybe (Config Count s)) Count
+proveSimLinearAndTree :: (HasCallStack, TapeSymbol s) => Int -> Int -> Turing -> SkipBook s
+  -> Skip Count s -> Either (Text, Maybe (Config Count s)) Natural
 -- simulateViaDFS :: Int -> Int -> SkipBook Bit -> Skip Count Bit -> Either Text Natural 
 proveSimLinearAndTree linStep treeStep machine book skip
-  = --force $ 
+  = force $ 
+  trace ("--------\n\n\n\n\n-----------\ntrying to prove: " <> showP skip) $
+  --TODO: why is it linStep treeStep fed as the limits to simulateViaDFS
+  --a node in DFS is a big step, so the nat output here is a big step
   case simulateViaDFS linStep treeStep book skip of
-    --TODO: this blurs the line of what the returned count means, between big steps and small steps
-    Right nat -> Right $ FinCount nat
-    Left text -> case proveBySimulating linStep machine book skip of
+    Right nat -> Right nat
+    Left text -> case proveBySimulating (fromIntegral linStep) machine book skip of
       --works if you comment out this error and return right, but HOW COULD THAT BE TRUE you should never hit this error
       --the reason for this is simulateViaDFS should guess the same as proveBySimulating as it's first deep path, and should only recurse onto 
       --other paths if that doesn't work
@@ -206,10 +209,20 @@ proveSimLinearAndTree linStep treeStep machine book skip
       --oh dear, maybe part of the issue is whether "simulateViaDFS" and "proveBySimulating" are using "big steps" or "little steps"? 
       --because the error occurs with count=467 which seems to be bigger than the callsite (guessAndProveWhatHappensNext), 
       --which calls with a limit of 200 afaict 
-      Right count -> error $ "what? count: " <> showP count <> " linstep:" <> showP linStep <> " treestep: " <> showP treeStep
-                            <> "\nmachine was\n" <> showP machine <> "\nwe were proving:\n" <> showP skip
-                            <> "\ndfs failed because:" <> text
-                            <> "\nbook was:\n" <> showP book
+
+      --update 10 July: it seems like the error has to be that "maximum" and "sortBy flip" are somehow not producing the same thing, 
+      --or something dumb like that, I can't see what else would produce this behavior
+      --I investigated a bit more and this seems likely to be true, yes. there are two skips with value "100" 
+      --and they are probably just randomly applied in different orders for no particularly good reason
+      --steps here is a big step
+      Right steps -> trace ("err:\nmachine was\n" <> showP machine <> "\nwe were proving:\n" <> showP skip <> "\nend err\n") $ 
+        error "boom"
+        --  Right steps
+
+        --  error $ "what? steps: " <> showP steps <> " linstep:" <> showP linStep <> " treestep: " <> showP treeStep
+        --                     <> "\nmachine was\n" <> showP machine <> "\nwe were proving:\n" <> showP skip
+        --                     <> "\ndfs failed because:" <> text
+        --                     <> "\nbook was:\n" <> showP book
       res@(Left _) -> res
 
 -- given a skip, replaces all occurences of a particular BoundVar with a particular Count
@@ -251,8 +264,8 @@ replaceBoundVarInCount varIn countOut (Count num symbolMap boundMap) =
 -- the text tells you why you failed, and you might have failed via getting "stuck" on something, in which case we return that
 -- this linearly simulates forward, which sometimes gets you into a hole when you prove something that skips ahead, because 
 -- you can end up skipping past the thing you want. to solve this problem, I wrote simulateviadfs
-proveBySimulating :: forall s. (TapeSymbol s) => Int -> Turing -> SkipBook s
-  -> Skip Count s -> Either (Text, Maybe (Config Count s)) Count
+proveBySimulating :: forall s. (TapeSymbol s) => Natural -> Turing -> SkipBook s
+  -> Skip Count s -> Either (Text, Maybe (Config Count s)) Natural
 proveBySimulating limit t book (Skip start skipEnd _) = case skipEnd of
   SkipHalt _ -> Left ("can't prove halt by induction", Nothing)
   SkipUnknownEdge _ -> Left ("can't prove unknownedge by induction", Nothing)
@@ -267,11 +280,11 @@ proveBySimulating limit t book (Skip start skipEnd _) = case skipEnd of
     ans where
     -- four conditions: we've taken more steps than the limit,
     -- we've succeeded, stepping fails for some reason, or we continue 
-    loop :: Int -> Phase -> ExpTape s InfCount -> Count -> Either (Text, Maybe (Config Count s)) Count
+    loop :: Natural -> Phase -> ExpTape s InfCount -> Count -> Either (Text, Maybe (Config Count s)) Natural
     loop numSteps p tape curCount
-      -- | trace (Unsafe.init $ toString $ "steps:" <> show numSteps <> " count:" <> showP curCount <>
-      --            " p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
-      | indMatch p tape (ph, tp) = pure curCount
+       | trace (Unsafe.init $ toString $ "PS: steps:" <> show numSteps <> " count:" <> showP curCount <>
+                  " p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
+      | indMatch p tape (ph, tp) = pure numSteps 
       | numSteps > limit = Left ("exceeded limit while simulating", Nothing)
       | otherwise = case skipStep t book p tape of
             Unknown e -> Left ("hit unknown edge" <> show e, Nothing)
@@ -316,12 +329,20 @@ proveBySimulating limit t book (Skip start skipEnd _) = case skipEnd of
 --TODO, it's really dumb we have to "deInfCount here"
 getNextConfigs :: forall s. (Ord s, Pretty s, Show s) 
   => SkipBook s -> Config Count s -> [Config Count s]
-getNextConfigs book curConfig = first deInfCount <$> mapMaybe getConfig choices
+getNextConfigs book curConfig = f ans
  where
+  f = if any thingContainsVar skipsUsed then trace msg else id 
+  msg = ("skips used:\n" <> showP skipsUsed)
+  skipsUsed = mapMaybe getSkip choices
+  ans =  first deInfCount <$> mapMaybe getConfig choices
   getConfig :: PartialStepResult InfCount s -> Maybe (Config InfCount s)
   getConfig = \case
     Stepped _ ph newTape _ _ _ -> Just $ etToConfig ph newTape
     _ -> Nothing
+  getSkip ::  PartialStepResult InfCount s -> Maybe (Skip Count s)
+  getSkip = \case 
+    Stepped _ _ _ skip _ _ -> Just skip
+    _ -> Nothing 
   choices :: [PartialStepResult InfCount s]
   --flip since sort gives smallest to largest by default but we want the largest skip first
   choices = sortBy (flip skipPrecedence)
@@ -507,7 +528,8 @@ guessInductionHypothesis th@(TapeHist hist) rsh = do
       --trace ("configs were:\n" <> showP ans) 
       ans
   case guessInductionHypWithIndices th rsh criticalPhase configIndicesAndConfigs of
-    Right ans -> trace ("guessed indhyp:\n" <> showP ans) $ Right ans
+    Right ans -> --trace ("guessed indhyp:\n" <> showP ans) $ 
+      Right ans
     --this is hacky and bad but it is necessary to guess right on trickyChristmasTree so I'll try it for now
     Left _msg -> guessInductionHypWithIndices th rsh criticalPhase (Unsafe.tail configIndicesAndConfigs)
 
@@ -521,7 +543,7 @@ guessInductionHypWithIndices (TapeHist hist) (ReadShiftHist rsHist) criticalPhas
       ans
     indexPairs = zipExact (U.init configIndices) (U.tail configIndices)
     slicePairs = let ans = uncurry (getReadShiftSlicePair hist rsHist) <$> indexPairs in
-      trace ("slicepairs were:\n" <> showP ans) 
+      --trace ("slicepairs were:\n" <> showP ans) 
       ans
     allSigs = let ans = fmap (bimapBoth tapeSignature) slicePairs in
       --trace ("allsigs were: " <> showP ans) 

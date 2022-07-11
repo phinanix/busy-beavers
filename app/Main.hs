@@ -101,17 +101,19 @@ main = do
   --       :: [(Turing, SimResult (ExpTape Bit InfCount))] 
   --       = indProveLoopMany 141 $ startMachine1 4
   -- let resultList 
-  --       :: [(Turing, SimResult InfCount Bit)]
+  --       :: [(Turing, SimResult InfCount   Bit)]
   --       = bestCurrentProveLoop 141 $ startMachine1 3
   --simProgram dispExpTape $ foldr (uncurry addResult) Empty resultList 
   --putTextLn $ dispResults $ foldr (uncurry addResult) Empty resultList 
-  let continues = getContinues $ outerLoop basicTacticVector (startMachine1 3)
+  let continues = getContinues $ outerLoop basicTacticVector (startMachine1 4)
   putText $ "there were: " <> show (length continues) <> " machines unproven:"
   traverse_ putPretty continues
 
   -- let assertFails = checkLRAssertManyMachines 200 $ startMachine1 4
   -- for_ assertFails putTextLn 
 
+-- crash on
+-- TR1FL2FL0FR1TR0TR3TL0___
 
 
 -- num states and num machines
