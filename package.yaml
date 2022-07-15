@@ -27,19 +27,19 @@ library:
   dependencies:
   - containers
   - constraints
+  - either 
+  - hspec
   - lens
   - monoidal-containers
-  - vector
   - mtl
   - prettyprinter
+  - QuickCheck
+  - quickcheck-instances
   - relude
   - safe
   - text
+  - vector
   - witherable
-  - QuickCheck
-  - hspec
-  - either 
-  - quickcheck-instances
     
 executables:
   busy-beavers-exe:

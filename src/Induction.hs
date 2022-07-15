@@ -113,11 +113,12 @@ proveInductively :: forall s. (HasCallStack, TapeSymbol s)
   -> Skip Count s -> BoundVar
   -> Either (Text, Maybe (Config Count s)) (SkipOrigin s)
 proveInductively limit t book goal indVar 
-  = case proveInductivelyWithX 0 limit t book goal indVar of 
+  = case proveInductivelyWithX 1 limit t book goal indVar of 
     Right so -> Right so 
-    Left stuck -> case proveInductivelyWithX 1 limit t book goal indVar of 
-      Right so -> Right so 
-      Left _stuckAgain -> Left stuck --we want the first stuckness, not the second one, usually
+    Left stuck -> Left stuck
+      -- case proveInductivelyWithX 1 limit t book goal indVar of 
+      -- Right so -> Right so 
+      -- Left _stuckAgain -> Left stuck --we want the first stuckness, not the second one, usually
 
 {-
 A function which is sort of like `proveInductively`, but it doesn't actually do induction.
@@ -146,7 +147,7 @@ proveInductivelyWithX :: forall s. (HasCallStack, TapeSymbol s)
   -> Either (Text, Maybe (Config Count s)) (SkipOrigin s)
 proveInductivelyWithX xPlus limit t book goal indVar = let
   ans =  -- <> "using book\n" <> show (pretty book)) $
-    --force $
+    force $
     case baseCase of
       Left res -> Left $ first ("failed base: " <>) res
       Right _ -> case indCase of
@@ -156,7 +157,7 @@ proveInductivelyWithX xPlus limit t book goal indVar = let
            <> showP ans <> "\nEOM\n"
     in 
       force $
-      --trace msg $
+      trace msg $
       assert (isSameInAsOut goal) ans
     where
     origin :: SkipOrigin s

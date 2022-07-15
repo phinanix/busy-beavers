@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b7c15d535d1e6eefed77d8ec4a1daea86fbd8849ba96b1a4d0d4eb6fcac24033
+-- hash: 0f0a61cb77bed86bd881e013c46a903e21296f2c7eefbe10f456d965c97f1d98
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -40,6 +40,7 @@ library
       MoreSimulationLoops
       Mystery
       Notation
+      NSym
       OuterLoop
       Results
       Simple.Display
@@ -189,6 +190,7 @@ test-suite busy-beavers-test
       LinRecurrenceSpec
       MoreSimulationLoopsSpec
       NotationSpec
+      NSymSpec
       SimulateSkipSpec
       SimulateSpec
       SimulationLoopsSpec
