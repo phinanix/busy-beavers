@@ -28,6 +28,7 @@ library:
   - containers
   - constraints
   - either 
+  - fixed-vector
   - hspec
   - lens
   - monoidal-containers

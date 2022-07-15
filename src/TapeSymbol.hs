@@ -218,7 +218,7 @@ chainArbitrary skip@(Skip start end _steps) = case end of
           LT -> Right (res, res, Just $ Start [(sym, FinCount (m - n))])
       _ -> Left $ "couldn't match counts:" <> rom
     
-addChainedToBook :: (TapeSymbol s) => SkipBook s -> SkipBook s
+addChainedToBook ::(Ord s, Pretty s) => SkipBook s -> SkipBook s
 addChainedToBook sb = addMultipleToBook newSkipAndOrigins sb where
   allSkips = M.keys =<< M.elems sb
   mbChained = chainArbitrary <$> allSkips

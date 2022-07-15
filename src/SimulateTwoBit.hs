@@ -27,8 +27,8 @@ because we're on the left of the twobit, we can split transitions into two group
 2) the transitions where we step right first, where we only need to make a skip for every
    cur symbol
 -}
-allInitTapes :: Turing -> [(Phase, ExpTape Bit Natural)]
-allInitTapes (Turing _n trans) = concatMap toList
+allInitTwoBitTapes :: Turing -> [(Phase, Tape Bit)]
+allInitTwoBitTapes (Turing _n trans) = concatMap toList
   $ (leftTransTapes <$> assocs leftTrans) ++ (rightTransTapes <$> assocs rightTrans)
   where
   transGoesLeft = \case
@@ -38,10 +38,10 @@ allInitTapes (Turing _n trans) = concatMap toList
   splitBy p xs = (filter p xs, filter (not . p) xs)
   (leftTrans, rightTrans) = splitBy transGoesLeft trans
 
-  allLeftTapes = (,1) <$$> ((:) <$> uniBit <*> (pure <$> uniBit))
+  allLeftTapes = (:) <$> uniBit <*> (pure <$> uniBit)
   leftTransTapes ((p, b), _) = (p,) <$>
-    ((\x y -> ExpTape x b [(y, 1)]) <$> allLeftTapes <*> uniBit)
-  rightTransTapes ((p, b), _) = (p,) <$> ((\x -> ExpTape [] b [(x, 1)]) <$> uniBit)
+    ((\x y -> Tape x b [y]) <$> allLeftTapes <*> uniBit)
+  rightTransTapes ((p, b), _) = (p,) <$> ((\x -> Tape [] b [x]) <$> uniBit)
 
 
 {-
@@ -53,7 +53,7 @@ for leftward transitions, we want either to get to the leftmost bit on the tape,
 the natural is the number of hops it took, and the conditionend means:
 Unknown: we hit an unknown edge
 fallright: we fell off the right, here is the tape to our left
-reachedleftmost: we're on the leftmost bit, here's the bit and the tape to our gith
+reachedleftmost: we're on the leftmost bit, here's the bit and the tape to our right
 cycle: the machine enters the same state in steps n and m 
   (here the stepcount natural is equal to n)
 -}
@@ -67,7 +67,7 @@ data ConditionEnd = UnknownEdge Edge
   deriving (Eq, Ord, Show, Generic)
 instance NFData ConditionEnd
 
-data PartialTapeResult s = PTUnknown Edge | PTStopped (Tape s) | PTStepped (TMState (Tape s)) 
+data PartialTapeResult s = PTUnknown Edge | PTStopped (Tape s) | PTStepped (TMState (Tape s))
   --which side you fell off; the point; the other side
   | PTFellOff Dir Phase [s]
 
@@ -77,25 +77,25 @@ simStep (Turing _ trans ) (TMState p (Tape ls bit rs))
     Nothing -> PTUnknown (p,bit)
     --we assume WLOG that the machine goes left and writes True when it halts
     --Phase -1 is for "halted"
-    Just Halt -> case ls of 
+    Just Halt -> case ls of
       [] -> PTFellOff L (Phase (-1)) (Bit True : rs)
       l : ls' -> PTStopped (Tape ls' l (Bit True : rs))
-    Just (Step q newBit L) -> case ls of 
+    Just (Step q newBit L) -> case ls of
       [] -> PTFellOff L q (newBit : rs)
       l : ls' -> PTStepped (TMState q $ Tape ls' l (newBit : rs))
-    Just (Step q newBit R) -> case rs of 
-      [] -> PTFellOff R q (newBit : ls) 
+    Just (Step q newBit R) -> case rs of
+      [] -> PTFellOff R q (newBit : ls)
       r : rs' -> PTStepped (TMState q $ Tape (newBit : ls) r rs')
 
 
 simulateUntilCondition :: Turing -> (Phase, Tape Bit) -> (Natural, ConditionEnd)
 simulateUntilCondition t (ph, startTape) = loop startState 0 Empty where
-  startState = let ans = TMState ph startTape in 
+  startState = let ans = TMState ph startTape in
     --trace ("machine: " <> showP t <> "\nstartState" <> showP ans)
     ans
   loop :: TMState (Tape Bit) -> Natural -> Map (TMState (Tape Bit)) Natural
     -> (Natural, ConditionEnd)
-  loop curState curStep pastStateMap = 
+  loop curState curStep pastStateMap =
     case pastStateMap ^. at curState of
     Just m -> (m, CECycle curStep m)
     Nothing -> let
@@ -122,16 +122,16 @@ makeTwoBitSkip t (startPh, startT) = Skip skipStart skipEnd hops
   skipEnd = case simEnd of
     UnknownEdge e -> SkipUnknownEdge e
     FallRight ph ls -> SkipStepped ph $ Side R $ rle $ pairBitList ls
-    ReachedLeftMost ph p (r : rs) 
+    ReachedLeftMost ph p (r : rs)
       -> SkipStepped ph $ Middle $ ExpTape [] (TwoBit p r) $ rle $ pairBitList rs
     ReachedLeftMost {} -> error $ "unreachable maketwobitskip:\n" <> showP t <> show startT <> show simEnd
     --TODO: these numbers are wrong, as is >>
     CECycle n m -> SkipNonhaltProven $ Cycle (fromIntegral n) (fromIntegral m)
     Halts tape -> SkipHalt $ Middle $ unFlattenET tape
 
-initTwoBitBook :: Turing -> SkipBook TwoBit 
-initTwoBitBook t = addChainedToBook $ appEndo (foldMap (Endo . addInitialSkipToBook) skips) Empty where 
-  skips = first FinCount . makeTwoBitSkip t . second flattenET <$> allInitTapes t
+initTwoBitBook :: Turing -> SkipBook TwoBit
+initTwoBitBook t = addChainedToBook $ appEndo (foldMap (Endo . addInitialSkipToBook) skips) Empty where
+  skips = first FinCount . makeTwoBitSkip t <$> allInitTwoBitTapes t
 
 unRLE :: [(s, Natural)] -> [s]
 unRLE = bind (\(s, n) -> genericReplicate n s)
@@ -200,5 +200,5 @@ instance TapeSymbol TwoBit where
     --I need the type ([x], y) -> x -> ([x], y)
     (x: y : rest) -> first (TwoBit x y :) $ fromBits rest
     tail -> ([], tail)
-  initBook = initTwoBitBook 
+  initBook = initTwoBitBook
 

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 0f0a61cb77bed86bd881e013c46a903e21296f2c7eefbe10f456d965c97f1d98
+-- hash: 8bd7cbbe61001b330bfb352b47e86e3613ef46b7f78748d48a78a59637df5095
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -40,7 +40,6 @@ library
       MoreSimulationLoops
       Mystery
       Notation
-      NSym
       OuterLoop
       Results
       Simple.Display
@@ -49,6 +48,7 @@ library
       Simulate
       SimulateSkip
       SimulateTwoBit
+      SimulateVecBit
       SimulationLoops
       Skip
       Tape
@@ -108,6 +108,7 @@ library
     , constraints
     , containers
     , either
+    , fixed-vector
     , hspec
     , lens
     , monoidal-containers
@@ -190,9 +191,9 @@ test-suite busy-beavers-test
       LinRecurrenceSpec
       MoreSimulationLoopsSpec
       NotationSpec
-      NSymSpec
       SimulateSkipSpec
       SimulateSpec
+      SimulateVecBitTest
       SimulationLoopsSpec
       SkipSpec
       TapeSymbolSpec
