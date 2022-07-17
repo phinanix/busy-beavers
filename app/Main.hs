@@ -118,7 +118,7 @@ main = do
   fileContents <- Relude.readFile "size4_unfinished_16_jul.txt"
   let machineStrings = lines $ fromString fileContents
       machines = unm <$> machineStrings 
-      runBWSearch = getContinues . outerLoop (V.fromList [tacticBackwardSearch])
+      runBWSearch = getContinues . outerLoop threeFourFiveTacticVector
       failsBWSearch = bind runBWSearch machines 
 
 

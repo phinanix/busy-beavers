@@ -84,8 +84,10 @@ allInitTapes n (Turing _n trans) = assert (n > 0) concatMap toList
   leftTransTapes (p, b) = (p,) <$>((\x y -> Tape x b y) <$> allLeftTapes <*> allRightTapes)
   rightTransTapes (p, b) = (p,) <$> (Tape [] b <$> allRightTapes)
 
-listToVector :: forall v. (Vector v Bit) => [Bit] -> [v Bit]
-listToVector l = let
+listToVector :: forall v. (Vector v Bit, Partial) => [Bit] -> [v Bit]
+listToVector l = case l of 
+  [] -> []
+  _ -> let
         vecLen = fromIntegral $ natVal (Proxy @(Dim v))
         (start, end) = splitAtExact vecLen l in
     (V.fromList' start :) $ listToVector end

@@ -10,6 +10,7 @@ import Safe.Exact
 import Prettyprinter
 import Safe.Partial
 import Control.Exception (assert)
+import Data.Vector.Fixed.Unboxed
 
 import qualified Data.List.NonEmpty as NE ((<|))
 import qualified Data.Set as S
@@ -26,6 +27,7 @@ import MoreSimulationLoops
 import SimulateTwoBit (TwoBit)
 import Mystery
 import ExpTape
+import SimulateVecBit
 
 {- 7 June 22 overall state
 the tactics are coming along nicely, I'm super excited to have a TwoBit simulation tactic
@@ -246,9 +248,37 @@ twoBitDispLoop = simLoop 150 $ simulateStepPartial maxInt :|
     liftModifyState recordHist
   , liftModifyState recordDispHist
   ])
- 
+
+baseSimLoop :: (TapeSymbol s) => Turing -> ([Turing],[(Turing, SimResult InfCount s)])
+baseSimLoop = simLoop 150 $ simulateStepPartial maxInt :| 
+  (liftOneToMulti <$> [checkSeenBefore
+  , liftModifyState recordHist
+  , liftModifyState recordDispHist
+  , runAtCount 10 proveByLR
+  , runAtCount 40 proveSimply
+  , runAtCount 145 proveByLR
+  , runAtCount 146 proveSimply
+  , runAtCount 147 proveByInd
+  ])
+
+threeBitSimLoop :: Tactic
+threeBitSimLoop = simulation @(Vec 3 Bit) baseSimLoop
+
+fourBitSimLoop :: Tactic
+fourBitSimLoop = simulation @(Vec 4 Bit) baseSimLoop
+
+fiveBitSimLoop :: Tactic
+fiveBitSimLoop = simulation @(Vec 5 Bit) baseSimLoop
+
+
 basicTacticVector :: V.Vector Tactic 
 basicTacticVector = V.fromList [basicSimLoop, twoBitSimLoop] --, tacticBackwardSearch]
+
+threeFourFiveTacticVector :: V.Vector Tactic
+threeFourFiveTacticVector = V.fromList [threeBitSimLoop, fourBitSimLoop, fiveBitSimLoop]
+
+bwSearchTacticVector :: V.Vector Tactic
+bwSearchTacticVector = V.fromList [tacticBackwardSearch]
 
 countSimResType :: [Mystery TapeSymbol (SimResult c)] -> (Int, Int, Int, Int) 
 countSimResType inp = foldr myPlus (0,0,0,0) (fmap whichCat inp) where 
