@@ -5,8 +5,9 @@ import Relude
 import Control.Lens
 import qualified Data.Text as T (length)
 import Data.Text.Read
-import System.IO (stdout, BufferMode(..))
 import Prettyprinter 
+import Control.Monad
+import qualified Data.Vector as V
 
 import Turing
 import TuringExamples
@@ -23,6 +24,7 @@ import SimulationLoops (simulateManyBasicLoop)
 import MoreSimulationLoops
 import Util
 import OuterLoop
+import System.IO (openFile, hGetContents, hClose)
 
 
 simProgram :: (Pretty s, Pretty c, Show s, Show c) => Results c s  -> IO ()
@@ -92,6 +94,13 @@ simProgram results = do
 --       so it can prove inductions with the same sig in and out
 -- integrate induction guesser into overall simulation loop; tune it 
 
+readFile :: String -> IO String
+readFile filename = do  
+        handle <- openFile filename ReadMode
+        contents <- hGetContents handle
+        hClose handle
+        pure contents
+
 main :: IO ()
 main = do
   -- let results = Simulate.simulate 100 $ startMachine1 4
@@ -106,8 +115,18 @@ main = do
   --simProgram dispExpTape $ foldr (uncurry addResult) Empty resultList 
   --putTextLn $ dispResults $ foldr (uncurry addResult) Empty resultList 
   let continues = getContinues $ outerLoop basicTacticVector (startMachine1 4)
-  putText $ "there were: " <> show (length continues) <> " machines unproven:"
-  traverse_ putPretty continues
+  fileContents <- Relude.readFile "size4_unfinished_16_jul.txt"
+  let machineStrings = lines $ fromString fileContents
+      machines = unm <$> machineStrings 
+      runBWSearch = getContinues . outerLoop (V.fromList [tacticBackwardSearch])
+      failsBWSearch = bind runBWSearch machines 
+
+
+  putText $ "there were: " <> show (length failsBWSearch) <> " machines unproven:"
+  --traverse_ putPretty continues
+  
+  --putText $ "there were: " <> show (length continues) <> " machines unproven:"
+  --traverse_ putPretty continues
 
   -- let assertFails = checkLRAssertManyMachines 200 $ startMachine1 4
   -- for_ assertFails putTextLn 

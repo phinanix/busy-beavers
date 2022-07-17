@@ -114,3 +114,7 @@ prettyText = pretty
 --     l = last ne 
 --     in 
 --       Just (i,l)
+
+ceilDiv :: Natural -> Natural -> Natural 
+ceilDiv x y = if x `mod` y == 0 then x `div` y else 1 + (x `div` y) 
+

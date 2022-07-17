@@ -852,6 +852,7 @@ generalizeFromCounts xs = force $
   where
     allEqualPair :: Maybe (Count, Count)
     allEqualPair = guard (list1AllEqual xs) >> pure (head xs)
+    -- allEqualPair = (head xs) `someIf` (list1AllEqual xs)
     countToMaybeNat = \case
         Count n Empty Empty -> Just n
         _ -> Nothing
@@ -890,6 +891,7 @@ generalizeFromCounts xs = force $
       in
       --trace ("add diff: " <> showP ans)
       ans
+    --isYmxplusb
     conformsToAffine :: Natural -> Int -> (Natural, Natural) -> Bool
     conformsToAffine m b (x, y) = fromIntegral x * fromIntegral m + b == fromIntegral y
     generalizeMulDiff :: Natural -> Int -> (Count, Count)
@@ -898,11 +900,11 @@ generalizeFromCounts xs = force $
         then (newBoundVarBad, m `nTimes` newBoundVarBad <> finiteCount (fromIntegral b))
         --this is the line we need to change
         --note: x -> 2x - 1 is not the same as x + 1 -> 2x !!
-        --so given 2x - 1 we compute the smallest multiple of 2 bigger than 1 (1), called toMul
-        -- and then x + toMul is like subtracting 2 * toMul, so we have to add that back on the 
-        --other side, except for the b we are actually supposed to subtract
+        --so given 2x - 1 we compute the smallest multiple of 2 bigger than or equal to 1 (1), 
+        --called toMul and then x + toMul is like subtracting 2 * toMul, so we have to add 
+        --that back on the other side, except for the b we are actually supposed to subtract
         else let
-          toMul = 1 + fromIntegral (-b) `div` m
+          toMul = fromIntegral (-b) `ceilDiv` m
           --do subtraction in int space and then go back to natural space
           c = fromIntegral (fromIntegral (toMul * m) + b)
           in
