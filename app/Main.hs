@@ -5,7 +5,7 @@ import Relude
 import Control.Lens
 import qualified Data.Text as T (length)
 import Data.Text.Read
-import Prettyprinter 
+import Prettyprinter
 import Control.Monad
 import qualified Data.Vector as V
 
@@ -95,7 +95,7 @@ simProgram results = do
 -- integrate induction guesser into overall simulation loop; tune it 
 
 readFile :: String -> IO String
-readFile filename = do  
+readFile filename = do
         handle <- openFile filename ReadMode
         contents <- hGetContents handle
         hClose handle
@@ -105,7 +105,7 @@ main :: IO ()
 main = do
   -- let results = Simulate.simulate 100 $ startMachine1 4
   -- simProgram dispTape results
-  
+
   --let resultList
   --       :: [(Turing, SimResult (ExpTape Bit InfCount))] 
   --       = indProveLoopMany 141 $ startMachine1 4
@@ -117,16 +117,16 @@ main = do
   --let continues = getContinues $ outerLoop basicTacticVector (startMachine1 4)
   fileContents <- Relude.readFile "size4_unfinished_16_jul.txt"
   let machineStrings = lines $ fromString fileContents
-      machines = unm <$> machineStrings 
+      machines = unm <$> machineStrings
       enumMachines = zip [0,1 ..] machines
-      runTactic = getContinues . outerLoop threeFourFiveTacticVector
+      runTactic = getContinues . outerLoop m3456TacticVector
       runTacticPrint (i, m) = trace ("machine: " <> show i) runTactic m
       unprovenMachines = bind runTacticPrint enumMachines
 
 
-  putText $ "there were: " <> show (length unprovenMachines) <> " machines unproven:"
-  traverse_ (putText . machineToNotation) unprovenMachines
-  
+  putText $ "there were: " <> show (length unprovenMachines) <> " machines unproven:\n"
+  traverse_ (putText . (\m -> machineToNotation m <> "\n")) unprovenMachines
+
   --putText $ "there were: " <> show (length continues) <> " machines unproven:"
   --traverse_ putPretty continues
 

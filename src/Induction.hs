@@ -56,12 +56,12 @@ Shortrange plan to get a thing which can prove the counter machine into main
 --we need the current step for the haltproof
 --we always return the new book
 --we return either a haltproof, or a text saying how we failed
-proveInductivelyIMeanIT :: (TapeSymbol s) => Turing -> SkipBook s -> Steps 
+proveInductivelyIMeanIT :: (TapeSymbol s, HasCallStack) => Turing -> SkipBook s -> Steps 
     -> TapeHist s InfCount -> ReadShiftHist
     -> (SkipBook s, Either Text (Skip Count s))
 proveInductivelyIMeanIT machine book curStep hist rsHist
-  = --force $ 
-  case guessInductionHypothesis hist rsHist of
+  = force $ let indGuess = guessInductionHypothesis hist rsHist in 
+  trace ("indGuess was: " <> showP indGuess) $ case indGuess of
     Left msg -> (book, Left $ "failed to guessIndHyp:\n" <> msg)
     Right indHyp -> let (newBook, tOrOrigin) = proveStrong 5 machine book indHyp (BoundVar 0) in
       case tOrOrigin of
@@ -76,7 +76,7 @@ proveInductivelyIMeanIT machine book curStep hist rsHist
 --the latter makes no progress if it proves 0 things, which is one way to abort
 --the former makes no progress if it gets stuck on the same thing as last time, which we note in order to track
 --we also as usual put a finite integer on the number of loops we can do, although hitting that would be pretty insane
-proveStrong :: forall s. (TapeSymbol s) => Int -> Turing -> SkipBook s
+proveStrong :: forall s. (TapeSymbol s, HasCallStack) => Int -> Turing -> SkipBook s
  -> Skip Count s -> BoundVar -> (SkipBook s, Either Text (SkipOrigin s))
 proveStrong loopLim machine book goal indVar = swapEither <$> loop 0 book Nothing where
   -- the skiporigin is one for specifically the goal 
@@ -159,7 +159,7 @@ proveInductivelyWithX xPlus limit t book goal indVar = let
     in 
       --force $
       --trace msg $
-      assert (isSameInAsOut goal) ans
+      assert (isSameInAsOut goal && thingContainsVar goal) ans
     where
     origin :: SkipOrigin s
     origin = Induction book limit
@@ -522,19 +522,23 @@ generalizeFromExamples slicePairs = undefined
 
 guessInductionHypothesis :: (TapeSymbol s) => TapeHist s InfCount -> ReadShiftHist
   -> Either Text (Skip Count s)
-guessInductionHypothesis th@(TapeHist hist) rsh = do
+guessInductionHypothesis th@(TapeHist hist) rsh = force $ do
   criticalConfig@(criticalPhase, _criticalSignature) <- guessCriticalConfiguration hist
   let
     configIndicesAndConfigs = let ans = obtainConfigIndices hist criticalConfig in
-      --trace ("configs were:\n" <> showP ans) 
+      trace ("configs were:\n" <> showP ans) 
       ans
-  case guessInductionHypWithIndices th rsh criticalPhase configIndicesAndConfigs of
-    Right ans -> --trace ("guessed indhyp:\n" <> showP ans) $ 
-      Right ans
-    --this is hacky and bad but it is necessary to guess right on trickyChristmasTree so I'll try it for now
-    Left _msg -> guessInductionHypWithIndices th rsh criticalPhase (Unsafe.tail configIndicesAndConfigs)
-
-
+    indGuess = case guessInductionHypWithIndices th rsh criticalPhase configIndicesAndConfigs of
+      Right ans -> Right ans
+      --this is hacky and bad but it used to be necessary to guess right on trickyChristmasTree so I'll try it for now
+      --24 jul 22  update is that it is no longer necessary, so I got rid of it, but we'll see what 
+      --happens in the future
+      Left msg -> Left msg -- guessInductionHypWithIndices th rsh criticalPhase (Unsafe.tail configIndicesAndConfigs)
+    in 
+     trace ("guessed indhyp:\n" <> showP indGuess) 
+     $ assert ((thingContainsVar <$> indGuess) /= Right False) 
+     $ force 
+     $ indGuess
 
 guessInductionHypWithIndices :: (Pretty s, Eq s) => TapeHist s InfCount -> ReadShiftHist -> Phase -> [(Int, (Phase, ExpTape s InfCount))] -> Either Text (Skip Count s)
 guessInductionHypWithIndices (TapeHist hist) (ReadShiftHist rsHist) criticalPhase configIndicesAndConfigs =

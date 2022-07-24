@@ -270,12 +270,14 @@ fourBitSimLoop = simulation @(Vec 4 Bit) baseSimLoop
 fiveBitSimLoop :: Tactic
 fiveBitSimLoop = simulation @(Vec 5 Bit) baseSimLoop
 
+sixBitSimLoop :: Tactic
+sixBitSimLoop = simulation @(Vec 6 Bit) baseSimLoop
 
 basicTacticVector :: V.Vector Tactic 
 basicTacticVector = V.fromList [basicSimLoop, twoBitSimLoop] --, tacticBackwardSearch]
 
-threeFourFiveTacticVector :: V.Vector Tactic
-threeFourFiveTacticVector = V.fromList [threeBitSimLoop, fourBitSimLoop, fiveBitSimLoop]
+m3456TacticVector :: V.Vector Tactic
+m3456TacticVector = V.fromList [threeBitSimLoop, fourBitSimLoop, fiveBitSimLoop, sixBitSimLoop]
 
 bwSearchTacticVector :: V.Vector Tactic
 bwSearchTacticVector = V.fromList [tacticBackwardSearch]
