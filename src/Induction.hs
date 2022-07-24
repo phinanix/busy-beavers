@@ -220,7 +220,7 @@ proveSimLinearAndTree linStep treeStep machine book skip
       Right steps -> error $ "what? steps: " <> showP steps <> " linstep:" <> showP linStep <> " treestep: " <> showP treeStep
                             <> "\nmachine was\n" <> showP machine <> "\nwe were proving:\n" <> showP skip
                             <> "\ndfs failed because:" <> text
-                            <> "\nbook was:\n" <> showP book
+                            -- <> "\nbook was:\n" <> showP book
       res@(Left _) -> res
 
 -- given a skip, replaces all occurences of a particular BoundVar with a particular Count
@@ -280,8 +280,8 @@ proveBySimulating limit t book (Skip start skipEnd _) = case skipEnd of
     -- we've succeeded, stepping fails for some reason, or we continue 
     loop :: Natural -> Phase -> ExpTape s InfCount -> Count -> Either (Text, Maybe (Config Count s)) Natural
     loop numSteps p tape curCount
-      --  | trace (Unsafe.init $ toString $ "PS: steps:" <> show numSteps <> " count:" <> showP curCount <>
-      --             " p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
+        | trace (Unsafe.init $ toString $ "PS: steps:" <> show numSteps <> " count:" <> showP curCount <>
+                   " p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
       | indMatch p tape (ph, tp) = pure numSteps 
       | numSteps > limit = Left ("exceeded limit while simulating", Nothing)
       | otherwise = case skipStep t book p tape of
@@ -346,7 +346,7 @@ getNextConfigs book curConfig = ans
   choices = sortBy (flip skipPrecedence)
     $ snd <$> uncurry (getSkipsWhichApply book) (configToET $ first NotInfinity curConfig)
 
---the text is why you failed, and the count is how many big steps 
+--the text is why you failed, and the natural is how many big steps 
 simulateViaDFS :: (Ord s, Pretty s, Show s) => Int -> Int -> SkipBook s -> Skip Count s
   -> Either Text Natural
 simulateViaDFS stepLim depthLim book (Skip startConfig skipEnd _hops)

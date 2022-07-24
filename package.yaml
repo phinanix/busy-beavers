@@ -33,6 +33,7 @@ library:
   - lens
   - monoidal-containers
   - mtl
+  - parsec
   - prettyprinter
   - QuickCheck
   - quickcheck-instances

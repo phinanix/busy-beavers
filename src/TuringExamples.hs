@@ -195,11 +195,32 @@ they could be sorted in either order.
 bouncerInBouncer :: Turing
 bouncerInBouncer = unm "TR1FL2FL0FR1TR0TR3TL0___"
 
+{-
+This machine is also from the assert in proveSimLinearAndTree failing, on macro size 4. 
+The way it works is it is a binary counter where the larger digits are represented 
+by larger blocks of Ts. It's something like, the nth digit is represented by 2^n + 1, 
+which would give 2, 3, 5, 9, but the biggest digit is 2 bigger or something like that. 
+and the spacing after digit n is 2^(n+1) - 1 I think. I am now pretty solidly sure that is
+correct. 
+-}
+binaryCounterVariableWidth :: Turing
+binaryCounterVariableWidth =  unm "TR1___FR2FR1TL2FL3TR0FL3"
+
+{-
+Posted on bbchallenge discord by tomtom2357
+After some startup effects, applies this rule with x=4 the first time. 
+3 (T, 5) F (T, 7) F (T, x)
+3 (T, 5) F (T, 7) F (T, x+12)
+-}
+difficultBilateralBouncer :: Turing
+difficultBilateralBouncer =  unm "TR1FL0FR2TR3TL0TL2FL2FR4___TR0"
+
 machineList :: [Turing]
 machineList = [weird3, almostweird3, fullsim_not_halt3, bb3, simple_sweeper, 
   checkerboardSweeper, goesLeftForever, binaryCounterTFTT, machineBreaksIndGuess, 
   false_backward_search, not_halt3, jumps_to_end, loop2, bb2,
-  some_kind_of_bincounter, bouncerInBouncer]
+  some_kind_of_bincounter, bouncerInBouncer, binaryCounterVariableWidth, 
+  difficultBilateralBouncer]
 
 instance Arbitrary Turing where 
   arbitrary = elements machineList 

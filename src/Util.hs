@@ -42,6 +42,12 @@ infixl 4 <$$$>
 (<%>) = traverse
 infixl 5 <%>
 
+(<<) :: Applicative f => f b -> f a -> f b
+ma << mb = do 
+  a <- ma 
+  mb 
+  pure a 
+
 fromJust :: Partial => Maybe a -> a 
 fromJust (Just a) = a 
 fromJust Nothing = error "unsafe"
@@ -118,3 +124,5 @@ prettyText = pretty
 ceilDiv :: Natural -> Natural -> Natural 
 ceilDiv x y = if x `mod` y == 0 then x `div` y else 1 + (x `div` y) 
 
+myPutText :: Text -> IO ()
+myPutText = putText 

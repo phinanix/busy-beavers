@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 8d9fec7dbb9fc45c05796abd113e01196df98b26ebeef79849d0893f0f839979
+-- hash: 09370fa1900737ebdd3f6eea9e41af985f2a45ffb587b9b8d5568e16f40a09c4
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -41,6 +41,7 @@ library
       Mystery
       Notation
       OuterLoop
+      Parsing
       Results
       Simple.Display
       Simple.Simulate
@@ -113,6 +114,7 @@ library
     , lens
     , monoidal-containers
     , mtl
+    , parsec
     , prettyprinter
     , quickcheck-instances
     , relude

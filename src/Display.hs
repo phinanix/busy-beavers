@@ -20,6 +20,23 @@ import Numeric (showFFloat)
 import Util
 import OuterLoop
 import SimulationLoops
+import Tape
+
+tapeToSimpleTape :: Tape Bit -> Simple.Tape
+tapeToSimpleTape (Tape.Tape ls p rs) = Simple.Tape ls p rs 
+
+flattenTape :: (TapeSymbol s) => Tape s -> Tape Bit 
+flattenTape (Tape ls p rs) = Tape (bind toBits ls) newP (firstRs <> restRs) where 
+  (newP : firstRs) = toBits p 
+  restRs = bind toBits rs
+
+showOneMachineTape :: Turing -> Steps -> Phase -> Simple.Tape -> Text 
+showOneMachineTape t n p tape = 
+  dispTuring t <> "\n" <> foldMap
+  (\steps -> Simple.dispResult (Simple.simulate steps startState t) <> "\n")
+  [0.. n]
+  where 
+    startState = (p, 0, tape)
 
 showOneMachine :: Turing -> Steps -> Text
 showOneMachine t n =

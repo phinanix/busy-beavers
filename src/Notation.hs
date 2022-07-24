@@ -14,6 +14,8 @@ import Count
 import Skip
 import ExpTape
 
+
+
 {-
 The goal of this file is to define functions which convert between in memory 
 Turing machines and a compact, easy to parse string representation. Each 
@@ -49,8 +51,8 @@ machineToNotation :: Turing -> Text
 machineToNotation (Turing n trans) = T.concat $ transToNotation <$> transes where
     transes = (\e -> trans ^. at e) <$> edgesOfLen n
 
-parseBit :: Char -> Either Text Bit
-parseBit = \case
+parseBit' :: Char -> Either Text Bit
+parseBit' = \case
   'T' -> Right $ Bit True
   'F' -> Right $ Bit False
   other -> Left $ "got " <> show other <> " for bit"
@@ -72,7 +74,7 @@ notationToTrans '_' '_' '_' = Right Nothing
 notationToTrans bitChar dirChar stateChar = case stateChar of
   'H' -> Right (Just Halt)
   stateDigit -> do
-      bit <- parseBit bitChar
+      bit <- parseBit' bitChar
       dir <- parseDir dirChar
       ph <- parsePhase stateDigit
       pure $ Just $ Step ph bit dir
@@ -118,7 +120,7 @@ instance Pretty Turing where
 
 {-
 Notation for Config
-[phase notation] [list of (bit notation, count notation)]>(bit notation, count notation)[list of (bit notation, count notation)]
+[phase notation] [list of (bit notation, count notation)]>bit notation<[list of (bit notation, count notation)]
 the first list is "backwards" ie it reads the normal way rather than the fucked way
 
 Bit notation: T or F 
@@ -138,11 +140,16 @@ or
 -}
 
 notationCount :: Count -> Text
+notationCount (FinCount n) = show n
 notationCount (Count n as xs) = T.concat $ intersperse "+" symbolList where
   symbolList = (if n > 0 then (show n :) else id)
     (nSymbolVar <$> M.assocs as) ++ (nBoundVar <$> M.assocs xs)
-  nBoundVar (BoundVar i, Sum n) = show n <> "*x_" <> show i
-  nSymbolVar (SymbolVar i, Sum n) = show n <> "*a_" <> show i
+  nBoundVar (BoundVar i, Sum n) = if n == 1 
+    then "x_" <> show i 
+    else show n <> "*x_" <> show i
+  nSymbolVar (SymbolVar i, Sum n) =  if n == 1 
+    then "a_" <> show i 
+    else show n <> "*a_" <> show i
 
 notationBitCount :: (Bit, Count) -> Text
 notationBitCount (b, c) = "(" <> dispBit b <> ", " <> notationCount c <> ") "
@@ -152,9 +159,12 @@ notationPhase (Phase i) = "p" <> show i <> " "
 
 notationTape :: ExpTape Bit Count -> Text
 notationTape (ExpTape ls p rs)
-  =  T.concat (notationBitCount <$> reverse ls)
-  <> ">" <> dispBit p <> "< " 
-  <> T.concat (notationBitCount <$> rs)
+  =  dispBitCountList (reverse ls)
+  <> " >" <> dispBit p <> "< " 
+  <> dispBitCountList rs
+  where 
+    dispBitCountList [] = "[]"
+    dispBitCountList xs = "[" <> T.init (T.concat (notationBitCount <$> xs)) <> "]"
 
 notationSkipEnd :: TapePush Count Bit -> Text 
 notationSkipEnd = \case 
