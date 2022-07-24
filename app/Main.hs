@@ -101,6 +101,11 @@ readFile filename = do
         hClose handle
         pure contents
 
+loadMachinesFromFile :: String -> IO [Turing] 
+loadMachinesFromFile fn = do 
+  fileContents <- Relude.readFile fn
+  pure $ unm <$> lines (fromString fileContents)
+  
 main :: IO ()
 main = do
   -- let results = Simulate.simulate 100 $ startMachine1 4
@@ -115,11 +120,9 @@ main = do
   --simProgram dispExpTape $ foldr (uncurry addResult) Empty resultList 
   --putTextLn $ dispResults $ foldr (uncurry addResult) Empty resultList 
   --let continues = getContinues $ outerLoop basicTacticVector (startMachine1 4)
-  fileContents <- Relude.readFile "size4_unfinished_16_jul.txt"
-  let machineStrings = lines $ fromString fileContents
-      machines = unm <$> machineStrings
-      enumMachines = zip [0,1 ..] machines
-      runTactic = getContinues . outerLoop m3456TacticVector
+  machines <- loadMachinesFromFile "size4_unfinished_123456macro_24_jul.txt"
+  let enumMachines = zip [0,1 ..] machines
+      runTactic = getContinues . outerLoop bwSearchTacticVector
       runTacticPrint (i, m) = trace ("machine: " <> show i) runTactic m
       unprovenMachines = bind runTacticPrint enumMachines
 
