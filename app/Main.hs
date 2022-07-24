@@ -114,16 +114,18 @@ main = do
   --       = bestCurrentProveLoop 141 $ startMachine1 3
   --simProgram dispExpTape $ foldr (uncurry addResult) Empty resultList 
   --putTextLn $ dispResults $ foldr (uncurry addResult) Empty resultList 
-  let continues = getContinues $ outerLoop basicTacticVector (startMachine1 4)
+  --let continues = getContinues $ outerLoop basicTacticVector (startMachine1 4)
   fileContents <- Relude.readFile "size4_unfinished_16_jul.txt"
   let machineStrings = lines $ fromString fileContents
       machines = unm <$> machineStrings 
-      runBWSearch = getContinues . outerLoop threeFourFiveTacticVector
-      failsBWSearch = bind runBWSearch machines 
+      enumMachines = zip [0,1 ..] machines
+      runTactic = getContinues . outerLoop threeFourFiveTacticVector
+      runTacticPrint (i, m) = trace ("machine: " <> show i) runTactic m
+      unprovenMachines = bind runTacticPrint enumMachines
 
 
-  putText $ "there were: " <> show (length failsBWSearch) <> " machines unproven:"
-  --traverse_ putPretty continues
+  putText $ "there were: " <> show (length unprovenMachines) <> " machines unproven:"
+  traverse_ (putText . machineToNotation) unprovenMachines
   
   --putText $ "there were: " <> show (length continues) <> " machines unproven:"
   --traverse_ putPretty continues

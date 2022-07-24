@@ -153,11 +153,12 @@ proveInductivelyWithX xPlus limit t book goal indVar = let
       Right _ -> case indCase of
         Left res -> Left $ first ("failed ind: " <>) res
         Right _ ->  pure origin
-  msg = ("trying to prove:\n" <> show (pretty goal)) <> "\ngot res"
-           <> showP ans <> "\nEOM\n"
+  msg = ("trying to prove:\n" <> show (pretty goal)) 
+          <> "\n inducting on:" <> show indVar 
+          <> "\ngot res" <> showP ans <> "\nEOM\n"
     in 
-      force $
-      trace msg $
+      --force $
+      --trace msg $
       assert (isSameInAsOut goal) ans
     where
     origin :: SkipOrigin s
