@@ -84,7 +84,7 @@ proveStrong loopLim machine book goal indVar = swapEither <$> loop 0 book Nothin
   loop :: Int -> SkipBook s -> Maybe (Config Count s) -> (SkipBook s, Either (SkipOrigin s) Text)
   loop idx curBook mbLastStuck = --force $ trace ("provestrong loop " <> show idx <> "\n") $
     if idx > loopLim then error "wow we exceeded looplim!" -- Right "limit exceeded" 
-    else case proveInductively 100 machine curBook goal indVar of
+    else case proveInductively 110 machine curBook goal indVar of
       Right skipOrigin -> (curBook, Left skipOrigin)
       Left (msg, maybeStuckConfig) -> --trace ("provestrong stuck on:\n" <> show (pretty maybeStuckConfig) <> "\nbecause:\n" <> toString msg) $
         if has _Just mbLastStuck && mbLastStuck == maybeStuckConfig
@@ -280,10 +280,12 @@ proveBySimulating limit t book (Skip start skipEnd _) = case skipEnd of
     -- we've succeeded, stepping fails for some reason, or we continue 
     loop :: Natural -> Phase -> ExpTape s InfCount -> Count -> Either (Text, Maybe (Config Count s)) Natural
     loop numSteps p tape curCount
-        | trace (Unsafe.init $ toString $ "PS: steps:" <> show numSteps <> " count:" <> showP curCount <>
-                   " p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
-      | indMatch p tape (ph, tp) = pure numSteps 
+        -- | trace (Unsafe.init $ toString $ "PS: steps:" <> show numSteps <> " count:" <> showP curCount <>
+        --            " p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
+      --we have to check the limit before checking for success, 
+      --because we don't want to succeed in 101 steps if the limit is 100 steps
       | numSteps > limit = Left ("exceeded limit while simulating", Nothing)
+      | indMatch p tape (ph, tp) = pure numSteps 
       | otherwise = case skipStep t book p tape of
             Unknown e -> Left ("hit unknown edge" <> show e, Nothing)
             Stopped {} -> Left ("halted while simulating", Nothing)
