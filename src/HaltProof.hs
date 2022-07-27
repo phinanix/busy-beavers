@@ -12,6 +12,7 @@ import Util
 import Config
 import Turing
 import Tape
+import Notation
 
 --the type of proofs that a TM will not halt
 -- - HaltUnreachable means the Halt state is never transitioned to from the current state
@@ -66,8 +67,14 @@ instance (Pretty s) => Pretty (HaltProof s) where
 --of course no such procedure can be complete, so we put a finite depth on the search and
 --give up after a while
 backwardSearch :: Turing -> Maybe (HaltProof s)
-backwardSearch (Turing n trans) | length trans < (n*2) - 1 = Nothing
-backwardSearch (Turing n trans) = recurse 0 $ fromList $ (, Min 0) <$> (initState <$> unusedEdges) where
+--backwardSearch (Turing n trans) | length trans < (n*2) - 1 = Nothing
+backwardSearch m@(Turing n trans) = let 
+  msg = machineToNotation m <> show ans 
+  f = if length trans < (n*2) - 1 then traceShow msg else id 
+  ans = recurse 0 $ fromList $ (, Min 0) <$> (initState <$> unusedEdges) 
+ in 
+  f ans
+  where 
   unusedEdges :: [Edge]
   unusedEdges = NE.filter (\e -> let t = trans ^. at e in t == Nothing || t == Just Halt) $ uniEdge n
   initState :: Edge -> (Phase,Tape Bit)

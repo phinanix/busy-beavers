@@ -11,7 +11,7 @@ import qualified Data.Map.Monoidal as M
 import Turing
 import Util
 import Count
-import Skip
+--import Skip
 import ExpTape
 
 
@@ -166,8 +166,9 @@ notationTape (ExpTape ls p rs)
     dispBitCountList [] = "[]"
     dispBitCountList xs = "[" <> T.init (T.concat (notationBitCount <$> xs)) <> "]"
 
-notationSkipEnd :: TapePush Count Bit -> Text 
+{- notationSkipEnd :: TapePush Count Bit -> Text 
 notationSkipEnd = \case 
   Middle tape -> notationTape tape 
   Side L xs -> "< " <> T.concat (notationBitCount <$> xs) 
   Side R xs -> T.concat (notationBitCount <$> reverse xs) <> " >"
+ -}

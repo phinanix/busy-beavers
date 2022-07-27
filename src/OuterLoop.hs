@@ -219,18 +219,18 @@ simLoopFromTape bigStepLimit updateFuncs startMachine startPhase startTape
 
 
 basicSimLoop :: Tactic 
-basicSimLoop = simulation $ simLoop 150 $ simulateStepPartial maxInt :| 
+basicSimLoop = simulation $ simLoop 300 $ simulateStepPartial maxInt :| 
   (liftOneToMulti <$> [checkSeenBefore, liftModifyState recordHist, 
   liftModifyState recordDispHist,
   runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof,
   runIfCond (atRightOfTape . view s_tape) attemptOtherEndOfTapeProof
   , runAtCount 145 proveByLR
   , runAtCount 146 proveSimply
-  , runAtCount 147 proveByInd
+  , runAtCount 299 proveByInd
   ])
 
 twoBitSimLoop :: Tactic
-twoBitSimLoop = simulation @TwoBit $ simLoop 150 $ simulateStepPartial maxInt :| 
+twoBitSimLoop = simulation @TwoBit $ simLoop 500 $ simulateStepPartial maxInt :| 
   (liftOneToMulti <$> [checkSeenBefore
   , liftModifyState recordHist
   , liftModifyState recordDispHist
@@ -238,8 +238,8 @@ twoBitSimLoop = simulation @TwoBit $ simLoop 150 $ simulateStepPartial maxInt :|
   -- , runAtCount 40 proveSimply
   -- , runAtCount 45 proveByInd
   , runAtCount 145 proveByLR
-  , runAtCount 146 proveSimply
-  , runAtCount 147 proveByInd
+  --, runAtCount 146 proveSimply
+  , runAtCount 499 proveByInd
   ])
 
 twoBitDispLoop :: TapeSymbol s => Turing -> ([Turing], [(Turing, SimResult InfCount s)])
@@ -250,15 +250,15 @@ twoBitDispLoop = simLoop 150 $ simulateStepPartial maxInt :|
   ])
 
 baseSimLoop :: (TapeSymbol s) => Turing -> ([Turing],[(Turing, SimResult InfCount s)])
-baseSimLoop = simLoop 150 $ simulateStepPartial maxInt :| 
+baseSimLoop = simLoop 300 $ simulateStepPartial maxInt :| 
   (liftOneToMulti <$> [checkSeenBefore
   , liftModifyState recordHist
   , liftModifyState recordDispHist
   , runAtCount 10 proveByLR
   , runAtCount 40 proveSimply
   , runAtCount 145 proveByLR
-  , runAtCount 146 proveSimply
-  , runAtCount 147 proveByInd
+  , runAtCount 298 proveSimply
+  , runAtCount 299 proveByInd
   ])
 
 threeBitSimLoop :: Tactic

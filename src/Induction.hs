@@ -113,12 +113,11 @@ proveInductively :: forall s. (HasCallStack, TapeSymbol s)
   -> Skip Count s -> BoundVar
   -> Either (Text, Maybe (Config Count s)) (SkipOrigin s)
 proveInductively limit t book goal indVar 
-  = case proveInductivelyWithX 1 limit t book goal indVar of 
+  = case proveInductivelyWithX 0 limit t book goal indVar of 
     Right so -> Right so 
-    Left stuck -> Left stuck
-      -- case proveInductivelyWithX 1 limit t book goal indVar of 
-      -- Right so -> Right so 
-      -- Left _stuckAgain -> Left stuck --we want the first stuckness, not the second one, usually
+    Left stuck -> case proveInductivelyWithX 1 limit t book goal indVar of 
+      Right so -> Right so 
+      Left _stuckAgain -> Left stuck --we want the first stuckness, not the second one, usually
 
 {-
 A function which is sort of like `proveInductively`, but it doesn't actually do induction.
@@ -157,8 +156,8 @@ proveInductivelyWithX xPlus limit t book goal indVar = let
           <> "\n inducting on:" <> show indVar 
           <> "\ngot res" <> showP ans <> "\nEOM\n"
     in 
-      --force $
-      --trace msg $
+      force $
+      trace msg $
       assert (isSameInAsOut goal && thingContainsVar goal) ans
     where
     origin :: SkipOrigin s
@@ -281,8 +280,8 @@ proveBySimulating limit t book (Skip start skipEnd _) = case skipEnd of
     -- we've succeeded, stepping fails for some reason, or we continue 
     loop :: Natural -> Phase -> ExpTape s InfCount -> Count -> Either (Text, Maybe (Config Count s)) Natural
     loop numSteps p tape curCount
-        -- | trace (Unsafe.init $ toString $ "PS: steps:" <> show numSteps <> " count:" <> showP curCount <>
-        --            " p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
+        | trace (Unsafe.init $ toString $ "PS: steps:" <> show numSteps <> " count:" <> showP curCount <>
+                   " p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
       --we have to check the limit before checking for success, 
       --because we don't want to succeed in 101 steps if the limit is 100 steps
       | numSteps > limit = Left ("exceeded limit while simulating", Nothing)
@@ -533,12 +532,12 @@ guessInductionHypothesis th@(TapeHist hist) rsh = force $ do
       --this is hacky and bad but it used to be necessary to guess right on trickyChristmasTree so I'll try it for now
       --24 jul 22  update is that it is no longer necessary, so I got rid of it, but we'll see what 
       --happens in the future
-      Left msg -> Left msg -- guessInductionHypWithIndices th rsh criticalPhase (Unsafe.tail configIndicesAndConfigs)
+      Left msg -> guessInductionHypWithIndices th rsh criticalPhase (Unsafe.tail configIndicesAndConfigs)
     in 
      trace ("guessed indhyp:\n" <> showP indGuess) 
-     $ assert ((thingContainsVar <$> indGuess) /= Right False) 
+    -- $ assert ((thingContainsVar <$> indGuess) /= Right False) 
      $ force 
-     $ indGuess
+     indGuess
 
 guessInductionHypWithIndices :: (Pretty s, Eq s) => TapeHist s InfCount -> ReadShiftHist -> Phase -> [(Int, (Phase, ExpTape s InfCount))] -> Either Text (Skip Count s)
 guessInductionHypWithIndices (TapeHist hist) (ReadShiftHist rsHist) criticalPhase configIndicesAndConfigs =
@@ -548,7 +547,7 @@ guessInductionHypWithIndices (TapeHist hist) (ReadShiftHist rsHist) criticalPhas
       ans
     indexPairs = zipExact (U.init configIndices) (U.tail configIndices)
     slicePairs = let ans = uncurry (getReadShiftSlicePair hist rsHist) <$> indexPairs in
-      --trace ("slicepairs were:\n" <> showP ans) 
+      trace ("slicepairs were:\n" <> showP ans) 
       ans
     allSigs = let ans = fmap (bimapBoth tapeSignature) slicePairs in
       --trace ("allsigs were: " <> showP ans) 

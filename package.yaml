@@ -37,6 +37,7 @@ library:
   - prettyprinter
   - QuickCheck
   - quickcheck-instances
+  - random
   - relude
   - safe
   - text
