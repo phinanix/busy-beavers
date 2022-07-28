@@ -488,30 +488,47 @@ getSlicePairC :: (Eq s) => [(Phase, ExpTape s Count)] -> [Int] -> Int -> Int -> 
 getSlicePairC hist = getSlicePair $ (fmap $ fmap $ second NotInfinity) hist
 
 --says whether by dropping one or both the left or the right bits of the start sig, we can reach the end sig
-calcCommonSig :: (Eq s) => Signature s -> Signature s -> Maybe (Bool, Bool)
-calcCommonSig start end = -- trace ("commonsig-ing " <> show start <> " and " <> show end) $
-  asum $ check <$> tf <*> tf where
-    tf = [False, True]
+--but we also want to be willing to drop one or both of the left or the right bits of the end sig
+--but on one side, we can drop either the start or the end, but not both
+data Drop = NoDrop | StartDrop | EndDrop deriving (Eq, Ord, Show, Generic)
+
+calcCommonSig :: (Eq s) => Signature s -> Signature s -> Maybe (Drop, Drop)
+calcCommonSig (Signature ls1 p1 rs1) (Signature ls2 p2 rs2) = -- trace ("commonsig-ing " <> show start <> " and " <> show end) $
+  asum $ check <$> drops <*> drops where
+    drops = [NoDrop, StartDrop, EndDrop]
+    check :: Drop -> Drop -> Maybe (Drop, Drop)
     check dl dr = do
-      let
-        lFunc = if dl then dropLeft else pure
-        rFunc = if dr then dropRight else pure
-      dropped_start <- lFunc =<< rFunc start
-      if dropped_start == end then Just (dl, dr) else Nothing
-    dropLeft (Signature ls p rs) = do
-      ls' <- viaNonEmpty init ls
-      pure $ Signature ls' p rs
-    dropRight (Signature ls p rs) = do
-      rs' <- viaNonEmpty init rs
-      pure $ Signature ls p rs'
+      (ls1', ls2') <- dropFunc dl (ls1, ls2)
+      (rs1', rs2') <- dropFunc dr (rs1, rs2)
+      let newStart = Signature ls1' p1 rs1' 
+          newEnd = Signature ls2' p2 rs2'
+      if newStart == newEnd then Just (dl, dr) else Nothing
+    dropFunc :: Drop -> ([s], [s]) -> Maybe ([s], [s])
+    dropFunc = \case 
+      NoDrop -> pure 
+      StartDrop -> firstT dropList 
+      EndDrop -> secondT dropList 
+    dropList = viaNonEmpty init
+
 
 --if we have to drop one or both of of the end bits of the start signature, then to compensate we will add
 --a zero to the end signature in the places we drop the bits 
-addZeros :: (Bool, Bool) -> ([Count], [Count]) -> ([Count], [Count])
-addZeros (dl, dr) (ls, rs) = (lFunc ls, rFunc rs) where
+addZeros :: (Drop, Drop) -> (([Count], [Count]), ([Count], [Count])) -> (([Count], [Count]), ([Count], [Count]))
+addZeros (dl, dr) ((s_ls, s_rs), (e_ls, e_rs)) = let 
+    (s_ls', e_ls') = addFunc dl (s_ls, e_ls) 
+    (s_rs', e_rs') = addFunc dr (s_rs, e_rs)
+   in 
+    ((s_ls', s_rs'), (e_ls', e_rs'))
+   where
     appendZero xs = xs <> [Empty]
-    lFunc = if dl then appendZero else id
-    rFunc = if dr then appendZero else id
+    --you reverse start is first and end is second
+    --because you are adding a zero. so if we dropped something from the start, then we 
+    --want to add a zero to the end. 
+    addFunc :: Drop -> ([Count], [Count]) -> ([Count], [Count])
+    addFunc = \case 
+      NoDrop -> id 
+      StartDrop -> second appendZero 
+      EndDrop -> first appendZero 
 
 --I have no idea how to write this function
 generalizeFromExamples :: [(ExpTape Bit Count, ExpTape Bit Count)] -> Maybe (Skip Count Bit)
@@ -565,7 +582,7 @@ guessInductionHypWithIndices (TapeHist hist) (ReadShiftHist rsHist) criticalPhas
     countListPairPairs :: [(([Count], [Count]), ([Count], [Count]))]
     countListPairPairs = bimapBoth getCounts <$> slicePairs
     --fmap over the list, then use second to only add zeros to the end signatures
-    augCountPairPairs = fmap (second (addZeros toDrop)) countListPairPairs
+    augCountPairPairs = fmap (addZeros toDrop) countListPairPairs
     doubleZipExact :: (([a], [x]), ([b], [y])) -> ([(a, b)], [(x, y)])
     doubleZipExact ((as, xs), (bs, ys)) = (zipExact as bs, zipExact xs ys)
     countPairListList :: [([(Count, Count)], [(Count, Count)])]

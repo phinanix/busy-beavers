@@ -147,76 +147,83 @@ chainArbitrary skip@(Skip start end _steps) = case end of
   newVar = varNotUsedInSkip skip
   matchConfigs :: Config Count s -> Config Count s -> Either Text (Config Count s, Config Count s)
   matchConfigs c1@(Config ph ls p rs) c2@(Config ph2 xs q ys) = do
+    --rest of message
     let rom = showP c1 <> " " <> showP c2
     guardMsg (ph == ph2 && p == q) $ "phases or points not equal: " <> rom
-    (newLs, newXs) <- matchLists ls xs
-    (newRs, newYs) <- matchLists rs ys
+    (newLs, newXs) <- matchLists newVar ls xs
+    (newRs, newYs) <- matchLists newVar rs ys
     pure (Config ph newLs p newRs, Config ph newXs p newYs)
-  matchLists :: [(s, Count)] -> [(s, Count)] -> Either Text ([(s, Count)], [(s, Count)])
-  matchLists xs ys = do
-    --maybeRes :: Either Text [((s, Count), (s, Count))]
-    --maybeRes <- traverse (uncurry matchPairs) (zip xs ys) --zip discards longer 
-    (maybeRes, maybeLeftover1) <- case unsnoc $ zip xs ys of 
-      Nothing -> Right ([], Nothing)
-      Just (initInp, last) -> do 
-        initRes <- traverse (uncurry matchPairs) initInp 
-        (l1, l2, maybeLeft) <- uncurry matchLastPairs last 
-        pure (initRes ++ [(l1, l2)], maybeLeft)
-    let maybeLeftover2 = case remainingLonger xs ys of
-          Left [] -> Nothing 
-          Left xs_left -> Just $ Start xs_left
-          Right ys_left -> Just $ End ys_left
-    leftover <- case (maybeLeftover1, maybeLeftover2) of 
-      (Just _, Just _) -> Left "we got two leftovers at once and don't know how to handle"
-      (Nothing, Nothing) -> Right $ Start [] 
-      (Just a, Nothing) -> Right a 
-      (Nothing, Just b) -> Right b
-    applyLeftover (unzip maybeRes, leftover)
-  applyLeftover :: (([(s, Count)], [(s, Count)]), Leftover s) -> Either Text ([(s, Count)], [(s, Count)])
-  applyLeftover ((starts, ends), lo) = case lo of
-    Start [] -> Right (starts, ends)
-    End [] -> Right (starts, ends)
-    Start [(s, FinCount n)] -> Right (invariantifyList $ starts ++ [(s, boundVarCount newVar n)], ends)
-    End [(s, FinCount n)] -> Right (starts, invariantifyList $ ends ++ [(s, boundVarCount newVar n)])
-    _ -> Left $ "leftover was not a single finite thing: " <> showP lo
-  matchPairs :: (s, Count) -> (s, Count) -> Either Text ((s, Count), (s, Count))
-  matchPairs (s, c) (t, d) = do
-    guardMsg (s == t) "two bits didn't match"
-    (c', d') <- matchCounts c d
-    pure ((s, c'), (t, d'))
-  --first one is start, second one is end
-  matchCounts :: Count -> Count -> Either Text (Count, Count)
-  matchCounts c d = let rom = showP c <> " and " <> showP d in -- "rest of message" 
-    if c == d then Right (c,d) else case (c,d) of
-      --if we have a pair of counts like (x + 2, x + 5), every trip through, we increase the output by 3 (increaseAmt)
-      -- so the total increase is 3 * y, for a "newVar" y, and that is the output below. 
-    (OneVar n as k x, OneVar m bs j y) -> do
-      guardMsg (x == y) $ "vars didn't match: " <> rom
-      guardMsg (k == 1 && j == 1) $ "vars weren't both 1: " <> rom
-      increaseAmt <- failMsg "chaining didn't increase" $ subCountFromCount (ZeroVar m bs) (ZeroVar n as)
-      case increaseAmt of
-        (FinCount incNat) -> let base =  OneVar n as 1 x in Right (base, base <> boundVarCount newVar incNat)
-        _ -> Left $ "amt of increase was not finite: " <> showP increaseAmt <> "\n" <> rom
+
+matchLists :: (Eq s, Pretty s) => BoundVar -> [(s, Count)] -> [(s, Count)] 
+  -> Either Text ([(s, Count)], [(s, Count)])
+matchLists newVar xs ys = bind (applyLeftover newVar) $ commonPartAndLeftover newVar xs ys
+
+commonPartAndLeftover :: (Eq s) => BoundVar -> [(s, Count)] -> [(s, Count)] 
+  -> Either Text (([(s, Count)], [(s, Count)]), Leftover s)
+commonPartAndLeftover newVar xs ys = do
+  --maybeRes :: Either Text [((s, Count), (s, Count))]
+  --maybeRes <- traverse (uncurry matchPairs) (zip xs ys) --zip discards longer 
+  (maybeRes, maybeLeftover1) <- case unsnoc $ zip xs ys of 
+    Nothing -> Right ([], Nothing)
+    Just (initInp, last) -> do 
+      initRes <- traverse (uncurry (matchPairs newVar)) initInp 
+      (l1, l2, maybeLeft) <- uncurry (matchLastPairs newVar) last 
+      pure (initRes ++ [(l1, l2)], maybeLeft)
+  let maybeLeftover2 = case remainingLonger xs ys of
+        Left [] -> Nothing 
+        Left xs_left -> Just $ Start xs_left
+        Right ys_left -> Just $ End ys_left
+  leftover <- case (maybeLeftover1, maybeLeftover2) of 
+    (Just _, Just _) -> Left "we got two leftovers at once and don't know how to handle"
+    (Nothing, Nothing) -> Right $ Start [] 
+    (Just a, Nothing) -> Right a 
+    (Nothing, Just b) -> Right b
+  pure (unzip maybeRes, leftover)
+applyLeftover :: (Eq s, Pretty s) => BoundVar -> (([(s, Count)], [(s, Count)]), Leftover s) -> Either Text ([(s, Count)], [(s, Count)])
+applyLeftover newVar ((starts, ends), lo) = case lo of
+  Start [] -> Right (starts, ends)
+  End [] -> Right (starts, ends)
+  Start [(s, FinCount n)] -> Right (invariantifyList $ starts ++ [(s, boundVarCount newVar n)], ends)
+  End [(s, FinCount n)] -> Right (starts, invariantifyList $ ends ++ [(s, boundVarCount newVar n)])
+  _ -> Left $ "leftover was not a single finite thing: " <> showP lo
+matchPairs :: (Eq s) => BoundVar -> (s, Count) -> (s, Count) -> Either Text ((s, Count), (s, Count))
+matchPairs newVar (s, c) (t, d) = do
+  guardMsg (s == t) "two bits didn't match"
+  (c', d') <- matchCounts newVar c d
+  pure ((s, c'), (t, d'))
+--first one is start, second one is end
+matchCounts :: BoundVar -> Count -> Count -> Either Text (Count, Count)
+matchCounts newVar c d = let rom = showP c <> " and " <> showP d in -- "rest of message" 
+  if c == d then Right (c,d) else case (c,d) of
+    --if we have a pair of counts like (x + 2, x + 5), every trip through, we increase the output by 3 (increaseAmt)
+    -- so the total increase is 3 * y, for a "newVar" y, and that is the output below. 
+  (OneVar n as k x, OneVar m bs j y) -> do
+    guardMsg (x == y) $ "vars didn't match: " <> rom
+    guardMsg (k == 1 && j == 1) $ "vars weren't both 1: " <> rom
+    increaseAmt <- failMsg "chaining didn't increase" $ subCountFromCount (ZeroVar m bs) (ZeroVar n as)
+    case increaseAmt of
+      (FinCount incNat) -> let base =  OneVar n as 1 x in Right (base, base <> boundVarCount newVar incNat)
+      _ -> Left $ "amt of increase was not finite: " <> showP increaseAmt <> "\n" <> rom
+  _ -> Left $ "couldn't match counts:" <> rom
+matchLastPairs :: (Eq s) => BoundVar -> (s, Count) -> (s, Count) 
+  -> Either Text ((s, Count), (s, Count), Maybe (Leftover s))
+matchLastPairs newVar (s, c) (t, d) = do 
+  guardMsg (s == t) "two bits didn't match"
+  (c', d', maybeLeft) <- matchLastCounts newVar s c d 
+  pure ((s, c'), (t, d'), maybeLeft)
+--the leftover is what's left after matching
+matchLastCounts :: BoundVar -> s -> Count -> Count -> Either Text (Count, Count, Maybe (Leftover s))
+matchLastCounts newVar sym c d = let rom = showP c <> " and " <> showP d in -- "rest of message" 
+  case matchCounts newVar c d of 
+  Right (x, y) -> Right (x, y, Nothing) 
+  Left _ -> case (c, d) of 
+    (FinCount n, FinCount m) -> let res = FinCount $ min n m
+        in
+      case compare n m of 
+        EQ -> error "unreachable matchLastCounts"
+        GT -> Right (res, res, Just $ Start [(sym, FinCount (n - m))])
+        LT -> Right (res, res, Just $ Start [(sym, FinCount (m - n))])
     _ -> Left $ "couldn't match counts:" <> rom
-  matchLastPairs :: (s, Count) -> (s, Count) 
-    -> Either Text ((s, Count), (s, Count), Maybe (Leftover s))
-  matchLastPairs (s, c) (t, d) = do 
-    guardMsg (s == t) "two bits didn't match"
-    (c', d', maybeLeft) <- matchLastCounts s c d 
-    pure ((s, c'), (t, d'), maybeLeft)
-  --the leftover is what's left after matching
-  matchLastCounts :: s -> Count -> Count -> Either Text (Count, Count, Maybe (Leftover s))
-  matchLastCounts sym c d = let rom = showP c <> " and " <> showP d in -- "rest of message" 
-   case matchCounts c d of 
-    Right (x, y) -> Right (x, y, Nothing) 
-    Left _ -> case (c, d) of 
-      (FinCount n, FinCount m) -> let res = FinCount $ min n m
-          in
-        case compare n m of 
-          EQ -> error "unreachable matchLastCounts"
-          GT -> Right (res, res, Just $ Start [(sym, FinCount (n - m))])
-          LT -> Right (res, res, Just $ Start [(sym, FinCount (m - n))])
-      _ -> Left $ "couldn't match counts:" <> rom
     
 addChainedToBook ::(Ord s, Pretty s) => SkipBook s -> SkipBook s
 addChainedToBook sb = addMultipleToBook newSkipAndOrigins sb where

@@ -122,7 +122,7 @@ main = do
   --let continues = getContinues $ outerLoop basicTacticVector (startMachine1 4)
   machines <- loadMachinesFromFile "size4_unfinished_123456macro_24_jul.txt"
   let enumMachines = zip [0,1 ..] machines
-      runTactic = getContinues . outerLoop bwSearchTacticVector
+      runTactic = getContinues . outerLoop basicTacticVector
       runTacticPrint (i, m) = trace ("machine: " <> show i) runTactic m
       unprovenMachines = bind runTacticPrint enumMachines
 

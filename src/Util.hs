@@ -1,12 +1,12 @@
 module Util where
 
-import Relude 
+import Relude
 import Data.Map.Monoidal
 import Control.Lens
 import Safe.Exact (takeExact, dropExact)
 import Safe.Partial
 import Prettyprinter
-import qualified Data.List.NonEmpty as NE 
+import qualified Data.List.NonEmpty as NE
 import Control.Exception
 
 type MMap = MonoidalMap
@@ -43,13 +43,13 @@ infixl 4 <$$$>
 infixl 5 <%>
 
 (<<) :: Applicative f => f b -> f a -> f b
-ma << mb = do 
-  a <- ma 
-  mb 
-  pure a 
+ma << mb = do
+  a <- ma
+  mb
+  pure a
 
-fromJust :: Partial => Maybe a -> a 
-fromJust (Just a) = a 
+fromJust :: Partial => Maybe a -> a
+fromJust (Just a) = a
 fromJust Nothing = error "unsafe"
 
 unsafeFromLeft :: Partial => Either a b -> a
@@ -70,15 +70,15 @@ atE i = at i . iso (fromMaybe Empty) Just
 slice :: Int -> Int -> [a] -> [a]
 slice from to xs = takeExact (to - from + 1) (dropExact from xs)
 
-allEqual :: (Eq s) => [s] -> Bool 
-allEqual [] = True 
-allEqual (x : xs) = all (== x) xs 
+allEqual :: (Eq s) => [s] -> Bool
+allEqual [] = True
+allEqual (x : xs) = all (== x) xs
 
 list1AllEqual :: (Ord a) => NonEmpty a -> Bool
 list1AllEqual (x :| rest) = all (== x) rest
 
 showOnEval :: (Show b, Pretty b) => b -> b
-showOnEval x = trace (showP x) x 
+showOnEval x = trace (showP x) x
 
 putPretty :: (Pretty a) => a -> IO ()
 putPretty = putText . show . pretty
@@ -86,25 +86,25 @@ putPretty = putText . show . pretty
 neZipExact :: Partial => NonEmpty a -> NonEmpty b -> NonEmpty (a, b)
 neZipExact as bs = assert (length as == length bs) $ NE.zip as bs
 
-showP :: (Pretty a, IsString s) => a -> s 
-showP = show . pretty 
+showP :: (Pretty a, IsString s) => a -> s
+showP = show . pretty
 
-failMsg :: Text -> Maybe a -> Either Text a 
+failMsg :: Text -> Maybe a -> Either Text a
 failMsg t = maybe (Left t) Right
 
-guardMsg :: Bool -> Text -> Either Text () 
-guardMsg b msg = if not b then Left msg else Right () 
+guardMsg :: Bool -> Text -> Either Text ()
+guardMsg b msg = if not b then Left msg else Right ()
 
-instance (Pretty a, Pretty b) => Pretty (Either a b) where 
-    pretty = \case      
-      Left a -> "Left: " <> pretty a 
-      Right b -> "Right: " <> pretty b 
+instance (Pretty a, Pretty b) => Pretty (Either a b) where
+    pretty = \case
+      Left a -> "Left: " <> pretty a
+      Right b -> "Right: " <> pretty b
 
 myLength :: [a] -> Integer
 myLength = myRecLength 0
 
-myRecLength :: Integer -> [a] -> Integer 
-myRecLength counter = \case 
+myRecLength :: Integer -> [a] -> Integer
+myRecLength counter = \case
   [] -> undefined  --trace (show counter) counter 
   (x : xs) -> undefined --trace (show counter) $ myRecLength (counter + 1) xs 
 
@@ -121,8 +121,16 @@ prettyText = pretty
 --     in 
 --       Just (i,l)
 
-ceilDiv :: Natural -> Natural -> Natural 
-ceilDiv x y = if x `mod` y == 0 then x `div` y else 1 + (x `div` y) 
+ceilDiv :: Natural -> Natural -> Natural
+ceilDiv x y = if x `mod` y == 0 then x `div` y else 1 + (x `div` y)
 
 myPutText :: Text -> IO ()
-myPutText = putText 
+myPutText = putText
+
+
+firstT :: (Bitraversable t, Applicative f) => (a -> f c) -> t a d -> f (t c d)
+firstT f = bitraverse f pure
+
+
+secondT :: (Bitraversable t, Applicative f) => (b -> f d) -> t c b -> f (t c d)
+secondT = bitraverse pure 
