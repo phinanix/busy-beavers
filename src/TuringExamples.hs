@@ -215,6 +215,9 @@ After some startup effects, applies this rule with x=4 the first time.
 difficultBilateralBouncer :: Turing
 difficultBilateralBouncer =  unm "TR1FL0FR2TR3TL0TL2FL2FR4___TR0"
 
+unproven_size4_24jul :: [Turing]
+unproven_size4_24jul = unm <$> ["TR1FR1TL2FL1TR0FL1______","TR1TL0FR2FR1TL2FR3___FR0","TR1TR0TL1TR2TR3TL2___FR0","TR1TL2FL2FR1TL3TL1TL0___","TR1___FL2TR0FL3FR1TR0TL2","TR1___TR2TL1FL1TR3FR0FR2","TR1TL2FL2FR1TL0FL3FL2___","TR1TL0FR2TL2TL0FL0______","TR1FL2TL2FR0TL0TL1______","TR1___TL2FR0TR3FL1TR0TR2"]
+
 machineList :: [Turing]
 machineList = [weird3, almostweird3, fullsim_not_halt3, bb3, simple_sweeper, 
   checkerboardSweeper, goesLeftForever, binaryCounterTFTT, machineBreaksIndGuess, 

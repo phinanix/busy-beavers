@@ -3,11 +3,14 @@ module Main where
 import Relude
 
 import Control.Lens
-import qualified Data.Text as T (length)
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import Data.Text.Read
 import Prettyprinter
 import Control.Monad
+import Data.Vector (Vector)
 import qualified Data.Vector as V
+import qualified Data.Map as M
 
 import Turing
 import TuringExamples
@@ -25,6 +28,7 @@ import MoreSimulationLoops
 import Util
 import OuterLoop
 import System.IO (openFile, hGetContents, hClose)
+import Control.Exception
 
 
 simProgram :: (Pretty s, Pretty c, Show s, Show c) => Results c s  -> IO ()
@@ -101,13 +105,54 @@ readFile filename = do
         hClose handle
         pure contents
 
-loadMachinesFromFile :: String -> IO [Turing] 
-loadMachinesFromFile fn = do 
-  fileContents <- Relude.readFile fn
-  pure $ unm <$> lines (fromString fileContents)
-  
+loadMachinesFromFile :: String -> IO [Turing]
+loadMachinesFromFile fn = do
+  fileContents <- TIO.readFile fn
+  pure $ unm <$> lines fileContents
+
+applyTactic :: Vector Tactic -> [Turing] -> [Turing]
+applyTactic tac machines = let
+    enumMachines = zip [0,1 ..] machines
+    runTactic = getContinues . outerLoop tac
+    runTacticPrint (i, m) = trace ("machine: " <> show i) runTactic m
+    unprovenMachines = bind runTacticPrint enumMachines
+  in
+    unprovenMachines
+
+tacticVectors :: (Ord a, IsString a) => Map a (Vector Tactic)
+tacticVectors = M.fromList
+  [ ("backward", bwSearchTacticVector)
+  , ("all", everythingVector)
+  , ("basic", basicTacticVector)
+  , ("constructive", constructiveVector)
+  , ("noncon", nonconVector)
+  ]
+
+putMachinesInFile :: [Turing] -> String -> IO ()
+putMachinesInFile ms fn = do
+  let machineString = T.intercalate "\n" $ machineToNotation <$> ms
+  TIO.writeFile fn machineString
+
+processMachinesViaArgs :: IO ()
+processMachinesViaArgs = do
+  args <- getArgs
+  let [tacticName, inputFile, outputFile] = assert (length args == 3) args
+      tacticVec = tacticVectors ^?! ix tacticName 
+  inputMachines <- loadMachinesFromFile inputFile 
+  let inputMessage = "read " <> show (length inputMachines) 
+       <> " machines as input. running: " <> fromString tacticName
+       <> "\n"
+  putText inputMessage
+  let unprovenMachines = applyTactic tacticVec inputMachines 
+  putMachinesInFile unprovenMachines outputFile 
+  putText inputMessage
+  putText $ "finished with " <> show (length unprovenMachines) 
+    <> " machines not proven, written to file\n"
+
+
 main :: IO ()
 main = do
+    processMachinesViaArgs
   -- let results = Simulate.simulate 100 $ startMachine1 4
   -- simProgram dispTape results
 
@@ -120,15 +165,9 @@ main = do
   --simProgram dispExpTape $ foldr (uncurry addResult) Empty resultList 
   --putTextLn $ dispResults $ foldr (uncurry addResult) Empty resultList 
   --let continues = getContinues $ outerLoop basicTacticVector (startMachine1 4)
-  machines <- loadMachinesFromFile "size4_unfinished_123456macro_24_jul.txt"
-  let enumMachines = zip [0,1 ..] machines
-      runTactic = getContinues . outerLoop basicTacticVector
-      runTacticPrint (i, m) = trace ("machine: " <> show i) runTactic m
-      unprovenMachines = bind runTacticPrint enumMachines
 
 
-  putText $ "there were: " <> show (length unprovenMachines) <> " machines unproven:\n"
-  traverse_ (putText . (\m -> machineToNotation m <> "\n")) unprovenMachines
+
 
   --putText $ "there were: " <> show (length continues) <> " machines unproven:"
   --traverse_ putPretty continues
@@ -136,6 +175,20 @@ main = do
   -- let assertFails = checkLRAssertManyMachines 200 $ startMachine1 4
   -- for_ assertFails putTextLn 
 
+{-
+30 jul todo
+1) read tms from file
+"readMachinesFromFile"
+2) get cl args
+"gatArgs"
+3) execute a given tactic vector on machines
+"applyTactic"
+4) tactic vectors have names
+"tacticVectors"
+5) output tms to file
+"putMachinesInFile"
+6) print summary output stats (# input machines, # holdouts)
+-}
 -- crash on
 -- TR1FL2FL0FR1TR0TR3TL0___
 

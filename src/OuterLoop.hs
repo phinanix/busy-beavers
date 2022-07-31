@@ -279,8 +279,17 @@ basicTacticVector = V.fromList [basicSimLoop, twoBitSimLoop] --, tacticBackwardS
 m3456TacticVector :: V.Vector Tactic
 m3456TacticVector = V.fromList [threeBitSimLoop, fourBitSimLoop, fiveBitSimLoop, sixBitSimLoop]
 
+constructiveVector :: V.Vector Tactic
+constructiveVector = V.fromList [basicSimLoop, twoBitSimLoop, threeBitSimLoop, fourBitSimLoop, fiveBitSimLoop, sixBitSimLoop]
+
 bwSearchTacticVector :: V.Vector Tactic
 bwSearchTacticVector = V.fromList [tacticBackwardSearch]
+
+nonconVector :: V.Vector Tactic
+nonconVector = V.fromList [tacticBackwardSearch]
+
+everythingVector :: V.Vector Tactic
+everythingVector = nonconVector V.++ constructiveVector
 
 countSimResType :: [Mystery TapeSymbol (SimResult c)] -> (Int, Int, Int, Int) 
 countSimResType inp = foldr myPlus (0,0,0,0) (fmap whichCat inp) where 

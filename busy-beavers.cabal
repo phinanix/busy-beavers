@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d538be91aecce432addbb35f0e1690423a9b334bcd60d8e8d4cbb83f674e3704
+-- hash: a6392e3131d4d360295ed70a5a629042d1a8c3dfb951f8d4da18716d39090650
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -176,6 +176,7 @@ executable busy-beavers-exe
   build-depends:
       base
     , busy-beavers
+    , containers
     , lens
     , prettyprinter
     , relude

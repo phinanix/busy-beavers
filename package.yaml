@@ -54,9 +54,10 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - busy-beavers
-    - relude
+    - containers
     - lens
     - prettyprinter
+    - relude
     - text
     - vector
 
