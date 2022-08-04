@@ -8,7 +8,7 @@ import qualified Data.Text as T (concat, intercalate)
 import qualified Data.Set as S
 
 import Prettyprinter
-import Data.Either.Combinators
+import Data.Either.Combinators hiding (rightToMaybe)
 
 import Data.Bits (Bits(bit))
 import Data.List (minimumBy, findIndex)
@@ -34,6 +34,7 @@ import SimulateSkip
 import SimulationLoops
 import Graphs
 import TapeSymbol
+import Data.Containers.ListUtils (nubOrd)
 
 {-
 27 Nov 21 
@@ -415,12 +416,25 @@ simplestNSigs n hist = take (fromIntegral n) $
     sortBy (compare `on` signatureComplexity . snd) $
     possibleSignatures hist
 
+orderSignatures :: Signature s -> Signature s -> Ordering 
+orderSignatures s t = case (compare `on` signatureComplexity) s t of 
+  LT -> LT
+  GT -> GT 
+  EQ -> case (compare `on` leftLen) s t of 
+    LT -> LT
+    GT -> GT
+    EQ -> (compare `on` rightLen) s t
+  where 
+    leftLen (Signature ls _p _rs) = length ls 
+    rightLen (Signature _ls _p rs) = length rs 
+
 --given a history, guesses a "critical configuration" 
 -- a simple tape appearance the machine repeatedly returns to
-guessCriticalConfiguration :: Ord s => [(Phase, ExpTape s InfCount)] -> Either Text (Phase, Signature s)
+guessCriticalConfiguration :: (Ord s, Show s, Pretty s) => [(Phase, ExpTape s InfCount)] -> Either Text (Phase, Signature s)
 guessCriticalConfiguration hist = case possibleSignatures hist of
   [] -> Left "no possible criticalconfigs"
-  xs -> Right $ minimumBy (compare `on` signatureComplexity . snd) xs
+  xs -> trace ("possible sigs: " <> showP (nubOrd (filter (\x -> signatureComplexity (snd x) <= 5) xs))) $ 
+    Right $ minimumBy (orderSignatures `on` snd) xs
 
 -- given a particular config, return the list of times that config occurred, plus the integer position in the original list
 obtainConfigIndices :: (Eq s) => [(Phase, ExpTape s InfCount)] -> (Phase, Signature s)
@@ -535,25 +549,30 @@ generalizeFromExamples :: [(ExpTape Bit Count, ExpTape Bit Count)] -> Maybe (Ski
 generalizeFromExamples slicePairs = undefined
 
 
-
-guessInductionHypothesis :: (TapeSymbol s) => TapeHist s InfCount -> ReadShiftHist
-  -> Either Text (Skip Count s)
-guessInductionHypothesis th@(TapeHist hist) rsh = force $ do
+obtainCriticalIndicesConfigs :: (TapeSymbol s) => TapeHist s InfCount 
+  -> Either Text (Phase, [(Int, (Phase, ExpTape s InfCount))])
+obtainCriticalIndicesConfigs (TapeHist hist) = do 
   criticalConfig@(criticalPhase, _criticalSignature) <- guessCriticalConfiguration hist
   let
     configIndicesAndConfigs = let ans = obtainConfigIndices hist criticalConfig in
       trace ("configs were:\n" <> showP ans) 
       ans
+  pure (criticalPhase, configIndicesAndConfigs)
+
+guessInductionHypothesis :: (TapeSymbol s) => TapeHist s InfCount -> ReadShiftHist
+  -> Either Text (Skip Count s)
+guessInductionHypothesis th rsh = force $ do
+  (criticalPhase, configIndicesAndConfigs) <- obtainCriticalIndicesConfigs th 
+  let
     indGuess = case guessInductionHypWithIndices th rsh criticalPhase configIndicesAndConfigs of
       Right ans -> Right ans
       --this is hacky and bad but it used to be necessary to guess right on trickyChristmasTree so I'll try it for now
       --24 jul 22  update is that it is no longer necessary, so I got rid of it, but we'll see what 
       --happens in the future
-      Left msg -> guessInductionHypWithIndices th rsh criticalPhase (Unsafe.tail configIndicesAndConfigs)
+      Left msg -> guessInductionHypWithIndices th rsh criticalPhase (Unsafe.tail $ Unsafe.tail configIndicesAndConfigs)
     in 
      trace ("guessed indhyp:\n" <> showP indGuess) 
-    -- $ assert ((thingContainsVar <$> indGuess) /= Right False) 
-     $ force 
+     $ assert ((thingContainsVar <$> indGuess) /= Right False) 
      indGuess
 
 guessInductionHypWithIndices :: (Pretty s, Eq s) => TapeHist s InfCount -> ReadShiftHist -> Phase -> [(Int, (Phase, ExpTape s InfCount))] -> Either Text (Skip Count s)
@@ -597,8 +616,7 @@ guessInductionHypWithIndices (TapeHist hist) (ReadShiftHist rsHist) criticalPhas
     bitraverseBoth (traverse nonEmpty) $ transposePairs countPairListList
   --the pair here is over left and right, then the list is over the "signature dimension", and the internal
   --pair is over start -> finish
-  allThingsGeneralized <- failMsg "failed to generalize"  $
-    bitraverseBoth (traverse generalizeFromCounts) thingsToGeneralizeList
+  allThingsGeneralized <- bitraverseBoth (traverse generalizeFromCounts) thingsToGeneralizeList
   --we want to pull the pair from start -> finish out to the front, then have the left right pair, then have the 
   --"signature dimension"
   let startCounts = bimapBoth (fmap fst) allThingsGeneralized
@@ -750,7 +768,7 @@ guessWhatHappensNext machine startConfig varToGeneralize
               msg = "generalized:" <> show (pretty cl) <> "\ngot\n" <> show (pretty ans)
             in
               -- trace msg 
-              ans
+              rightToMaybe ans
         {-algorithm:
         first, generalize all the counts to pairs, with the simnum we put in. you might think we're done now, and we just want the 
         second number of this pair. I also thought this, but that is not correct, because in the two pairs (x, x) (x + 2, x), that
@@ -869,9 +887,10 @@ guessAndProveWhatHappensNext machine book startConfig varToGeneralize
 -- such as n + 2 -> n, or n -> n + 3
 -- else, see if they are generated by a function of the form x -> m * x + b 
 -- else give up 
-generalizeFromCounts :: NonEmpty (Count, Count) -> Maybe (Count, Count)
-generalizeFromCounts xs = force $
-  allEqualPair <|> additivePair <|> affinePair
+generalizeFromCounts :: NonEmpty (Count, Count) -> Either Text (Count, Count)
+generalizeFromCounts xs = case  allEqualPair <|> additivePair <|> affinePair of
+  Just x -> Right x 
+  Nothing -> Left $ "failed to generalize the pairs: " <> showP xs 
   where
     allEqualPair :: Maybe (Count, Count)
     allEqualPair = guard (list1AllEqual xs) >> pure (head xs)
@@ -884,7 +903,7 @@ generalizeFromCounts xs = force $
         ans = traverse (bitraverse countToMaybeNat countToMaybeNat) xs
         msg = "attempting to generalize these pairs:\n" <> show ans
      in
-        --trace msg 
+        trace msg 
         ans
     subNats :: Natural -> Natural -> Int
     subNats = (-) `on` fromIntegral
@@ -964,7 +983,7 @@ generalizeFromInfCounts xs = infinityUnit <|> notInfinityCountPair where
     infinityUnit :: Maybe (Either () (Count, Count))
     infinityUnit = guard (all (uncurry ((&&) `on` (== Infinity))) xs) >> pure (Left ())
     notInfinityCountPair :: Maybe (Either () (Count, Count))
-    notInfinityCountPair = Right <$> (maybeAllCounts >>= generalizeFromCounts)
+    notInfinityCountPair = Right <$> (maybeAllCounts >>= (rightToMaybe . generalizeFromCounts))
     infCountToMaybeCount :: InfCount -> Maybe Count
     infCountToMaybeCount = \case
         Infinity -> Nothing

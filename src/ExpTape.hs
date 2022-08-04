@@ -139,7 +139,13 @@ tapeHalfToBitList = flatten . intify . Unsafe.init  where
 data Signature s = Signature [s] s [s] deriving (Eq, Ord, Show, Generic)
 instance (NFData s) => NFData (Signature s)
 
-instance (Show s, Pretty s) => Pretty (Signature s)
+dispSignature :: Pretty s => Signature s -> Text
+dispSignature (Signature ls p rs) = mconcat (showP <$> reverse ls) 
+  <> dispPoint p 
+  <> mconcat (showP <$> rs)
+
+instance Pretty s => Pretty (Signature s) where 
+  pretty = prettyText . dispSignature 
 
 tapeSignature :: ExpTape s c -> Signature s
 tapeSignature (ExpTape ls p rs) = Signature (fst <$> ls) p  (fst <$> rs)

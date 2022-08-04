@@ -78,7 +78,7 @@ simulateOneMachineOuterLoop updateFuncs startMachine
       Left r -> (r, one init)
       Right next -> (NE.<|) init <$> iterateEither k next
 
-simOneFromStartLoop :: NonEmpty (SimOneAction Bit) -> Turing -> OneLoopRes Bit
+simOneFromStartLoop :: (TapeSymbol s) => NonEmpty (SimOneAction s) -> Turing -> OneLoopRes s
 simOneFromStartLoop updateFuncs startMachine
   = simulateOneMachineOuterLoop updateFuncs startMachine (initSkipState startMachine)
 
@@ -173,7 +173,7 @@ simulateStepOneMachine handleUnknown limit machine
  state@(SimState ph tape book steps skipTrace hist histSet counter curDisp dispHist rsHist)
   = if counter > limit
     then Left $ Continue steps ph tape curDisp
-    else --trace ("counter:" <> show counter) $ 
+    else trace ("steps:" <> show steps <> " p:" <> showP ph <> " t:" <> showP tape) $ 
     case skipStep machine book ph tape of
     Unknown e -> handleUnknown e state
     MachineStuck -> Left MachineStuckRes
@@ -396,14 +396,15 @@ loopForEndOfTapeGlue :: Int -> Turing -> OneLoopRes Bit
 loopForEndOfTapeGlue limit = simOneFromStartLoop $
     simulateStepTotalLoop limit :| [liftModifyState recordHist, liftModifyState recordDispHist, runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof]
 
-simulateForTime :: Partial => Int -> Turing -> OneLoopRes Bit
+simulateForTime :: (Partial, TapeSymbol s) => Int -> Turing -> OneLoopRes s
 simulateForTime time = simOneFromStartLoop actionList where
   actionList = simulateStepTotalLoop (time + 1) :| [liftModifyState recordHist, liftModifyState recordDispHist]
 
-getStateAfterTime :: Partial => Int -> Turing -> SimState Bit
+getStateAfterTime :: (Partial, TapeSymbol s) => Int -> Turing -> SimState s
 getStateAfterTime time turing = last $ simulateForTime time turing ^. _2
 
-getTwoHistAfterTime :: Partial => Int -> Turing -> (TapeHist Bit InfCount, ReadShiftHist)
+getTwoHistAfterTime :: (Partial, TapeSymbol s) 
+  => Int -> Turing -> (TapeHist s InfCount, ReadShiftHist)
 getTwoHistAfterTime stepCount turing
   = (guessingState ^. s_history, guessingState ^. s_readshift_history)
   where

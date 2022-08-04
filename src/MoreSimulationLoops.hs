@@ -43,7 +43,8 @@ indGuessLoop limit = simOneFromStartLoop $
    liftModifyState recordDispHist,
    runAtCount 100 attemptInductionGuess]
 
-makeIndGuess :: Int -> Turing -> Either Text (Skip Count Bit)
+-- this function works though
+makeIndGuess :: forall s. (TapeSymbol s) => Int -> Turing -> Either Text (Skip Count s)
 makeIndGuess = uncurry guessInductionHypothesis .: getTwoHistAfterTime
 
 getRecurRes :: Int -> Turing -> Maybe (HaltProof Bit)

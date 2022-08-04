@@ -240,7 +240,7 @@ examples of machines for induction
    iterates through ph 1 [binnum]>F<
      where 0->TT 1->TF
 4) the binary counter of variable symbol width
-   counts to the right
+   expands to the left and right
    iterates through ph 3 >F< [binnum] (eg 382)
      where 1 is mapped to 2, 3, 5, 9 ... (2^n + 1) Ts except the leading 1 is (2^n + 3) Ts
      and 0 is mapped to the same number of Fs
@@ -250,6 +250,55 @@ examples of machines for induction
        eg at 1022 ?
        wait no, I think it only recursively counts in order to carry through the highest #
        but I am not 100% here. 
+-}
+{-
+1) a completely vanilla binary counter
+guessed indhyp:
+Right: in 0 steps we turn
+phase: 2  (F, 1) |>F<|(T, 0 + 1*x_0 ) (F, 1)
+into:
+phase: 2|>F<|(T, 1 + 1*x_0 ) (F, 1)
+
+2) a binary counter of symbol size 3
+guessed indhyp:
+Right: in 0 steps we turn
+phase: 3  (|FFF|, 1) |>|FTT|<|(|TTT|, 0 + 1*x_0 ) (|TTF|, 1)
+into:
+phase: 3|>|FTT|<|(|TTT|, 1 + 1*x_0 ) (|TTF|, 1)
+
+3) that fucked binary counter with weird symbols and a weird top symbol
+guessed indhyp:
+Right: in 0 steps we turn
+phase: 2  (|FF|, 1) (|TF|, 0 + 1*x_0 ) |>|TT|<|(|FF|, 1)
+into:
+phase: 2(|TF|, 1 + 1*x_0 ) |>|TT|<|(|FF|, 1)
+
+4) the binary counter of variable symbol width
+the thing we should guess is 
+2 (F, x) (T, 2x) (F, x+2) >F< (F, 2x) 
+2        (T, 4x) (F, 2x+2) >F<
+but the problem is the guesser is not smart enough to generalize x -> 0 and 2x -> 0 in 
+  the right way, which sort of makes sense. It needs a global view of the thing but is 
+  trying to proceed elementwise
+-}
+{-
+todo to develop induction algorithm
+- gather an indhyp for each of these 4
+    makeIndGuess 300 <$> machines
+    to do this for 2) I had to write orderSignatures which uses the second heuristic 
+    of it's good if the machine is close to the left or right of the tape among 
+    signatures of the same complexity. 
+    to do this for 4) I will have to somehow make it so the numbers are generalized globally
+    rather than locally, but I haven't done this yet. 
+- get >=4 indices at which said config occurs
+    
+- get the history traces in between said indices
+- get the common sigs across a machine's history trace
+- possible filters
+  - simple 
+  - occurs frequently
+  - left-side / right-side heuristic
+  - self-apply heuristic
 -}
 inductionExamples :: [Turing]
 inductionExamples = 
