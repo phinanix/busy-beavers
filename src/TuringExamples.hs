@@ -1,6 +1,12 @@
 module TuringExamples where
 
 import Relude
+import qualified Relude.Unsafe as U
+{-
+examples of machines for induction
+1) a completely vanilla binary counter
+2) a 
+-}
 
 import Turing
 import Count
@@ -217,6 +223,41 @@ difficultBilateralBouncer =  unm "TR1FL0FR2TR3TL0TL2FL2FR4___TR0"
 
 unproven_size4_24jul :: [Turing]
 unproven_size4_24jul = unm <$> ["TR1FR1TL2FL1TR0FL1______","TR1TL0FR2FR1TL2FR3___FR0","TR1TR0TL1TR2TR3TL2___FR0","TR1TL2FL2FR1TL3TL1TL0___","TR1___FL2TR0FL3FR1TR0TL2","TR1___TR2TL1FL1TR3FR0FR2","TR1TL2FL2FR1TL0FL3FL2___","TR1TL0FR2TL2TL0FL0______","TR1FL2TL2FR0TL0TL1______","TR1___TL2FR0TR3FL1TR0TR2"]
+
+
+{-
+examples of machines for induction
+1) a completely vanilla binary counter
+  counts to the left. 
+  iterates through ph 0 [binnum]>F<
+2) a binary counter of symbol size 3
+  counts to the left
+  iterates through ph 1 [binnum]>F<T 
+    where binnum is written with 0->FFF 1->TFF
+  and as the carrying happens, all the TFFs get converted to TTTs
+3) that fucked binary counter with weird symbols and a weird top symbol
+   counts to the left
+   iterates through ph 1 [binnum]>F<
+     where 0->TT 1->TF
+4) the binary counter of variable symbol width
+   counts to the right
+   iterates through ph 3 >F< [binnum] (eg 382)
+     where 1 is mapped to 2, 3, 5, 9 ... (2^n + 1) Ts except the leading 1 is (2^n + 3) Ts
+     and 0 is mapped to the same number of Fs
+     and before the first digit is 2 Fs
+     and after each digit is 1, 3, 7, ... (2^(n+1)) Fs 
+     and in order to count up, it counts up recursively 
+       eg at 1022 ?
+       wait no, I think it only recursively counts in order to carry through the highest #
+       but I am not 100% here. 
+-}
+inductionExamples :: [Turing]
+inductionExamples = 
+  [ weird3
+  , unproven_size4_24jul U.!! 3
+  , unproven_size4_24jul U.!! 4
+  , binaryCounterVariableWidth
+  ]
 
 machineList :: [Turing]
 machineList = [weird3, almostweird3, fullsim_not_halt3, bb3, simple_sweeper, 
