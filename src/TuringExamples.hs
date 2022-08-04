@@ -291,9 +291,10 @@ todo to develop induction algorithm
     to do this for 4) I will have to somehow make it so the numbers are generalized globally
     rather than locally, but I haven't done this yet. 
 - get >=4 indices at which said config occurs
-    
+    obtainMachineConfigs
 - get the history traces in between said indices
 - get the common sigs across a machine's history trace
+    putText $ showP $ fmap toList $ fmap obtainSigsWhichOccur $ obtainHistorySlices @(Vec 3 Bit) 400 (inductionExamples U.!! 1)
 - possible filters
   - simple 
   - occurs frequently
