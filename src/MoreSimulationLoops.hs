@@ -2,11 +2,13 @@ module MoreSimulationLoops where
 
 import Relude
 import qualified Relude.Unsafe as Unsafe
+import qualified Relude.Unsafe as U
 import Control.Lens
 import Prettyprinter
 import Control.Exception (assert)
 
 import qualified Data.Map as M
+import qualified Data.Set as S
 
 import Turing
 import Count
@@ -20,6 +22,7 @@ import HaltProof
 import LinRecurrence
 import TapeSymbol
 import SimulateTwoBit (TwoBit)
+import ExpTape
 
 attemptInductionGuess :: Turing -> SimState Bit
   -> Either (SimResult InfCount Bit) (SimState Bit)
@@ -46,6 +49,28 @@ indGuessLoop limit = simOneFromStartLoop $
 -- this function works though
 makeIndGuess :: forall s. (TapeSymbol s) => Int -> Turing -> Either Text (Skip Count s)
 makeIndGuess = uncurry guessInductionHypothesis .: getTwoHistAfterTime
+
+obtainMachineConfigs :: forall s. (TapeSymbol s) => Int -> Turing
+  -> Either Text (Phase,  [(Int, (Phase, ExpTape s InfCount))])
+obtainMachineConfigs = (obtainCriticalIndicesConfigs . fst) .: getTwoHistAfterTime
+
+obtainHistorySlices :: forall s. (TapeSymbol s) => Int -> Turing
+  -> Either Text [(Int, Int, [(Phase, ExpTape s InfCount)], [ReadShift])]
+obtainHistorySlices limit m = do
+  let (th@(TapeHist tapeHist), ReadShiftHist readShiftHist) = getTwoHistAfterTime limit m
+  machineConfigs <- obtainCriticalIndicesConfigs th
+  let indices = fst <$> snd machineConfigs
+      pairedIndices = zip (U.init indices) (U.tail indices )
+  pure $ (\(s, e) -> (s, e, slice s e tapeHist, slice s e readShiftHist))
+        <$> pairedIndices
+
+obtainSigsWhichOccur :: (Ord s) => [(Int, Int, [(Phase, ExpTape s InfCount)], [ReadShift])]
+ -> Set (Phase, Signature s)
+obtainSigsWhichOccur = intersectFold
+  . fmap (S.fromList . fmap (second tapeSignature) . getThird)
+  where
+  getThird (_a, _b, c, _d) = c
+
 
 getRecurRes :: Int -> Turing -> Maybe (HaltProof Bit)
 getRecurRes stepCount turing = detectLinRecurrence tapeHist rsHist where
@@ -117,59 +142,59 @@ proveByLR _machine state = case maybeProof of
 
 proveLRLoop :: Int -> Turing -> OneLoopRes Bit
 proveLRLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
-  :| [liftModifyState recordHist, liftModifyState recordDispHist, 
+  :| [liftModifyState recordHist, liftModifyState recordDispHist,
     runAtCount (limit-2) proveByLR]
 
-canProveLR :: Int -> Turing -> Bool 
-canProveLR limit m = case proveLRLoop limit m of 
-  (ContinueForever (LinRecur _ _), _ne) -> True 
-  (ContinueForever (SkippedToInfinity _), _ne) -> True 
-  _ -> False 
+canProveLR :: Int -> Turing -> Bool
+canProveLR limit m = case proveLRLoop limit m of
+  (ContinueForever (LinRecur _ _), _ne) -> True
+  (ContinueForever (SkippedToInfinity _), _ne) -> True
+  _ -> False
 
 proveCycleLoop :: Int -> Turing -> OneLoopRes Bit
 proveCycleLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
-  :| [checkSeenBefore] 
+  :| [checkSeenBefore]
 
-canProveCycle :: Int -> Turing -> Bool 
-canProveCycle limit m = case proveCycleLoop limit m of 
-  (ContinueForever (Cycle _ _), _ne) -> True 
-  (ContinueForever (SkippedToInfinity _), _ne) -> True 
-  _ -> False 
+canProveCycle :: Int -> Turing -> Bool
+canProveCycle limit m = case proveCycleLoop limit m of
+  (ContinueForever (Cycle _ _), _ne) -> True
+  (ContinueForever (SkippedToInfinity _), _ne) -> True
+  _ -> False
 
 proveEOTLoop :: Int -> Turing -> OneLoopRes Bit
 proveEOTLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
-  :| [liftModifyState recordHist, liftModifyState recordDispHist, 
+  :| [liftModifyState recordHist, liftModifyState recordDispHist,
   runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof]
 
-canProveEOT :: Int -> Turing -> Bool 
-canProveEOT limit m = case proveEOTLoop limit m of 
-  (ContinueForever (OffToInfinityN _ _), _) -> True 
-  (ContinueForever (SkippedToInfinity _), _ne) -> True 
-  _ -> False 
+canProveEOT :: Int -> Turing -> Bool
+canProveEOT limit m = case proveEOTLoop limit m of
+  (ContinueForever (OffToInfinityN _ _), _) -> True
+  (ContinueForever (SkippedToInfinity _), _ne) -> True
+  _ -> False
 
 proveOEOTLoop :: Int -> Turing -> OneLoopRes Bit
 proveOEOTLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
-  :| [liftModifyState recordHist, liftModifyState recordDispHist, 
+  :| [liftModifyState recordHist, liftModifyState recordDispHist,
   runIfCond (atRightOfTape . view s_tape) attemptOtherEndOfTapeProof]
 
-canProveOEOT :: Int -> Turing -> Bool 
-canProveOEOT limit m = case proveOEOTLoop limit m of 
-  (ContinueForever (OffToInfinityN _ _), _) -> True 
-  _ -> False 
+canProveOEOT :: Int -> Turing -> Bool
+canProveOEOT limit m = case proveOEOTLoop limit m of
+  (ContinueForever (OffToInfinityN _ _), _) -> True
+  _ -> False
 
 checkLRAssertOneMachine :: Int -> Turing -> Maybe Text
-checkLRAssertOneMachine limit unfinishedM = if toAssert then Nothing else Just msg where 
+checkLRAssertOneMachine limit unfinishedM = if toAssert then Nothing else Just msg where
   m = fillInMachine unfinishedM
-  lrWorked = canProveLR limit m 
-  cycleWorked = canProveCycle limit m 
-  eotWorked = canProveEOT limit m 
+  lrWorked = canProveLR limit m
+  cycleWorked = canProveCycle limit m
+  eotWorked = canProveEOT limit m
   otherEotWorked = canProveOEOT limit m
   notBothEot = not (eotWorked && otherEotWorked && not cycleWorked)
   lrComplementsWorked = cycleWorked || eotWorked || otherEotWorked
   lrIffComplements = lrWorked == lrComplementsWorked
 
   toAssert = lrIffComplements && notBothEot
-  msg = "assert failed on:\n" <> showP m 
+  msg = "assert failed on:\n" <> showP m
     <> " " <> showP [lrWorked, cycleWorked, eotWorked, otherEotWorked]
 
 --todo run at count being measured in big steps while limit is measured in small steps is bad
@@ -187,13 +212,13 @@ enumerateMachinesLoop limit = simulateManyMachinesOuterLoop (const Nothing) $
   simulateStepPartial limit :| []
 
 checkLRAssertManyMachines :: Int -> Turing -> [Text]
-checkLRAssertManyMachines limit startMachine = catMaybes texts where 
+checkLRAssertManyMachines limit startMachine = catMaybes texts where
   machines = fst <$> enumerateMachinesLoop limit startMachine
-  texts = checkLRAssertOneMachine limit <$> machines 
+  texts = checkLRAssertOneMachine limit <$> machines
 
 indProveLoopMany :: Int -> Turing -> MultiLoopRes Bit
-indProveLoopMany limit = simulateManyMachinesOuterLoop backwardSearch $ 
-  simulateStepPartial limit :| (liftOneToMulti <$> [checkSeenBefore, liftModifyState recordHist, 
+indProveLoopMany limit = simulateManyMachinesOuterLoop backwardSearch $
+  simulateStepPartial limit :| (liftOneToMulti <$> [checkSeenBefore, liftModifyState recordHist,
   liftModifyState recordDispHist,
   runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof,
   runIfCond (atRightOfTape . view s_tape) attemptOtherEndOfTapeProof,
@@ -201,8 +226,8 @@ indProveLoopMany limit = simulateManyMachinesOuterLoop backwardSearch $
   ])
 
 bestCurrentProveLoop :: Int -> Turing -> MultiLoopRes Bit
-bestCurrentProveLoop limit = simulateManyMachinesOuterLoop backwardSearch $ 
-  simulateStepPartial limit :| (liftOneToMulti <$> [checkSeenBefore, liftModifyState recordHist, 
+bestCurrentProveLoop limit = simulateManyMachinesOuterLoop backwardSearch $
+  simulateStepPartial limit :| (liftOneToMulti <$> [checkSeenBefore, liftModifyState recordHist,
   liftModifyState recordDispHist,
   runAtCounts [10, 40, 140] proveByLR,
   runAtCounts [40, 140] proveByInd

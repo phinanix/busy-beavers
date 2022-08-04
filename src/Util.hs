@@ -1,7 +1,9 @@
 module Util where
 
 import Relude
-import Data.Map.Monoidal
+import Data.Map.Monoidal ( MonoidalMap )
+import qualified Data.Set as S 
+
 import Control.Lens
 import Safe.Exact (takeExact, dropExact)
 import Safe.Partial
@@ -134,3 +136,7 @@ firstT f = bitraverse f pure
 
 secondT :: (Bitraversable t, Applicative f) => (b -> f d) -> t c b -> f (t c d)
 secondT = bitraverse pure 
+
+intersectFold :: (Ord a) => [Set a] -> Set a 
+intersectFold [] = Empty 
+intersectFold (x : xs) = foldr S.intersection x xs 
