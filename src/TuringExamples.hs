@@ -208,6 +208,24 @@ by larger blocks of Ts. It's something like, the nth digit is represented by 2^n
 which would give 2, 3, 5, 9, but the biggest digit is 2 bigger or something like that. 
 and the spacing after digit n is 2^(n+1) - 1 I think. I am now pretty solidly sure that is
 correct. 
+
+the proof I have that this counter runs forever: 
+
+A_n (beta_n in notebook)
+3 (F, 2^n -1) >F< (F, 2^(n+1))
+2 (T, 2^n+1) (F, 2^n) |>
+
+k_n 
+2 (F, 2^n) >T< (T, x) (F, 2^(n+1) - 1)
+2 (T, 2^(n+1))(F, x+2^n) >|
+
+Proving A_(n+1) uses A_n and k_n 
+Proving k_(n+1) uses A_(n+1) and k_n
+
+We would indguess
+3 (F, x) >F< (F, 2x) (T, x+3) (F, 2x) 
+3        >F< (F, 4x) (T, 2x+3)
+which I think can be proven using A_n and k_n but I'm not going to check right now
 -}
 binaryCounterVariableWidth :: Turing
 binaryCounterVariableWidth =  unm "TR1___FR2FR1TL2FL3TR0FL3"
