@@ -140,3 +140,6 @@ secondT = bitraverse pure
 intersectFold :: (Ord a) => [Set a] -> Set a 
 intersectFold [] = Empty 
 intersectFold (x : xs) = foldr S.intersection x xs 
+
+third :: (a -> b) -> (x, y, a) -> (x, y, b)
+third f (x, y, a) = (x, y, f a)
