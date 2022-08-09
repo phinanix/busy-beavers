@@ -61,7 +61,7 @@ obtainHistorySlices limit m = do
       labelledTapeHist = zip [0, 1..] tapeHist
   machineConfigs <- obtainCriticalIndicesConfigs th
   -- TODO: trying drop 1 to fix startup effects
-  let indices = drop 2 $ fst <$> snd machineConfigs
+  let indices = drop 1 $ fst <$> snd machineConfigs
       pairedIndices = zip (U.init indices) (U.tail indices )
   pure $ (\(s, e) -> (s, e, (\((w, (x, y)), z) -> (w, x, y, z)) <$> zip (slice s e labelledTapeHist) (slice s e readShiftHist)))
         <$> pairedIndices

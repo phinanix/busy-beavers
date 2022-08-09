@@ -300,6 +300,96 @@ but the problem is the guesser is not smart enough to generalize x -> 0 and 2x -
   trying to proceed elementwise
 -}
 {-
+scaffold analysis (with drop 1)
+1) f (cadg)^n baehf
+   the right thing is a subset: it is the first a to the last a
+
+  prefix  f cadg 
+  suffix    cadg baehf 
+  "be at left or right" gives the prefix fad  suffix ad baef
+  "simplest sig" doesn't pick out a, and it picks b, which is not right, but everything other than b is the same simplicity
+
+2) ecafg (intersperse cafg (D <> [m..1])) bafgafje
+where 
+D[n] = intersperseSE dikh (\i -> (di * i)) <$> [n..0]
+ie
+ecafg                                               dikh bafgafje
+ecafg                             dikh di dikh cafg dikh bafgafje
+ecafg dikh di dikh didi dikh cafg dikh di dikh cafg dikh bafgafje
+
+ecafg dikh di dikh didi dikh dididi dikh cafg 
+      dikh di dikh didi dikh cafg dikh di dikh cafg dikh bafgafje
+
+   first a to last a works again, I believe
+
+   prefix  e cafg dikh
+   suffix    cafg dikh bafgafje
+   
+   "leftmost / rightmost" gives 
+   prefix  e af di
+   suffix    af di afafe
+
+   "simplest sig" throws out di, which is correct, and everything else is same complexity 
+   (ie, second simplest doesn't throw anything out)
+
+3)  
+igfv swdqot (X <> [1..m]) nbfvsmaljki
+where 
+X[n] = (\i -> x + hzy*i + ehzy rdqopu) <$> [0..(n-1)] <> ncfv swdqot
+ie 
+igfv swdqot                                                                                                                    x e hzy rdqopu ncfv swdqot nbfvsmaljki
+igfv swdqot                                                                      x e hzy rdqopu x hzy e hzy rdqopu ncfv swdqot x e hzy rdqopu ncfv swdqot nbfvsmaljki
+igfv swdqot x e hzy rdqopu x hzy e hzy rdqopu x hzy hzy e hzy rdqopu ncfv swdqot x e hzy rdqopu x hzy e hzy rdqopu ncfv swdqot x e hzy rdqopu ncfv swdqot nbfvsmaljki
+
+I think first f to last f works?
+     
+    prefix  igfv swdqot x e hzy rdqopu
+    suffix              x e hzy rdqopu ncfv swdqot nbfvsmaljki
+
+    "leftmost/rightmost"  
+    prefix  ifv swdqot e hzy rdqop 
+    suffix             e hzy rdqop fv swdqot bfvsmaljki
+
+    simplest does some work here too, I think, reducing to 
+    second simplest
+    prefix  ifv swt  
+    suffix          swt bfvsmaljki
+    most simple
+    prefix  i
+    suffix     bmaljki
+    so second simplest does work, I think
+
+4) ia (g * n) jadgj becfhki
+first i to first g is my A_n above and first g to f is my k_n, I think. so I think it "roughly" works 
+    
+    prefix  ia g
+    suffix     g jadgj becfhki
+
+    it's less clear what to say about this one, because it requires a double induction
+    but we can see what the above heuristics would do anyway
+    
+    leftmost/rightmost 
+    prefix  i 
+    suffix    cfi
+    so this is pretty clearly wrong / unhelpful, because we need more points in the thing for the double induction basically
+
+    simplest (not after L/R, independently, unlike above)
+    second simplest filters out zero items
+    most simple
+    prefix  i 
+    suffix     d becfhki
+    this is sort of helpful, but not actually - it still filters too much
+
+    todo: maybe try these heuristics again, this time with the "drop 2" alphabet rather than the "drop 1" alphabet, since "drop 2"
+    first of all is more the "right thing" and second has way more letters and thus filtering is more relevant
+
+sig analysis codes:
+putText $ (\x -> x <> "\n") $ showP $ (fmap . fmap . fmap . fmap) (\(a,b,c,d,e) -> (a,b,c,d)) $  scaffoldV0 @Bit 400 (inductionExamples U.!! 0)
+putText $ (\x -> x <> "\n") $ showP $ (fmap . fmap . fmap . fmap) (\(a,b,c,d,e) -> (a,b,c,d)) $  scaffoldV0 @(Vec 3 Bit) 400 (inductionExamples U.!! 1)
+putText $ (\x -> x <> "\n") $ showP $ (fmap . fmap . fmap . fmap) (\(a,b,c,d,e) -> (a,b,c,d)) $  scaffoldV0 @(Vec 2 Bit) 400 (inductionExamples U.!! 2)
+putText $ (\x -> x <> "\n") $ showP $ (fmap . fmap . fmap . fmap) (\(a,b,c,d,e) -> (a,b,c,d)) $ scaffoldV0 @(Bit) 500 (inductionExamples U.!! 3)
+-}
+{-
 todo to develop induction algorithm
 - gather an indhyp for each of these 4
     makeIndGuess 300 <$> machines
@@ -318,6 +408,19 @@ todo to develop induction algorithm
   - occurs frequently
   - left-side / right-side heuristic
   - self-apply heuristic
+
+- scaffold: putText $ (\x -> x <> "\n") $ showP $ (fmap . fmap . fmap . fmap) (\(a,b,c,d,e) -> (a,b,c,d)) $  scaffoldV0 @Bit 400 (inductionExamples U.!! 0)
+
+
+- how to turn a scaffold into a set of proof goals: 
+1) find the common prefixes and suffixes of the characters the traces contain
+2) filter down to the points where the machine is at the furthest left or right it gets (RLE-wise)
+3) for now, try all pairs of 1 thing from prefix & 1 thing from suffix
+4) given a set of history pairs, generalize it similarly to guessWhatHappensNext 
+5) attempt to prove it via induction
+6) once at least 1 induction succeeds, go back to trying to prove the full runForever without induction
+
+this won't get everything, but it should get all the counters and plausibly other things
 -}
 inductionExamples :: [Turing]
 inductionExamples = 
