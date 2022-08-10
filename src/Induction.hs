@@ -2,7 +2,7 @@ module Induction where
 
 import Relude
 import Control.Lens
-import Data.Map.Monoidal (assocs, keysSet)
+import Data.Map.Monoidal (assocs, keysSet, keys)
 import qualified Data.Map as M
 import qualified Data.Text as T (concat, intercalate)
 import qualified Data.Set as S
@@ -869,6 +869,9 @@ thingContainsVar = getAny . bifoldMap (Any . countContainsVar) (const mempty) wh
         FinCount _n -> False
         _notFin -> True
 
+getBoundVars :: (Bifoldable p) => p Count b -> [BoundVar] 
+getBoundVars = bifoldMap getCountBVs (const mempty) where 
+  getCountBVs (Count _n _as xs) = keys xs 
 
 guessAndProveWhatHappensNext :: (TapeSymbol s) => Turing -> SkipBook s -> Config Count s
   -> SymbolVar -> [(Skip Count s, SkipOrigin s)]

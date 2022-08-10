@@ -43,11 +43,16 @@ obtainMachineConfigs :: forall s. (TapeSymbol s) => Int -> Turing
   -> Either Text (Phase,  [(Int, (Phase, ExpTape s InfCount))])
 obtainMachineConfigs = (obtainCriticalIndicesConfigs . fst) .: getTwoHistAfterTime
 
-obtainHistorySlices :: forall s. (TapeSymbol s) => Int -> Turing
+obtainHistorySlices' :: forall s. (TapeSymbol s) => Int -> Turing
   -> Either Text (NonEmpty (Int, Int, [(Int, Phase, ExpTape s InfCount, ReadShift)]))
-obtainHistorySlices limit m = do
-  let (th@(TapeHist tapeHist), ReadShiftHist readShiftHist) = getTwoHistAfterTime limit m
-      labelledTapeHist = zip [0, 1..] tapeHist
+obtainHistorySlices' limit m = let (th, rsh) = getTwoHistAfterTime limit m in 
+  obtainHistorySlices th rsh
+
+
+obtainHistorySlices  :: forall s. (TapeSymbol s) => TapeHist s InfCount -> ReadShiftHist
+  -> Either Text (NonEmpty (Int, Int, [(Int, Phase, ExpTape s InfCount, ReadShift)]))
+obtainHistorySlices th@(TapeHist tapeHist) (ReadShiftHist readShiftHist) = do 
+  let labelledTapeHist = zip [0, 1..] tapeHist
   machineConfigs <- obtainCriticalIndicesConfigs th
   -- TODO: trying drop 1 to fix startup effects
   let indices = drop 1 $ fst <$> snd machineConfigs
@@ -81,10 +86,16 @@ numToLet :: Int -> Char
 numToLet i = ab U.!! i where 
   ab = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
-filteredHistories :: forall s. (TapeSymbol s) => Int -> Turing
+filterHistories' :: forall s. (TapeSymbol s) => Int -> Turing
   -> Either Text (NonEmpty (Int, Int, [(Char, Int, Phase, ExpTape s InfCount, ReadShift)]))
-filteredHistories limit m = do 
-  historySlices <- obtainHistorySlices limit m 
+filterHistories' limit m = do 
+  historySlices <- obtainHistorySlices' limit m 
+  pure $ filterHistories historySlices 
+  
+filterHistories :: Ord s
+  => NonEmpty (Int, Int, [(Int, Phase, ExpTape s InfCount, ReadShift)])
+  -> NonEmpty (Int, Int, [(Char, Int, Phase, ExpTape s InfCount, ReadShift)])
+filterHistories historySlices =   
   let sigsWhichOccurred = obtainSigsWhichOccur historySlices 
       sigsToLetters = M.fromList . fmap (second numToLet) . flip zip [0, 1..] .  S.toList $ sigsWhichOccurred
       third f (x, y, z) = (x, y, f z)
@@ -94,8 +105,9 @@ filteredHistories limit m = do
           Just ch -> Just (ch, s, ph, tape, rs) 
         ))
         <$> historySlices 
-  trace ("sigs to letters: " <> showP (M.assocs sigsToLetters)) $ pure filteredHist 
-  
+  in 
+    filteredHist 
+
 
 commonPrefix :: NonEmpty [Char] -> [Char] 
 commonPrefix strings = takeExact lastValid $ head strings where 
@@ -103,11 +115,11 @@ commonPrefix strings = takeExact lastValid $ head strings where
     isValid i = allEqual $ toList $ takeExact i <$> strings 
     lastValid = U.last $ takeWhile isValid [0.. longestStringLen]
 
-scaffoldHypotheses :: forall s. (TapeSymbol s) 
+makeScaffoldHypotheses :: forall s. (TapeSymbol s) 
     => NonEmpty (Int, Int, [(Char, Int, Phase, ExpTape s InfCount, ReadShift)])
     -> NonEmpty (Int, Int, [(Int, Phase, ExpTape s InfCount, ReadShift)])
     -> [Skip Count s]
-scaffoldHypotheses filteredHist unfilteredHist 
+makeScaffoldHypotheses filteredHist unfilteredHist 
   = theAssert $ mapMaybe rightToMaybe $ toList generalizedHistories 
   where 
     alphabets = (\(_a,_b,c) -> c) <$> ((\(a,_b,_c,_d, _e) -> a) <$$$> filteredHist)
@@ -146,3 +158,24 @@ scaffoldHypotheses filteredHist unfilteredHist
     guessHists = makeGuessHist <$> [0, 1.. length (lrmostPrefixSuffixes ^. ix 0 . _3)] 
         <*> [0, 1.. length (lrmostPrefixSuffixes ^. ix 0 . _4)]
     generalizedHistories = generalizeHistories <$> guessHists 
+
+proveByScaffold :: forall s. (TapeSymbol s) => Turing -> SkipBook s 
+    -> TapeHist s InfCount -> ReadShiftHist 
+    -> Either Text (Skip Count s) 
+proveByScaffold machine book th rsh = do 
+    unfilteredHistories <- obtainHistorySlices th rsh 
+    let filteredHistories = filterHistories unfilteredHistories
+        scaffoldHypothesis = makeScaffoldHypotheses filteredHistories unfilteredHistories
+        mbProofs =
+            (\s -> rightToMaybe $ (s,) <$> proveInductively 110 machine book s (getVar s)) 
+            <$> scaffoldHypothesis
+    fmap fst $ failMsg "no proof succeeded" $ viaNonEmpty head $ catMaybes mbProofs
+    
+    where 
+      getVar :: Skip Count s -> BoundVar 
+      getVar skip = let bvs = getBoundVars skip in 
+        (if length bvs > 1 
+            then trace ("machine: " <> showP machine <> "skip:" <> showP skip 
+                        <> "bvs:" <> show bvs) 
+            else id) 
+        U.head bvs 
