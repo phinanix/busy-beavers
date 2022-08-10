@@ -684,7 +684,7 @@ replaceSymbolVarInConfig runAssert config sv ans
           (Count _n as _xs) -> has (ix sv) as
 
 generalizeHistories :: forall s. (TapeSymbol s) 
-  => NonEmpty (Natural, [(Phase, ExpTape s Count)], [ReadShift])
+  => NonEmpty (Natural, [(Phase, ExpTape s InfCount)], [ReadShift])
   -> Either Text (Skip Count s)
 generalizeHistories simWithNums = res where
   --simNums :: NonEmpty Natural
@@ -729,7 +729,7 @@ generalizeHistories simWithNums = res where
   res = do
       let slicedPairs :: NonEmpty (ExpTape s Count, ExpTape s Count)
           slicedPairs = let
-            ans = (\(hist, rSs) -> getReadShiftSlicePairC hist rSs 0 (length hist - 1)) <$>
+            ans = (\(hist, rSs) -> getReadShiftSlicePair hist rSs 0 (length hist - 1)) <$>
               sims
             msg = "slicedPairs were:\n" <> show (pretty ans)
             in
@@ -816,7 +816,8 @@ guessWhatHappensNext machine startConfig varToGeneralize
         ans
     --generalizes an ending signature if possible
     generalizeOneSig :: (Phase, Signature s) -> Maybe (Skip Count s)
-    generalizeOneSig pSig = rightToMaybe $ generalizeHistories simPairs
+    generalizeOneSig pSig = rightToMaybe $ generalizeHistories 
+      $ simPairs
       where
         munge :: [(Phase, ExpTape s Count)] -> (Int, (Phase, ExpTape s Count))
         munge hist = case findIndex (\(p, t) -> (p, tapeSignature t) == pSig) hist of
@@ -831,8 +832,10 @@ guessWhatHappensNext machine startConfig varToGeneralize
           -- trace msg 
                 ans
         finalIndices = view _1 <$> finalIndexAndConfig
-        simPairs :: NonEmpty (Natural, [(Phase, ExpTape s Count)], [ReadShift])
-        simPairs = fmap (\(x, (y, z)) -> (x, y, z)) $ neZipExact numsToSimulateAt $ 
+        munge2 ::  NonEmpty (Natural, [(Phase, ExpTape s Count)], [ReadShift]) ->  NonEmpty (Natural, [(Phase, ExpTape s InfCount)], [ReadShift])
+        munge2 = (fmap . second3 . fmap . fmap . second) NotInfinity
+        simPairs :: NonEmpty (Natural, [(Phase, ExpTape s InfCount)], [ReadShift])
+        simPairs = munge2 $ fmap (\(x, (y, z)) -> (x, y, z)) $ neZipExact numsToSimulateAt $ 
           (\(i, (th, rsh)) -> (takeExact (i+1) th, takeExact (i+1) rsh)) 
           <$> neZipExact finalIndices simsAtNums
 

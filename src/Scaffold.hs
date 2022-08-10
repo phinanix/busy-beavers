@@ -7,6 +7,7 @@ import Prettyprinter
 import Control.Exception (assert)
 import Data.List (minimum, maximum) 
 
+import qualified Data.List.NonEmpty as NE 
 import qualified Data.Map as M
 import qualified Data.Set as S
 
@@ -21,6 +22,7 @@ import TapeSymbol
 import ExpTape
 import Util 
 import Safe.Exact
+import Relude.Extra (bimapBoth)
 
 
 {-
@@ -103,8 +105,11 @@ commonPrefix strings = takeExact lastValid $ head strings where
 
 scaffoldHypotheses :: forall s. (TapeSymbol s) 
     => NonEmpty (Int, Int, [(Char, Int, Phase, ExpTape s InfCount, ReadShift)])
+    -> NonEmpty (Int, Int, [(Int, Phase, ExpTape s InfCount, ReadShift)])
     -> [Skip Count s]
-scaffoldHypotheses filteredHist = theAssert trace (showP guessPairs) undefined where 
+scaffoldHypotheses filteredHist unfilteredHist 
+  = theAssert $ mapMaybe rightToMaybe $ toList generalizedHistories 
+  where 
     alphabets = (\(_a,_b,c) -> c) <$> ((\(a,_b,_c,_d, _e) -> a) <$$$> filteredHist)
     prefix = commonPrefix alphabets 
     suffix = reverse $ commonPrefix $ reverse <$> alphabets
@@ -123,12 +128,21 @@ scaffoldHypotheses filteredHist = theAssert trace (showP guessPairs) undefined w
         <$> prefixSuffixPairs
     theAssert = let thing = (\(_, _, p, s) -> (view _1 <$> p, view _1 <$> s)) <$> lrmostPrefixSuffixes in 
         assert $ allEqual $ toList thing
-        
-    makePair s e = (\(_, _, ps, ss) -> (ps U.!! s, ss U.!! e))<$> prefixSuffixPairs
-    --this is a list of guesses. where each guess is a nonempty list of the "examples"
-    -- we've seen of that guess. 
-    guessPairs :: [NonEmpty ((Char, Int, Phase, ExpTape s InfCount, ReadShift), 
-                             (Char, Int, Phase, ExpTape s InfCount, ReadShift))]
-    guessPairs = makePair <$> [0, 1.. length (lrmostPrefixSuffixes ^. ix 0 . _3)] 
-        <*> [0, 1.. length (lrmostPrefixSuffixes ^. ix 0 . _4)]
     
+
+    makePair s e = (\(_, _, ps, ss) -> (ps U.!! s, ss U.!! e)) <$> prefixSuffixPairs
+    makeGuessHist :: Int -> Int -> NonEmpty (Natural, [(Phase, ExpTape s InfCount)], [ReadShift])
+    makeGuessHist s e = fmap (\(x, (y, z)) -> (x, y, z)) . NE.zip (3 :| [4,5..]) 
+      $ munge4 . sliceHist <$> histIndexPairs 
+      where 
+        listOfPairs = makePair s e 
+        indexPairs = bimapBoth (view _2) <$> listOfPairs 
+        histIndexPairs = neZipExact indexPairs (view _3 <$> unfilteredHist) 
+        sliceHist ((s, e), hist) = slice s e hist 
+        munge4 :: [(a,b,c,d)] -> ([(b,c)],[d])
+        munge4 = foldr (\(_a,b,c,d) (bcs, ds) -> ((b,c):bcs, d:ds)) ([],[])
+    --this is a list of guesses. where each guess is a nonempty list of the example
+    --histories we've seen corresponding to that guess. 
+    guessHists = makeGuessHist <$> [0, 1.. length (lrmostPrefixSuffixes ^. ix 0 . _3)] 
+        <*> [0, 1.. length (lrmostPrefixSuffixes ^. ix 0 . _4)]
+    generalizedHistories = generalizeHistories <$> guessHists 

@@ -144,3 +144,6 @@ intersectFold t = go $ toList t where
 
 third :: (a -> b) -> (x, y, a) -> (x, y, b)
 third f (x, y, a) = (x, y, f a)
+
+second3 :: (a -> b) -> (x, a, y) -> (x, b, y) 
+second3 f (x, a, y) = (x, f a, y)
