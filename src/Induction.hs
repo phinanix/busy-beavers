@@ -57,11 +57,11 @@ Shortrange plan to get a thing which can prove the counter machine into main
 --we need the current step for the haltproof
 --we always return the new book
 --we return either a haltproof, or a text saying how we failed
-proveInductivelyIMeanIT :: (TapeSymbol s, HasCallStack) => Turing -> SkipBook s -> Steps 
+proveInductivelyIMeanIT :: (TapeSymbol s, HasCallStack) => Turing -> SkipBook s -> Steps
     -> TapeHist s InfCount -> ReadShiftHist
     -> (SkipBook s, Either Text (Skip Count s))
 proveInductivelyIMeanIT machine book curStep hist rsHist
-  = force $ let indGuess = guessInductionHypothesis hist rsHist in 
+  = force $ let indGuess = guessInductionHypothesis hist rsHist in
   trace ("indGuess was: " <> showP indGuess) $ case indGuess of
     Left msg -> (book, Left $ "failed to guessIndHyp:\n" <> msg)
     Right indHyp -> let (newBook, tOrOrigin) = proveStrong 5 machine book indHyp (BoundVar 0) in
@@ -113,11 +113,11 @@ proveInductively :: forall s. (HasCallStack, TapeSymbol s)
   => Int -> Turing -> SkipBook s
   -> Skip Count s -> BoundVar
   -> Either (Text, Maybe (Config Count s)) (SkipOrigin s)
-proveInductively limit t book goal indVar 
-  = case proveInductivelyWithX 0 limit t book goal indVar of 
-    Right so -> Right so 
-    Left stuck -> case proveInductivelyWithX 1 limit t book goal indVar of 
-      Right so -> Right so 
+proveInductively limit t book goal indVar
+  = case proveInductivelyWithX 0 limit t book goal indVar of
+    Right so -> Right so
+    Left stuck -> case proveInductivelyWithX 1 limit t book goal indVar of
+      Right so -> Right so
       Left _stuckAgain -> Left stuck --we want the first stuckness, not the second one, usually
 
 {-
@@ -153,10 +153,10 @@ proveInductivelyWithX xPlus limit t book goal indVar = let
       Right _ -> case indCase of
         Left res -> Left $ first ("failed ind: " <>) res
         Right _ ->  pure origin
-  msg = ("trying to prove:\n" <> show (pretty goal)) 
-          <> "\n inducting on:" <> show indVar 
+  msg = ("trying to prove:\n" <> show (pretty goal))
+          <> "\n inducting on:" <> show indVar
           <> "\ngot res" <> showP ans <> "\nEOM\n"
-    in 
+    in
       force $
       trace msg $
       assert (isSameInAsOut goal && thingContainsVar goal) ans
@@ -168,7 +168,7 @@ proveInductivelyWithX xPlus limit t book goal indVar = let
     baseGoal :: Skip Count s
     baseGoal = replaceVarInSkip goal indVar $ finiteCount 1 --TODO, should be 1
     setStepCount steps skip = skip & hops .~ FinCount steps
-    goalPlusX x = setStepCount (120 + x) $ 
+    goalPlusX x = setStepCount (120 + x) $
       replaceVarInSkip goal indVar $ FinCount x <> symbolVarCount newSymbolVar 1
     indCase :: Either (Text, Maybe (Config Count s)) Natural
     --this doesn't actually add the inductive hypothesis to the book!
@@ -197,7 +197,7 @@ proveSimLinearAndTree :: (HasCallStack, TapeSymbol s) => Int -> Int -> Turing ->
   -> Skip Count s -> Either (Text, Maybe (Config Count s)) Natural
 -- simulateViaDFS :: Int -> Int -> SkipBook Bit -> Skip Count Bit -> Either Text Natural 
 proveSimLinearAndTree linStep treeStep machine book skip
-  = 
+  =
     --force $ 
   --trace ("--------\n\n\n\n\n-----------\ntrying to prove: " <> showP skip) $
   --TODO: why is it linStep treeStep fed as the limits to simulateViaDFS
@@ -286,7 +286,7 @@ proveBySimulating limit t book (Skip start skipEnd _) = case skipEnd of
       --we have to check the limit before checking for success, 
       --because we don't want to succeed in 101 steps if the limit is 100 steps
       | numSteps > limit = Left ("exceeded limit while simulating", Nothing)
-      | indMatch p tape (ph, tp) = pure numSteps 
+      | indMatch p tape (ph, tp) = pure numSteps
       | otherwise = case skipStep t book p tape of
             Unknown e -> Left ("hit unknown edge" <> show e, Nothing)
             Stopped {} -> Left ("halted while simulating", Nothing)
@@ -296,7 +296,7 @@ proveBySimulating limit t book (Skip start skipEnd _) = case skipEnd of
                 msg = "machine stuck on step: " <> show numSteps
                   <> " in phase:" <> show p
                   <> "\ncur tape:" <> dispExpTape tape
-                  <> "\ngoal:" <> show (pretty (ph, tp)) <> "\nend of goal" 
+                  <> "\ngoal:" <> show (pretty (ph, tp)) <> "\nend of goal"
                 in
                 Left (msg, Just stuckConfig)
             Stepped Infinity _ _ _ _ _ -> Left ("hopped to infinity", Nothing)
@@ -328,11 +328,11 @@ proveBySimulating limit t book (Skip start skipEnd _) = case skipEnd of
         mbdeInfCount (NotInfinity c) = Just c
 
 --TODO, it's really dumb we have to "deInfCount here"
-getNextConfigs :: forall s. (Ord s, Pretty s, Show s) 
+getNextConfigs :: forall s. (Ord s, Pretty s, Show s)
   => SkipBook s -> Config Count s -> [Config Count s]
 getNextConfigs book curConfig = ans
  where
-  f = if any thingContainsVar skipsUsed then trace msg else id 
+  f = if any thingContainsVar skipsUsed then trace msg else id
   msg = ("skips used:\n" <> showP skipsUsed)
   skipsUsed = mapMaybe getSkip choices
   ans =  first deInfCount <$> mapMaybe getConfig choices
@@ -341,9 +341,9 @@ getNextConfigs book curConfig = ans
     Stepped _ ph newTape _ _ _ -> Just $ etToConfig ph newTape
     _ -> Nothing
   getSkip ::  PartialStepResult InfCount s -> Maybe (Skip Count s)
-  getSkip = \case 
+  getSkip = \case
     Stepped _ _ _ skip _ _ -> Just skip
-    _ -> Nothing 
+    _ -> Nothing
   choices :: [PartialStepResult InfCount s]
   --flip since sort gives smallest to largest by default but we want the largest skip first
   choices = sortBy (flip skipPrecedence)
@@ -360,9 +360,9 @@ simulateViaDFS stepLim depthLim book (Skip startConfig skipEnd _hops)
   Right NoSuccess -> Left "dfs exhaustively searched with no results"
   Left message -> Left $ "failed dfs: " <> message
   where
-    target = case skipEnd of 
-      SkipStepped ph (Middle et) -> Just $ etToConfig ph et 
-      _ -> Nothing 
+    target = case skipEnd of
+      SkipStepped ph (Middle et) -> Just $ etToConfig ph et
+      _ -> Nothing
     res = case target of
       Nothing -> Left "target skip did not endmiddle"
       Just endConfig -> dfs stepLim depthLim (getNextConfigs book) (== endConfig) startConfig
@@ -416,24 +416,24 @@ simplestNSigs n hist = take (fromIntegral n) $
     sortBy (compare `on` signatureComplexity . snd) $
     possibleSignatures hist
 
-orderSignatures :: Signature s -> Signature s -> Ordering 
-orderSignatures s t = case (compare `on` signatureComplexity) s t of 
+orderSignatures :: Signature s -> Signature s -> Ordering
+orderSignatures s t = case (compare `on` signatureComplexity) s t of
   LT -> LT
-  GT -> GT 
-  EQ -> case (compare `on` leftLen) s t of 
+  GT -> GT
+  EQ -> case (compare `on` leftLen) s t of
     LT -> LT
     GT -> GT
     EQ -> (compare `on` rightLen) s t
-  where 
-    leftLen (Signature ls _p _rs) = length ls 
-    rightLen (Signature _ls _p rs) = length rs 
+  where
+    leftLen (Signature ls _p _rs) = length ls
+    rightLen (Signature _ls _p rs) = length rs
 
 --given a history, guesses a "critical configuration" 
 -- a simple tape appearance the machine repeatedly returns to
 guessCriticalConfiguration :: (Ord s, Show s, Pretty s) => [(Phase, ExpTape s InfCount)] -> Either Text (Phase, Signature s)
 guessCriticalConfiguration hist = case possibleSignatures hist of
   [] -> Left "no possible criticalconfigs"
-  xs -> trace ("possible sigs: " <> showP (nubOrd (filter (\x -> signatureComplexity (snd x) <= 5) xs))) $ 
+  xs -> trace ("possible sigs: " <> showP (nubOrd (filter (\x -> signatureComplexity (snd x) <= 5) xs))) $
     Right $ minimumBy (orderSignatures `on` snd) xs
 
 -- given a particular config, return the list of times that config occurred, plus the integer position in the original list
@@ -445,19 +445,19 @@ obtainConfigIndices hist config
 --given a tape history and a readshift history corresponding to what was read at each 
 --transition, plus two indicies, obtain the slices that were read + written from the 
 --beginning to the end
-getReadShiftSlicePair :: (Eq s) => [(Phase, ExpTape s InfCount)] -> [ReadShift] -> Int -> Int 
+getReadShiftSlicePair :: (Eq s) => [(Phase, ExpTape s InfCount)] -> [ReadShift] -> Int -> Int
   -> (ExpTape s Count, ExpTape s Count)
-getReadShiftSlicePair hist rSs start end = (startSlice, endSlice) where 
+getReadShiftSlicePair hist rSs start end = (startSlice, endSlice) where
     startTape = hist ^?! ix start . _2
     endTape = hist ^?! ix end . _2
     (ReadShift lenL lenR shiftDist) = mconcat (slice start (end-1) rSs)
-    startSlice = sliceExpTape startTape lenL lenR 
+    startSlice = sliceExpTape startTape lenL lenR
     --because if you go 5 steps right, you need to slice 5 less distance to the right and
     --5 more distance left
     endSlice = sliceExpTape endTape (lenL - shiftDist) (lenR - shiftDist)
 
-getReadShiftSlicePairC :: (Eq s) => [(Phase, ExpTape s Count)] -> [ReadShift] -> Int -> Int -> (ExpTape s Count, ExpTape s Count) 
-getReadShiftSlicePairC hist = getReadShiftSlicePair ((fmap $ fmap $ second NotInfinity) hist) 
+getReadShiftSlicePairC :: (Eq s) => [(Phase, ExpTape s Count)] -> [ReadShift] -> Int -> Int -> (ExpTape s Count, ExpTape s Count)
+getReadShiftSlicePairC hist = getReadShiftSlicePair ((fmap $ fmap $ second NotInfinity) hist)
 
 --given a list of displacements and a start and end index, return the maximum 
 --left and rightward displacements that occured between the two indices, inclusive 
@@ -514,24 +514,25 @@ calcCommonSig (Signature ls1 p1 rs1) (Signature ls2 p2 rs2) = -- trace ("commons
     check dl dr = do
       (ls1', ls2') <- dropFunc dl (ls1, ls2)
       (rs1', rs2') <- dropFunc dr (rs1, rs2)
-      let newStart = Signature ls1' p1 rs1' 
+      let newStart = Signature ls1' p1 rs1'
           newEnd = Signature ls2' p2 rs2'
       if newStart == newEnd then Just (dl, dr) else Nothing
     dropFunc :: Drop -> ([s], [s]) -> Maybe ([s], [s])
-    dropFunc = \case 
-      NoDrop -> pure 
-      StartDrop -> firstT dropList 
-      EndDrop -> secondT dropList 
+    dropFunc = \case
+      NoDrop -> pure
+      StartDrop -> firstT dropList
+      EndDrop -> secondT dropList
     dropList = viaNonEmpty init
 
 
 --if we have to drop one or both of of the end bits of the start signature, then to compensate we will add
 --a zero to the end signature in the places we drop the bits 
-addZeros :: (Drop, Drop) -> (([Count], [Count]), ([Count], [Count])) -> (([Count], [Count]), ([Count], [Count]))
-addZeros (dl, dr) ((s_ls, s_rs), (e_ls, e_rs)) = let 
-    (s_ls', e_ls') = addFunc dl (s_ls, e_ls) 
+addZeros :: (Drop, Drop) -> (([Count], [Count]), ([Count], [Count]))
+                         -> (([Count], [Count]), ([Count], [Count]))
+addZeros (dl, dr) ((s_ls, s_rs), (e_ls, e_rs)) = let
+    (s_ls', e_ls') = addFunc dl (s_ls, e_ls)
     (s_rs', e_rs') = addFunc dr (s_rs, e_rs)
-   in 
+   in
     ((s_ls', s_rs'), (e_ls', e_rs'))
    where
     appendZero xs = xs <> [Empty]
@@ -539,30 +540,30 @@ addZeros (dl, dr) ((s_ls, s_rs), (e_ls, e_rs)) = let
     --because you are adding a zero. so if we dropped something from the start, then we 
     --want to add a zero to the end. 
     addFunc :: Drop -> ([Count], [Count]) -> ([Count], [Count])
-    addFunc = \case 
-      NoDrop -> id 
-      StartDrop -> second appendZero 
-      EndDrop -> first appendZero 
+    addFunc = \case
+      NoDrop -> id
+      StartDrop -> second appendZero
+      EndDrop -> first appendZero
 
 --I have no idea how to write this function
 generalizeFromExamples :: [(ExpTape Bit Count, ExpTape Bit Count)] -> Maybe (Skip Count Bit)
 generalizeFromExamples slicePairs = undefined
 
 
-obtainCriticalIndicesConfigs :: (TapeSymbol s) => TapeHist s InfCount 
+obtainCriticalIndicesConfigs :: (TapeSymbol s) => TapeHist s InfCount
   -> Either Text (Phase, [(Int, (Phase, ExpTape s InfCount))])
-obtainCriticalIndicesConfigs (TapeHist hist) = do 
+obtainCriticalIndicesConfigs (TapeHist hist) = do
   criticalConfig@(criticalPhase, _criticalSignature) <- guessCriticalConfiguration hist
   let
     configIndicesAndConfigs = let ans = obtainConfigIndices hist criticalConfig in
-      trace ("configs were:\n" <> showP ans) 
+      trace ("configs were:\n" <> showP ans)
       ans
   pure (criticalPhase, configIndicesAndConfigs)
 
 guessInductionHypothesis :: (TapeSymbol s) => TapeHist s InfCount -> ReadShiftHist
   -> Either Text (Skip Count s)
 guessInductionHypothesis th rsh = force $ do
-  (criticalPhase, configIndicesAndConfigs) <- obtainCriticalIndicesConfigs th 
+  (criticalPhase, configIndicesAndConfigs) <- obtainCriticalIndicesConfigs th
   let
     indGuess = case guessInductionHypWithIndices th rsh criticalPhase configIndicesAndConfigs of
       Right ans -> Right ans
@@ -570,9 +571,9 @@ guessInductionHypothesis th rsh = force $ do
       --24 jul 22  update is that it is no longer necessary, so I got rid of it, but we'll see what 
       --happens in the future
       Left msg -> guessInductionHypWithIndices th rsh criticalPhase (Unsafe.tail $ Unsafe.tail configIndicesAndConfigs)
-    in 
-     trace ("guessed indhyp:\n" <> showP indGuess) 
-     $ assert ((thingContainsVar <$> indGuess) /= Right False) 
+    in
+     trace ("guessed indhyp:\n" <> showP indGuess)
+     $ assert ((thingContainsVar <$> indGuess) /= Right False)
      indGuess
 
 guessInductionHypWithIndices :: (Pretty s, Eq s) => TapeHist s InfCount -> ReadShiftHist -> Phase -> [(Int, (Phase, ExpTape s InfCount))] -> Either Text (Skip Count s)
@@ -583,7 +584,7 @@ guessInductionHypWithIndices (TapeHist hist) (ReadShiftHist rsHist) criticalPhas
       ans
     indexPairs = zipExact (U.init configIndices) (U.tail configIndices)
     slicePairs = let ans = uncurry (getReadShiftSlicePair hist rsHist) <$> indexPairs in
-      trace ("slicepairs were:\n" <> showP ans) 
+      trace ("slicepairs were:\n" <> showP ans)
       ans
     allSigs = let ans = fmap (bimapBoth tapeSignature) slicePairs in
       --trace ("allsigs were: " <> showP ans) 
@@ -682,6 +683,92 @@ replaceSymbolVarInConfig runAssert config sv ans
         countContainsSymbolVar sv = \case
           (Count _n as _xs) -> has (ix sv) as
 
+generalizeHistories :: forall s. (TapeSymbol s) 
+  => NonEmpty (Natural, [(Phase, ExpTape s Count)], [ReadShift])
+  -> Either Text (Skip Count s)
+generalizeHistories simWithNums = res where
+  --simNums :: NonEmpty Natural
+  simNums = view _1 <$> simWithNums 
+  sims = (\(_x, y, z) -> (y, z)) <$> simWithNums
+  startPhases = flip (^?!) (_1 . ix 0 . _1) <$> sims
+  startPhase = guardMsg (list1AllEqual startPhases) "start phases not equal" $> head startPhases 
+  finalPhases = flip (^?!) (_1 . _last . _1) <$> sims
+  finalPhase = guardMsg (list1AllEqual finalPhases) "end phases not equal" $> head finalPhases
+  --the problem is these slicedpairs may not all have the same signature as the original thing 
+  --which we are trying to generalize
+
+  --generalizes against the numsToSimulateAt from above 
+
+  --the outer maybe is in case we fail. the inner maybe is because sometimes we don't generalize against the simnum at all, 
+  --in which case the simnum is irrelevant 
+  generalizeCL :: Partial => NonEmpty Count -> Either Text (Maybe Count, Count)
+  generalizeCL cl = if list1AllEqual cl
+      then Right (Nothing, head cl)
+      --the problem with discarding the fst element of this pair, is that if you generalize (3,1) (4,2), then the first
+      --the pair is (x + 2, x), but by discarding the first element, you're implcitly assuming it's x, more-or-less, so 
+      --that ends up not working 
+      else let
+        ans = first pure <$> generalizeFromCounts (neZipExact (FinCount <$> simNums) cl)
+        msg = "generalized:" <> show (pretty cl) <> "\ngot\n" <> show (pretty ans)
+      in
+        -- trace msg 
+        ans
+  {-algorithm:
+  first, generalize all the counts to pairs, with the simnum we put in. you 
+  might think we're done now, and we just want the second number of this pair. 
+  I also thought this, but that is not correct, because in the two pairs 
+  (x, x) (x + 2, x), that second x does not mean the same thing!
+  therefore, the second thing to do is to make a big list of all the first 
+  elements of the pairs, and calculate their "maximum" (smallest thing you 
+  can add something to all of them to get). Third, map across all the pairs 
+  again, adding to both elements whatever it takes to get the first element 
+  to the maximum, and then discarding the first element, to leave just the 
+  second element. 
+  -}
+  bigTraverse = bitraverseBoth . bitraverseBoth . traverse
+  res = do
+      let slicedPairs :: NonEmpty (ExpTape s Count, ExpTape s Count)
+          slicedPairs = let
+            ans = (\(hist, rSs) -> getReadShiftSlicePairC hist rSs 0 (length hist - 1)) <$>
+              sims
+            msg = "slicedPairs were:\n" <> show (pretty ans)
+            in
+            --trace msg 
+              ans
+          countLists :: NonEmpty (([Count], [Count]), ([Count], [Count]))
+          countLists = fmap (bimapBoth getCounts) slicedPairs
+          flippedCountLists = transposeOverTwoPairs countLists
+      countPairLists <- --trace ("flipcountls" <> showP flippedCountLists) 
+        bigTraverse generalizeCL flippedCountLists
+      let listOfFirstElements = (bifoldMapBoth . bifoldMapBoth . foldMap) 
+            (maybeToList . fst) countPairLists
+          --todo does this do the right thing
+          maxFirstElt = case listOfFirstElements of
+            [] -> error "empty list of first elements"
+            (x : xs) -> maximum listOfFirstElements
+      ((s_cls, s_crs), (e_cls, e_crs)) <- 
+        bigTraverse (resolveCountPair maxFirstElt) countPairLists  
+      s_ph <- startPhase        
+      e_ph <- finalPhase
+      let startSignatures = tapeSignature . fst <$> slicedPairs
+          endSignatures = tapeSignature . snd <$> slicedPairs
+      --after you slice them, they may no longer all be the same signature
+      --for now, lets just assume they are
+      guardMsg (list1AllEqual startSignatures && list1AllEqual endSignatures) "all sigs not equal"
+      let startSig = head startSignatures
+          endSig = head endSignatures
+          guessedStartConfig = etToConfig s_ph $ zipSigToET startSig (s_cls, s_crs)
+          skipOut = Skip
+            guessedStartConfig
+            (SkipStepped e_ph $ Middle $ zipSigToET endSig (e_cls, e_crs))
+            (FinCount 100)  --TODO
+          msg = "guessedWhatsNext " <> showP skipOut
+      --force $ trace msg $ 
+      assert (isSameInAsOut skipOut) $
+        pure skipOut
+
+
+
 {-takes in a machine, a tape configuration, and a symbolvar present in that tape configuration 
 to generalize over. attempts to generate a skip with that config as a starting point
 algorithm: instatiate the variable at several values, simulate forward a bunch of steps
@@ -692,11 +779,11 @@ generates the coefficients of 0 1 and 0 from the instantiated symbolvar)
 right now generalizeFromCounts returns always (BoundVar 0), so as a hack we're going to change 
 the symbolvar in the input config to be (BoundVar 0) also so it is the same
 
-a lot of the possible "guesswhathappensnext"s are true but are once again not proveable via weak induction, so 
-we're going to return a list of them instead, in the hopes that one works
+a lot of the possible "guesswhathappensnext"s are true but are once again not proveable via weak 
+induction, so we're going to return a list of them instead, in the hopes that one works
 for now, lets do all of the ones that have the same signature complexity as the minimum
 -}
-guessWhatHappensNext :: forall s. (TapeSymbol s) 
+guessWhatHappensNext :: forall s. (TapeSymbol s)
   => Turing -> Config Count s -> SymbolVar -> [Skip Count s]
 guessWhatHappensNext machine startConfig varToGeneralize
  = mapMaybe generalizeOneSig (--force $ 
@@ -729,10 +816,10 @@ guessWhatHappensNext machine startConfig varToGeneralize
         ans
     --generalizes an ending signature if possible
     generalizeOneSig :: (Phase, Signature s) -> Maybe (Skip Count s)
-    generalizeOneSig psb@(_p, sigToGeneralize) = --force $ --trace ("generalizing\n" <> show sigToGeneralize)
-      res where
+    generalizeOneSig pSig = rightToMaybe $ generalizeHistories simPairs
+      where
         munge :: [(Phase, ExpTape s Count)] -> (Int, (Phase, ExpTape s Count))
-        munge hist = case findIndex (\(p, t) -> (p, tapeSignature t) == psb) hist of
+        munge hist = case findIndex (\(p, t) -> (p, tapeSignature t) == pSig) hist of
             Nothing -> error "there was nothing with a signature we checked is in everything"
             Just i -> (i, hist !! i)
         --for each hisory, the time at which the signature occured, and the simstate at that point
@@ -744,93 +831,10 @@ guessWhatHappensNext machine startConfig varToGeneralize
           -- trace msg 
                 ans
         finalIndices = view _1 <$> finalIndexAndConfig
-        finalPhases = view (_2 . _1) <$> finalIndexAndConfig
-        finalPhase :: Maybe Phase
-        finalPhase = guard (list1AllEqual finalPhases) $> head finalPhases
-        --the problem is these slicedpairs may not all have the same signature as the original thing 
-        --which we are trying to generalize
-        --generalizes against the numsToSimulateAt from above 
-        --the outer maybe is in case we fail. the inner maybe is because sometimes we don't generalize against the simnum at all, 
-        --in which case the simnum is irrelevant 
-        generalizeCL :: Partial => NonEmpty Count -> Maybe (Maybe Count, Count)
-        generalizeCL cl = if list1AllEqual cl
-            then Just (Nothing, head cl)
-            --the problem with discarding the fst element of this pair, is that if you generalize (3,1) (4,2), then the first
-            --the pair is (x + 2, x), but by discarding the first element, you're implcitly assuming it's x, more-or-less, so 
-            --that ends up not working 
-            else let
-              f = (FinCount <$> numsToSimulateAt)
-              s = cl
-              m1 = "zipping:" <> showP f <> " " <> showP s
-              ans =
-                --trace m1 $ 
-                first pure <$> generalizeFromCounts (neZipExact f s)
-              msg = "generalized:" <> show (pretty cl) <> "\ngot\n" <> show (pretty ans)
-            in
-              -- trace msg 
-              rightToMaybe ans
-        {-algorithm:
-        first, generalize all the counts to pairs, with the simnum we put in. you might think we're done now, and we just want the 
-        second number of this pair. I also thought this, but that is not correct, because in the two pairs (x, x) (x + 2, x), that
-        second x does not mean the same thing!
-        therefore, the second thing to do is to make a big list of all the first elements of the pairs, and calculate their 
-        "maximum" (smallest thing you can add something to all of them to get). 
-        Third, map across all the pairs again, adding to both elements whatever it takes to get the first element to the maximum, and 
-        then discarding the first element, to leave just the second element. 
-        -}
-        bigTraverse = bitraverseBoth . bitraverseBoth . traverse
-        --bigMap = bimapBoth . bimapBoth . fmap
-        --transposedCountLists = bitraverseBoth (bitraverseBoth (traverse generalizeCL)) flippedCountLists
-        res = do
-            let slicedPairs :: NonEmpty (ExpTape s Count, ExpTape s Count)
-                slicedPairs = let
-                  -- TODO: getting pairs via displacement doesn't work with TwoBits, update it
-                  -- to use ReadShifts!
-                  ans = (\(i, (hist, rSs)) -> getReadShiftSlicePairC hist rSs 0 i) <$>
-                    neZipExact finalIndices simsAtNums
-                  msg = "slicedPairs were:\n" <> show (pretty ans)
-                  in
-                  --trace msg 
-                    ans
-                countLists :: NonEmpty (([Count], [Count]), ([Count], [Count]))
-                countLists = fmap (bimapBoth getCounts) slicedPairs
-                flippedCountLists = transposeOverTwoPairs countLists
-            --after you slice them, they may no longer all be the same signature
-            --for now, lets just assume they are
-            guard $ list1AllEqual $ fmap (bimapBoth tapeSignature) slicedPairs
-            countPairLists <- --trace ("flipcountls" <> showP flippedCountLists) 
-              bigTraverse generalizeCL flippedCountLists
-            let listOfFirstElements = (bifoldMapBoth . bifoldMapBoth . foldMap) (maybeToList . fst) countPairLists
-                --todo does this do the right thing
-                maxFirstElt = case listOfFirstElements of
-                  [] -> error "empty list of first elements"
-                  (x : xs) -> maximum listOfFirstElements
-            ((s_cls, s_crs), (e_cls, e_crs)) <- bigTraverse (resolveCountPair maxFirstElt) countPairLists
-            --todo, we probably shouldn't get the start counts from the aggregator, because that is kind of bad, compared to 
-            --getting them from the startConfig. the problem is, we also need to slice the startConfig somehow, and that's 
-            --actually quite hard. 
-            --actually not sure this is right on more consideration            
-            e_ph :: Phase <- finalPhase
-            let end_points = point . view (_2 . _2) <$> finalIndexAndConfig
-            guard $ list1AllEqual end_points
-            let startSignatures = tapeSignature . fst <$> slicedPairs
-                endSignatures = tapeSignature . snd <$> slicedPairs
-            guard $ list1AllEqual startSignatures && list1AllEqual endSignatures
-            let startSig = head startSignatures
-                endSig = head endSignatures
-                guessedStartConfig = etToConfig (startConfig ^. cstate) $ zipSigToET startSig (s_cls, s_crs)
-                skipOut = Skip
-                  (replaceSymbolVarInConfig False guessedStartConfig varToGeneralize (boundVarCount (BoundVar 0) 1))
-                  -- we have the e_cls and the e_crs, and we have psb which is the final phase 
-                  --and signature we're trying to generalize across, so we just need to write 
-                  -- Signature Bit -> ([Count], [Count]) -> ExpTape Bit Count with zipExact
-                  (SkipStepped e_ph $ Middle $ zipSigToET endSig (e_cls, e_crs))
-                  (FinCount 100)  --TODO
-                msg = "guessedWhatsNext " <> showP skipOut
-            assert (endSig `isSubSignatureOf` sigToGeneralize) $
-              --force $ trace msg $ 
-              assert (isSameInAsOut skipOut) $
-              pure skipOut
+        simPairs :: NonEmpty (Natural, [(Phase, ExpTape s Count)], [ReadShift])
+        simPairs = fmap (\(x, (y, z)) -> (x, y, z)) $ neZipExact numsToSimulateAt $ 
+          (\(i, (th, rsh)) -> (takeExact (i+1) th, takeExact (i+1) rsh)) 
+          <$> neZipExact finalIndices simsAtNums
 
 {- We're trying to get the first element of the pair to be target, which will require modifying 
 the second element, which we then return. if the first element is Nothing, it can be whatever and
@@ -838,13 +842,13 @@ thus we can just return the second element.
 To make the first element be equal to the target, we're going to try to substitute one variable 
 in the first element to be equal to some of the second variable 
 -}
-resolveCountPair :: Count -> (Maybe Count, Count) -> Maybe Count
+resolveCountPair :: Count -> (Maybe Count, Count) -> Either Text Count
 resolveCountPair target = \case
-  (Nothing, s) -> Just s
+  (Nothing, s) -> Right s
   (Just f@(OneVar n as k x), s) -> do
     let (Count m bs ys) = target --we're casing down here so we're lazy in target
         (_likes, _rL, remRight) = likeTerms (ZeroVar n as) (ZeroVar m bs)
-    countToMapTo <- (remRight <> Count 0 Empty ys) `divCount` k
+    countToMapTo <- failMsg "failed divide" $ (remRight <> Count 0 Empty ys) `divCount` k
     let updateMap = one (x, countToMapTo)
         updatedF = updateCount updateMap f
         updatedS = updateCount updateMap s
@@ -853,7 +857,7 @@ resolveCountPair target = \case
           <> " getting " <> showP (updatedF, updatedS)
     --trace msg $
     assert (updatedF == target) $ pure updatedS
-  (Just f, s) -> if f == target then Just s else error ("failed to resolve: " <> showP (target, f, s))
+  (Just f, s) -> if f == target then Right s else error ("failed to resolve: " <> showP (target, f, s))
 
 --skipContainsVar :: Skip Count Bit -> Bool
 thingContainsVar :: (Bifoldable p) => p Count b -> Bool
@@ -889,8 +893,8 @@ guessAndProveWhatHappensNext machine book startConfig varToGeneralize
 -- else give up 
 generalizeFromCounts :: NonEmpty (Count, Count) -> Either Text (Count, Count)
 generalizeFromCounts xs = case  allEqualPair <|> additivePair <|> affinePair of
-  Just x -> Right x 
-  Nothing -> Left $ "failed to generalize the pairs: " <> showP xs 
+  Just x -> Right x
+  Nothing -> Left $ "failed to generalize the pairs: " <> showP xs
   where
     allEqualPair :: Maybe (Count, Count)
     allEqualPair = guard (list1AllEqual xs) >> pure (head xs)
@@ -903,7 +907,7 @@ generalizeFromCounts xs = case  allEqualPair <|> additivePair <|> affinePair of
         ans = traverse (bitraverse countToMaybeNat countToMaybeNat) xs
         msg = "attempting to generalize these pairs:\n" <> show ans
      in
-        trace msg 
+        trace msg
         ans
     subNats :: Natural -> Natural -> Int
     subNats = (-) `on` fromIntegral

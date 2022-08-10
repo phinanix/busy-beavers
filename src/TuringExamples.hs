@@ -414,11 +414,13 @@ todo to develop induction algorithm
 
 - how to turn a scaffold into a set of proof goals: 
 1) find the common prefixes and suffixes of the characters the traces contain
-2) filter down to the points where the machine is at the furthest left or right it gets (RLE-wise)
+2) filter down to the points where the machine is at the furthest left or right it 
+gets (RLE-wise)
 3) for now, try all pairs of 1 thing from prefix & 1 thing from suffix
 4) given a set of history pairs, generalize it similarly to guessWhatHappensNext 
 5) attempt to prove it via induction
-6) once at least 1 induction succeeds, go back to trying to prove the full runForever without induction
+6) once at least 1 induction succeeds, go back to trying to prove the full runForever 
+   without induction
 
 this won't get everything, but it should get all the counters and plausibly other things
 -}

@@ -50,58 +50,6 @@ indGuessLoop limit = simOneFromStartLoop $
 makeIndGuess :: forall s. (TapeSymbol s) => Int -> Turing -> Either Text (Skip Count s)
 makeIndGuess = uncurry guessInductionHypothesis .: getTwoHistAfterTime
 
-obtainMachineConfigs :: forall s. (TapeSymbol s) => Int -> Turing
-  -> Either Text (Phase,  [(Int, (Phase, ExpTape s InfCount))])
-obtainMachineConfigs = (obtainCriticalIndicesConfigs . fst) .: getTwoHistAfterTime
-
-obtainHistorySlices :: forall s. (TapeSymbol s) => Int -> Turing
-  -> Either Text [(Int, Int, [(Int, Phase, ExpTape s InfCount, ReadShift)])]
-obtainHistorySlices limit m = do
-  let (th@(TapeHist tapeHist), ReadShiftHist readShiftHist) = getTwoHistAfterTime limit m
-      labelledTapeHist = zip [0, 1..] tapeHist
-  machineConfigs <- obtainCriticalIndicesConfigs th
-  -- TODO: trying drop 1 to fix startup effects
-  let indices = drop 1 $ fst <$> snd machineConfigs
-      pairedIndices = zip (U.init indices) (U.tail indices )
-  pure $ (\(s, e) -> (s, e, (\((w, (x, y)), z) -> (w, x, y, z)) <$> zip (slice s e labelledTapeHist) (slice s e readShiftHist)))
-        <$> pairedIndices
-
-obtainSigsWhichOccur :: (Ord s) => [(Int, Int, [(Int, Phase, ExpTape s InfCount, ReadShift)])]
- -> Set (Phase, Signature s)
-obtainSigsWhichOccur = intersectFold
-  . fmap (S.fromList . fmap makePhaseSig . getThird)
-  where
-  getThird (_a, _b, c) = c
-  makePhaseSig (_s, ph, tape, _rs) = (ph, tapeSignature tape)
-
-instance (Pretty a, Pretty b, Pretty c, Pretty d) => Pretty (a, b, c, d) where 
-  pretty (a, b, c, d) = "(" <> pretty a <> ", "
-   <> pretty b <> ", " 
-   <> pretty c <> ", "
-   <> pretty d <> ")"
-   
-numToLet :: Int -> Char
-numToLet i = ab U.!! i where 
-  ab = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-scaffoldV0 ::  forall s. (TapeSymbol s) => Int -> Turing
-  -> Either Text [(Int, Int, [(Char, Int, Phase, ExpTape s InfCount, ReadShift)])]
-scaffoldV0 limit m = do 
-  historySlices <- obtainHistorySlices limit m 
-  let sigsWhichOccurred = obtainSigsWhichOccur historySlices 
-      sigsToLetters = M.fromList . fmap (second numToLet) . flip zip [0, 1..] .  S.toList $ sigsWhichOccurred
-      third f (x, y, z) = (x, y, f z)
-      filteredHist = third (mapMaybe (\(s, ph, tape, rs) 
-        -> case sigsToLetters ^. at (ph, tapeSignature tape) of 
-          Nothing -> Nothing 
-          Just ch -> Just (ch, s, ph, tape, rs) 
-        ))
-        <$> historySlices 
-  trace ("sigs to letters: " <> showP (M.assocs sigsToLetters)) $ pure filteredHist 
-  
-
-
-
 getRecurRes :: Int -> Turing -> Maybe (HaltProof Bit)
 getRecurRes stepCount turing = detectLinRecurrence tapeHist rsHist where
   tapeHist = guessingState ^. s_history

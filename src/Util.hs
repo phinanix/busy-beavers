@@ -137,9 +137,10 @@ firstT f = bitraverse f pure
 secondT :: (Bitraversable t, Applicative f) => (b -> f d) -> t c b -> f (t c d)
 secondT = bitraverse pure 
 
-intersectFold :: (Ord a) => [Set a] -> Set a 
-intersectFold [] = Empty 
-intersectFold (x : xs) = foldr S.intersection x xs 
+intersectFold :: (Ord a, Foldable t) => t (Set a) -> Set a 
+intersectFold t = go $ toList t where 
+  go [] = Empty 
+  go (x : xs) = foldr S.intersection x xs 
 
 third :: (a -> b) -> (x, y, a) -> (x, y, b)
 third f (x, y, a) = (x, y, f a)

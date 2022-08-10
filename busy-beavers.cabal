@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a6392e3131d4d360295ed70a5a629042d1a8c3dfb951f8d4da18716d39090650
+-- hash: 72953e130a2812ae15a73451a124752bf2e5b863e19c01c1e8471a817261d9eb
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -43,6 +43,7 @@ library
       OuterLoop
       Parsing
       Results
+      Scaffold
       Simple.Display
       Simple.Simulate
       Simple.Tape

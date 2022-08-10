@@ -27,6 +27,8 @@ import SimulationLoops (simulateManyBasicLoop)
 import MoreSimulationLoops
 import Util
 import OuterLoop
+import Scaffold
+
 import System.IO (openFile, hGetContents, hClose)
 import Control.Exception
 
@@ -152,6 +154,8 @@ processMachinesViaArgs = do
 
 main :: IO ()
 main = do
+    let x = numToLet 5
+    putText (show x) 
     processMachinesViaArgs
   -- let results = Simulate.simulate 100 $ startMachine1 4
   -- simProgram dispTape results
