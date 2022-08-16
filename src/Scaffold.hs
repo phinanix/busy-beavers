@@ -57,7 +57,7 @@ obtainHistorySlices th@(TapeHist tapeHist) (ReadShiftHist readShiftHist) = do
   -- TODO: trying drop 1 to fix startup effects
   let indices = drop 1 $ fst <$> snd machineConfigs
       pairedIndices = zip (U.init indices) (U.tail indices)
-  nonemptyPairs <- trace ("pairedIndices" <> show pairedIndices <> "length" <> show (length labelledTapeHist) <> show (length readShiftHist) ) 
+  nonemptyPairs <- --trace ("pairedIndices" <> show pairedIndices <> "length" <> show (length labelledTapeHist) <> show (length readShiftHist) ) 
     failMsg (error "pairs were empty") $ nonEmpty pairedIndices
   --remember, the readshifts go between the tapes in the tapehist, so there is one less of them
   pure $ (\(s, e) -> (s, e, (\((w, (x, y)), z) -> (w, x, y, z)) <$> zip (slice s e labelledTapeHist) (slice s (e-1) readShiftHist)))
@@ -118,9 +118,9 @@ filterHistories historySlices =
 
 commonPrefix :: (Eq a) => NonEmpty [a] -> [a] 
 commonPrefix strings = takeExact lastValid $ head strings where 
-    longestStringLen = maximum1Of traverse1 $ length <$> strings 
+    shortestStringLen = minimum1Of traverse1 $ length <$> strings 
     isValid i = allEqual $ toList $ takeExact i <$> strings 
-    lastValid = U.last $ takeWhile isValid [0.. longestStringLen]
+    lastValid = U.last $ takeWhile isValid [0.. shortestStringLen]
 
 makeScaffoldHypotheses :: forall s. (TapeSymbol s) 
     => NonEmpty (Int, Int, [(SigID, Int, Phase, ExpTape s InfCount, ReadShift)])
@@ -158,22 +158,23 @@ makeScaffoldHypotheses filteredHist unfilteredHist
         if s_step <= e_step then Just (x, y) else Nothing 
       ) <%> lrmostPrefixSuffixes
     makeGuessHist :: Int -> Int -> Maybe (NonEmpty (Natural, [(Phase, ExpTape s InfCount)], [ReadShift]))
-    makeGuessHist s e = fmap (\(x, (y, z)) -> (x, y, z)) . NE.zip (3 :| [4,5..]) 
-      $ munge4 . sliceHist <$> histIndexPairs 
+    makeGuessHist s e = do 
+      listOfPairs <- makePair s e 
+      let indexPairs = --trace ("list of pairs:" <> showP listOfPairs) 
+           bimapBoth (view _2) <$> listOfPairs 
+          histIndexPairs = neZipExact indexPairs unfilteredHist
+      pure $ fmap (\(x, (y, z)) -> (x, y, z)) . NE.zip (3 :| [4,5..]) 
+        $ munge4 . sliceHist <$> histIndexPairs 
       where 
-        listOfPairs = makePair s e 
-        indexPairs = --trace ("list of pairs:" <> showP listOfPairs) 
-          bimapBoth (view _2) <$> listOfPairs 
-        histIndexPairs = neZipExact indexPairs unfilteredHist
-        sliceHist ((slice_start, slice_end), (hist_start, hist_end, hist)) = 
-          trace ("slice-ing" <> show (slice_start, slice_end) <> show (hist_start, hist_end))
+        sliceHist ((slice_start, slice_end), (hist_start, _hist_end, hist)) = 
+          --trace ("slice-ing" <> show (slice_start, slice_end) <> show (hist_start, hist_end))
           slice (slice_start - hist_start) (slice_end - hist_start) hist 
         munge4 :: [(a,b,c,d)] -> ([(b,c)],[d])
         munge4 = foldr (\(_a,b,c,d) (bcs, ds) -> ((b,c):bcs, d:ds)) ([],[])
     --this is a list of guesses. where each guess is a nonempty list of the example
     --histories we've seen corresponding to that guess. 
-    guessHists = trace (showP lrmostPrefixSuffixes) 
-      makeGuessHist <$> [0, 1.. length (lrmostPrefixSuffixes ^. ix 0 . _3) - 1] 
+    guessHists = --trace (showP lrmostPrefixSuffixes) 
+      catMaybes $ makeGuessHist <$> [0, 1.. length (lrmostPrefixSuffixes ^. ix 0 . _3) - 1] 
         <*> [0, 1.. length (lrmostPrefixSuffixes ^. ix 0 . _4) - 1]
     generalizedHistories = generalizeHistories <$> guessHists 
  

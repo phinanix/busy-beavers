@@ -446,7 +446,7 @@ obtainConfigIndices hist config
 --beginning to the end
 getReadShiftSlicePair :: (Partial, Eq s) => [(Phase, ExpTape s InfCount)] -> [ReadShift] -> Int -> Int
   -> (ExpTape s Count, ExpTape s Count)
-getReadShiftSlicePair hist rSs start end = trace ("lengths: " <> show (length hist, length rSs) <> " s,e: " <> show (start,end))
+getReadShiftSlicePair hist rSs start end = --trace ("lengths: " <> show (length hist, length rSs) <> " s,e: " <> show (start,end))
  (startSlice, endSlice) where
     startTape = hist ^?! ix start . _2
     endTape = hist ^?! ix end . _2
@@ -580,7 +580,7 @@ guessInductionHypWithIndices :: (Pretty s, Eq s, Partial) => TapeHist s InfCount
 guessInductionHypWithIndices (TapeHist hist) (ReadShiftHist rsHist) criticalPhase configIndicesAndConfigs =
   let
     configIndices = let ans = fst <$> configIndicesAndConfigs in
-      trace ("configIndices were: " <> showP ans)
+      --trace ("configIndices were: " <> showP ans)
       ans
     indexPairs = zipExact (U.init configIndices) (U.tail configIndices)
     slicePairs = let ans = uncurry (getReadShiftSlicePair hist rsHist) <$> indexPairs in
