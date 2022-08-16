@@ -203,7 +203,7 @@ simulateStepPartial limit machine (SimState ph tape book steps skipTrace hist hi
   --trace ("stepping bigStep: " <> showP counter <> " smallStep: " <> showP steps) $
   if counter > limit
   then Result $ Continue steps ph tape curDisp
-  else trace ("step:" <> showP counter <> " phase: " <> showP ph <> " curTape: " <> showP tape) $
+  else --trace ("step:" <> showP counter <> " phase: " <> showP ph <> " curTape: " <> showP tape) $
   case skipStep machine book ph tape of
     Unknown e -> UnknownEdge e
     MachineStuck -> error "machinestuck "

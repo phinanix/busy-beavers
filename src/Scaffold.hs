@@ -57,8 +57,10 @@ obtainHistorySlices th@(TapeHist tapeHist) (ReadShiftHist readShiftHist) = do
   -- TODO: trying drop 1 to fix startup effects
   let indices = drop 1 $ fst <$> snd machineConfigs
       pairedIndices = zip (U.init indices) (U.tail indices)
-  nonemptyPairs <- failMsg (error "pairs were empty") $ nonEmpty pairedIndices
-  pure $ (\(s, e) -> (s, e, (\((w, (x, y)), z) -> (w, x, y, z)) <$> zip (slice s e labelledTapeHist) (slice s e readShiftHist)))
+  nonemptyPairs <- trace ("pairedIndices" <> show pairedIndices <> "length" <> show (length labelledTapeHist) <> show (length readShiftHist) ) 
+    failMsg (error "pairs were empty") $ nonEmpty pairedIndices
+  --remember, the readshifts go between the tapes in the tapehist, so there is one less of them
+  pure $ (\(s, e) -> (s, e, (\((w, (x, y)), z) -> (w, x, y, z)) <$> zip (slice s e labelledTapeHist) (slice s (e-1) readShiftHist)))
         <$> nonemptyPairs
 
 obtainSigsWhichOccur :: (Ord s) => NonEmpty (Int, Int, [(Int, Phase, ExpTape s InfCount, ReadShift)])
@@ -82,22 +84,27 @@ instance (Pretty a, Pretty b, Pretty c, Pretty d, Pretty e) => Pretty (a, b, c, 
    <> pretty d <> ", "   
    <> pretty e <> ")"   
 
+-- todo this is great for debugging but pretty dumb that we keep exceeding the length limit
 numToLet :: Int -> Char
-numToLet i = ab U.!! i where 
+numToLet i = ab !!! i where 
   ab = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
+newtype SigID = SigID Int deriving (Eq, Ord, Show)
+instance Pretty SigID where 
+  pretty (SigID s) = if s < 52 then pretty (numToLet s) else pretty s
+
 filterHistories' :: forall s. (TapeSymbol s) => Int -> Turing
-  -> Either Text (NonEmpty (Int, Int, [(Char, Int, Phase, ExpTape s InfCount, ReadShift)]))
+  -> Either Text (NonEmpty (Int, Int, [(SigID, Int, Phase, ExpTape s InfCount, ReadShift)]))
 filterHistories' limit m = do 
   historySlices <- obtainHistorySlices' limit m 
   pure $ filterHistories historySlices 
   
 filterHistories :: Ord s
   => NonEmpty (Int, Int, [(Int, Phase, ExpTape s InfCount, ReadShift)])
-  -> NonEmpty (Int, Int, [(Char, Int, Phase, ExpTape s InfCount, ReadShift)])
+  -> NonEmpty (Int, Int, [(SigID, Int, Phase, ExpTape s InfCount, ReadShift)])
 filterHistories historySlices =   
   let sigsWhichOccurred = obtainSigsWhichOccur historySlices 
-      sigsToLetters = M.fromList . fmap (second numToLet) . flip zip [0, 1..] .  S.toList $ sigsWhichOccurred
+      sigsToLetters = M.fromList . fmap (second SigID) . flip zip [0, 1..] .  S.toList $ sigsWhichOccurred
       third f (x, y, z) = (x, y, f z)
       filteredHist = third (mapMaybe (\(s, ph, tape, rs) 
         -> case sigsToLetters ^. at (ph, tapeSignature tape) of 
@@ -109,14 +116,14 @@ filterHistories historySlices =
     filteredHist 
 
 
-commonPrefix :: NonEmpty [Char] -> [Char] 
+commonPrefix :: (Eq a) => NonEmpty [a] -> [a] 
 commonPrefix strings = takeExact lastValid $ head strings where 
     longestStringLen = maximum1Of traverse1 $ length <$> strings 
     isValid i = allEqual $ toList $ takeExact i <$> strings 
     lastValid = U.last $ takeWhile isValid [0.. longestStringLen]
 
 makeScaffoldHypotheses :: forall s. (TapeSymbol s) 
-    => NonEmpty (Int, Int, [(Char, Int, Phase, ExpTape s InfCount, ReadShift)])
+    => NonEmpty (Int, Int, [(SigID, Int, Phase, ExpTape s InfCount, ReadShift)])
     -> NonEmpty (Int, Int, [(Int, Phase, ExpTape s InfCount, ReadShift)])
     -> [Skip Count s]
 makeScaffoldHypotheses filteredHist unfilteredHist 
@@ -126,8 +133,8 @@ makeScaffoldHypotheses filteredHist unfilteredHist
     prefix = commonPrefix alphabets 
     suffix = reverse $ commonPrefix $ reverse <$> alphabets
     prefixSuffixPairs :: NonEmpty (Int, Int, 
-        [(Char, Int, Phase, ExpTape s InfCount, ReadShift)], 
-        [(Char, Int, Phase, ExpTape s InfCount, ReadShift)])
+        [(SigID, Int, Phase, ExpTape s InfCount, ReadShift)], 
+        [(SigID, Int, Phase, ExpTape s InfCount, ReadShift)])
     prefixSuffixPairs = (\(x,y,z) -> (x, y, takeExact (length prefix) z, 
         reverse $ takeExact (length suffix) $ reverse z)) 
         <$> filteredHist
@@ -138,30 +145,41 @@ makeScaffoldHypotheses filteredHist unfilteredHist
     etLRMost (ExpTape ls _p rs) = length ls == minLeftLen || length rs == minRightLen
     lrmostPrefixSuffixes = (\f (w, x, y, z) -> (w, x, f y, f z)) (filter (etLRMost . view _4)) 
         <$> prefixSuffixPairs
-    theAssert = let thing = (\(_, _, p, s) -> (view _1 <$> p, view _1 <$> s)) <$> lrmostPrefixSuffixes in 
+    theAssert = let thing = (\(_, _, p, s) -> (view _1 <$> p, view _1 <$> s)) 
+                     <$> lrmostPrefixSuffixes in 
         assert $ allEqual $ toList thing
     
-
-    makePair s e = (\(_, _, ps, ss) -> (ps U.!! s, ss U.!! e)) <$> prefixSuffixPairs
-    makeGuessHist :: Int -> Int -> NonEmpty (Natural, [(Phase, ExpTape s InfCount)], [ReadShift])
+    --this is not always a valid pair, because the start could've occured after the end, eg 20,19
+    -- so we need to check that what we're acquiring with !!! satisfies start <= end and then we'll 
+    -- be good 
+    --makePair :: Int -> Int -> 
+    makePair s e = (\(_, _, ps, ss) -> case (ps !!! s, ss !!! e) of 
+      (x@(_, s_step, _, _, _), y@(_, e_step, _, _, _)) -> 
+        if s_step <= e_step then Just (x, y) else Nothing 
+      ) <%> lrmostPrefixSuffixes
+    makeGuessHist :: Int -> Int -> Maybe (NonEmpty (Natural, [(Phase, ExpTape s InfCount)], [ReadShift]))
     makeGuessHist s e = fmap (\(x, (y, z)) -> (x, y, z)) . NE.zip (3 :| [4,5..]) 
       $ munge4 . sliceHist <$> histIndexPairs 
       where 
         listOfPairs = makePair s e 
-        indexPairs = bimapBoth (view _2) <$> listOfPairs 
-        histIndexPairs = neZipExact indexPairs (view _3 <$> unfilteredHist) 
-        sliceHist ((s, e), hist) = slice s e hist 
+        indexPairs = --trace ("list of pairs:" <> showP listOfPairs) 
+          bimapBoth (view _2) <$> listOfPairs 
+        histIndexPairs = neZipExact indexPairs unfilteredHist
+        sliceHist ((slice_start, slice_end), (hist_start, hist_end, hist)) = 
+          trace ("slice-ing" <> show (slice_start, slice_end) <> show (hist_start, hist_end))
+          slice (slice_start - hist_start) (slice_end - hist_start) hist 
         munge4 :: [(a,b,c,d)] -> ([(b,c)],[d])
         munge4 = foldr (\(_a,b,c,d) (bcs, ds) -> ((b,c):bcs, d:ds)) ([],[])
     --this is a list of guesses. where each guess is a nonempty list of the example
     --histories we've seen corresponding to that guess. 
-    guessHists = makeGuessHist <$> [0, 1.. length (lrmostPrefixSuffixes ^. ix 0 . _3)] 
-        <*> [0, 1.. length (lrmostPrefixSuffixes ^. ix 0 . _4)]
+    guessHists = trace (showP lrmostPrefixSuffixes) 
+      makeGuessHist <$> [0, 1.. length (lrmostPrefixSuffixes ^. ix 0 . _3) - 1] 
+        <*> [0, 1.. length (lrmostPrefixSuffixes ^. ix 0 . _4) - 1]
     generalizedHistories = generalizeHistories <$> guessHists 
-
+ 
 proveByScaffold :: forall s. (TapeSymbol s) => Turing -> SkipBook s 
     -> TapeHist s InfCount -> ReadShiftHist 
-    -> Either Text (Skip Count s) 
+    -> Either Text (Skip Count s, SkipOrigin s) 
 proveByScaffold machine book th rsh = do 
     unfilteredHistories <- obtainHistorySlices th rsh 
     let filteredHistories = filterHistories unfilteredHistories
@@ -169,13 +187,13 @@ proveByScaffold machine book th rsh = do
         mbProofs =
             (\s -> rightToMaybe $ (s,) <$> proveInductively 110 machine book s (getVar s)) 
             <$> scaffoldHypothesis
-    fmap fst $ failMsg "no proof succeeded" $ viaNonEmpty head $ catMaybes mbProofs
+    failMsg "no proof succeeded" $ viaNonEmpty head $ catMaybes mbProofs
     
     where 
       getVar :: Skip Count s -> BoundVar 
       getVar skip = let bvs = getBoundVars skip in 
-        (if length bvs > 1 
-            then trace ("machine: " <> showP machine <> "skip:" <> showP skip 
-                        <> "bvs:" <> show bvs) 
-            else id) 
+        -- (if length bvs > 1 
+        --     then trace ("machine: " <> showP machine <> "skip:" <> showP skip 
+        --                 <> "bvs:" <> show bvs) 
+        --     else id) 
         U.head bvs 

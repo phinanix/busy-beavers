@@ -1,6 +1,7 @@
 module Util where
 
 import Relude
+import qualified Relude.Unsafe as U
 import Data.Map.Monoidal ( MonoidalMap )
 import qualified Data.Set as S 
 
@@ -69,8 +70,8 @@ atE i = at i . iso (fromMaybe Empty) Just
 --taken from https://stackoverflow.com/questions/4597820/does-haskell-have-list-slices-i-e-python
 -- TODO: Use Vector package?
 --inclusive of the endpoints 
-slice :: Int -> Int -> [a] -> [a]
-slice from to xs = takeExact (to - from + 1) (dropExact from xs)
+slice :: Partial => Int -> Int -> [a] -> [a]
+slice from to xs = assert (from <= to) takeExact (to - from + 1) (dropExact from xs)
 
 allEqual :: (Eq s) => [s] -> Bool
 allEqual [] = True
@@ -147,3 +148,8 @@ third f (x, y, a) = (x, y, f a)
 
 second3 :: (a -> b) -> (x, a, y) -> (x, b, y) 
 second3 f (x, a, y) = (x, f a, y)
+
+(!!!) :: (Partial) => [a] -> Int -> a 
+(!!!) list i = assert (i < length list) $ case (!!?) list i of
+   Nothing -> error ("index " <> show i <> " list length " <> show (length list))
+   Just a -> a 

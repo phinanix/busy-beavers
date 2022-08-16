@@ -23,6 +23,7 @@ import LinRecurrence
 import TapeSymbol
 import SimulateTwoBit (TwoBit)
 import ExpTape
+import Scaffold
 
 attemptInductionGuess :: Turing -> SimState Bit
   -> Either (SimResult InfCount Bit) (SimState Bit)
@@ -86,6 +87,31 @@ proveByInd machine state = --force $ --trace ("proveByInd on:\n" <> showP machin
     ans
 {-# SPECIALISE proveByInd :: SimOneAction Bit #-}
 {-# SPECIALISE proveByInd :: SimOneAction TwoBit #-}
+
+
+proveByIndV1 ::(TapeSymbol s) => SimOneAction s 
+proveByIndV1 machine state =
+  case mbProof of 
+    Left _msg -> Right state 
+    Right hp -> Left $ ContinueForever hp 
+  where 
+    hist = state ^. s_history
+    rsHist = state ^. s_readshift_history
+    mbProof = do 
+      indGuess <- guessInductionHypothesis hist rsHist 
+      (scaffoldSkip, scaffoldOrigin) <-
+       proveByScaffold machine (state ^. s_book) hist rsHist 
+      let newBook = addSkipToBook scaffoldSkip scaffoldOrigin (state ^. s_book)
+      --this is where we obtain the skipOrigin that proves indGUess
+      n <- 
+      --  trace ("indguess: " <> showP indGuess <> "scaffoldSkip: " <> showP scaffoldSkip
+      --  <> "book: " <> showP (state ^. s_book))
+       --this should really only be proveBySimulating, but the thing is, often you want to prove with
+       --x, rather than with x+1, and proveInductively does that for you, which is helpful
+       --first fst $ proveBySimulating 100 machine newBook indGuess
+       first fst $ proveInductively 100 machine newBook indGuess (BoundVar 0)
+      arbSkip <- chainArbitrary indGuess  
+      skipAppliesForeverInHist arbSkip hist
 
 proveSimply :: (TapeSymbol s) => SimOneAction s
 proveSimply machine state = case mbProof of

@@ -226,11 +226,11 @@ basicSimLoop = simulation $ simLoop 300 $ simulateStepPartial maxInt :|
   runIfCond (atRightOfTape . view s_tape) attemptOtherEndOfTapeProof
   , runAtCount 145 proveByLR
   , runAtCount 146 proveSimply
-  , runAtCount 299 proveByInd
+  , runAtCount 299 proveByIndV1
   ])
 
 twoBitSimLoop :: Tactic
-twoBitSimLoop = simulation @TwoBit $ simLoop 500 $ simulateStepPartial maxInt :| 
+twoBitSimLoop = simulation @TwoBit $ simLoop 300 $ simulateStepPartial maxInt :| 
   (liftOneToMulti <$> [checkSeenBefore
   , liftModifyState recordHist
   , liftModifyState recordDispHist
@@ -239,7 +239,7 @@ twoBitSimLoop = simulation @TwoBit $ simLoop 500 $ simulateStepPartial maxInt :|
   -- , runAtCount 45 proveByInd
   , runAtCount 145 proveByLR
   --, runAtCount 146 proveSimply
-  , runAtCount 499 proveByInd
+  , runAtCount 299 proveByIndV1
   ])
 
 twoBitDispLoop :: TapeSymbol s => Turing -> ([Turing], [(Turing, SimResult InfCount s)])
@@ -258,8 +258,24 @@ baseSimLoop = simLoop 300 $ simulateStepPartial maxInt :|
   , runAtCount 40 proveSimply
   , runAtCount 145 proveByLR
   , runAtCount 298 proveSimply
-  , runAtCount 299 proveByInd
+  , runAtCount 299 proveByIndV1
   ])
+{-# SPECIALISE baseSimLoop :: Turing -> ([Turing],[(Turing, SimResult InfCount Bit)]) #-}
+{-# SPECIALISE baseSimLoop :: Turing -> ([Turing],[(Turing, SimResult InfCount (Vec 2 Bit))]) #-}
+{-# SPECIALISE baseSimLoop :: Turing -> ([Turing],[(Turing, SimResult InfCount (Vec 3 Bit))]) #-}
+{-# SPECIALISE baseSimLoop :: Turing -> ([Turing],[(Turing, SimResult InfCount (Vec 4 Bit))]) #-}
+{-# SPECIALISE baseSimLoop :: Turing -> ([Turing],[(Turing, SimResult InfCount (Vec 5 Bit))]) #-}
+{-# SPECIALISE baseSimLoop :: Turing -> ([Turing],[(Turing, SimResult InfCount (Vec 6 Bit))]) #-}
+
+indV1Loop :: (TapeSymbol s) => Turing -> ([Turing],[(Turing, SimResult InfCount s)])
+indV1Loop = simLoop 300 $ simulateStepPartial maxInt :| 
+  (liftOneToMulti <$> [checkSeenBefore
+  , liftModifyState recordHist
+  , liftModifyState recordDispHist
+  , runAtCount 10 proveByLR
+  , runAtCount 299 proveByIndV1
+  ])  
+
 
 threeBitSimLoop :: Tactic
 threeBitSimLoop = simulation @(Vec 3 Bit) baseSimLoop
