@@ -14,14 +14,21 @@ import Test.Hspec
 import Test.QuickCheck hiding (Success)
 
 import Graphs 
+import Util (prettyText)
 
 -- first int is how many children you have, second one is just a tag
 newtype GraphWithBranches = GraphWithBranches (Int, Int) deriving (Eq, Ord, Show, Generic)
+
+instance Pretty GraphWithBranches where 
+  pretty = prettyText . show 
 
 getAdjacentGWB (GraphWithBranches (n, _tag)) = GraphWithBranches . (n - 1,) <$> take n [0, 1 ..] 
 
 newtype BinarySeq = BinarySeq [Bool] deriving (Eq, Ord, Show, Generic)
 
+instance Pretty BinarySeq where 
+  pretty = prettyText . show 
+  
 getAdjacentBS (BinarySeq xs) = (\x -> BinarySeq (x : xs)) <$> [False, True]
 
 spec :: Spec

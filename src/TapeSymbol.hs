@@ -140,7 +140,8 @@ chainArbitrary skip@(Skip start end _steps) = case end of
   SkipStepped ph (Middle et) -> do
     (newStart, newEnd) <- matchConfigs start $ etToConfig ph et
     let (endPh, endTape) = configToET newEnd
-    pure (Skip newStart (SkipStepped endPh $ Middle endTape) (FinCount 50)) --TODO handle steps obviously
+        ans = (Skip newStart (SkipStepped endPh $ Middle endTape) (FinCount 50)) --TODO handle steps obviously
+    assertMsg (isSameInAsOut ans) ("chainArb bug, inp: " <> showP skip <> "\nincorrect output:" <> showP ans) $ pure ans
   _ -> Left "wasn't middle or side w/1"
   where
   newVar :: BoundVar

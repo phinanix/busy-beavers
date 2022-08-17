@@ -24,7 +24,6 @@ import Util
 import Safe.Exact
 import Relude.Extra (bimapBoth)
 
-
 {-
 - how to turn a scaffold into a set of proof goals: 
 1) find the common prefixes and suffixes of the characters the traces contain
@@ -55,7 +54,9 @@ obtainHistorySlices th@(TapeHist tapeHist) (ReadShiftHist readShiftHist) = do
   let labelledTapeHist = zip [0, 1..] tapeHist
   machineConfigs <- obtainCriticalIndicesConfigs th
   -- TODO: trying drop 1 to fix startup effects
-  let indices = drop 1 $ fst <$> snd machineConfigs
+  -- it looks like we shoudl maybe try drop 0, 1, 2, etc. and see
+  -- or maybe we should truncate to only 3 or 4 things, instead of dropping
+  let indices = trace ("machine configs: " <> showP machineConfigs) drop 0 $ fst <$> snd machineConfigs
       pairedIndices = zip (U.init indices) (U.tail indices)
   nonemptyPairs <- --trace ("pairedIndices" <> show pairedIndices <> "length" <> show (length labelledTapeHist) <> show (length readShiftHist) ) 
     failMsg (error "pairs were empty") $ nonEmpty pairedIndices
@@ -102,7 +103,7 @@ filterHistories' limit m = do
 filterHistories :: Ord s
   => NonEmpty (Int, Int, [(Int, Phase, ExpTape s InfCount, ReadShift)])
   -> NonEmpty (Int, Int, [(SigID, Int, Phase, ExpTape s InfCount, ReadShift)])
-filterHistories historySlices =   
+filterHistories historySlices = trace (showP $ length <$$> historySlices) $
   let sigsWhichOccurred = obtainSigsWhichOccur historySlices 
       sigsToLetters = M.fromList . fmap (second SigID) . flip zip [0, 1..] .  S.toList $ sigsWhichOccurred
       third f (x, y, z) = (x, y, f z)
@@ -127,7 +128,8 @@ makeScaffoldHypotheses :: forall s. (TapeSymbol s)
     -> NonEmpty (Int, Int, [(Int, Phase, ExpTape s InfCount, ReadShift)])
     -> [Skip Count s]
 makeScaffoldHypotheses filteredHist unfilteredHist 
-  = theAssert $ mapMaybe rightToMaybe $ toList generalizedHistories 
+  = let ans = filter thingContainsVar $ theAssert $ mapMaybe rightToMaybe $ toList generalizedHistories 
+  in ans
   where 
     alphabets = (\(_a,_b,c) -> c) <$> ((\(a,_b,_c,_d, _e) -> a) <$$$> filteredHist)
     prefix = commonPrefix alphabets 
@@ -135,14 +137,14 @@ makeScaffoldHypotheses filteredHist unfilteredHist
     prefixSuffixPairs :: NonEmpty (Int, Int, 
         [(SigID, Int, Phase, ExpTape s InfCount, ReadShift)], 
         [(SigID, Int, Phase, ExpTape s InfCount, ReadShift)])
-    prefixSuffixPairs = (\(x,y,z) -> (x, y, takeExact (length prefix) z, 
+    prefixSuffixPairs = trace ("pre / suf" <> showP (prefix, suffix)) (\(x,y,z) -> (x, y, takeExact (length prefix) z, 
         reverse $ takeExact (length suffix) $ reverse z)) 
         <$> filteredHist
     (_s, _e, pref, suf) = head prefixSuffixPairs 
     --yes, we are deliberately counting the number of (s, Count) pairs rather than the number of s 
     minLeftLen = minimum $ (\(_, _, _, ExpTape ls _p _rs, _) -> length ls) <$> (pref ++ suf)
     minRightLen = minimum $ (\(_, _, _, ExpTape _ls _p rs, _) -> length rs) <$> (pref ++ suf)
-    etLRMost (ExpTape ls _p rs) = length ls == minLeftLen || length rs == minRightLen
+    etLRMost (ExpTape ls _p rs) = True --length ls == minLeftLen || length rs == minRightLen
     lrmostPrefixSuffixes = (\f (w, x, y, z) -> (w, x, f y, f z)) (filter (etLRMost . view _4)) 
         <$> prefixSuffixPairs
     theAssert = let thing = (\(_, _, p, s) -> (view _1 <$> p, view _1 <$> s)) 
@@ -153,10 +155,15 @@ makeScaffoldHypotheses filteredHist unfilteredHist
     -- so we need to check that what we're acquiring with !!! satisfies start <= end and then we'll 
     -- be good 
     --makePair :: Int -> Int -> 
-    makePair s e = (\(_, _, ps, ss) -> case (ps !!! s, ss !!! e) of 
-      (x@(_, s_step, _, _, _), y@(_, e_step, _, _, _)) -> 
-        if s_step <= e_step then Just (x, y) else Nothing 
-      ) <%> lrmostPrefixSuffixes
+    makePair s e = do 
+      ans <- --NE.filter (\(x@(_, s_step, _, _, _), y@(_, e_step, _, _, _)) -> s_step+2 <= e_step) <$>
+        (\(_, _, ps, ss) -> case (ps !!! s, ss !!! e) of 
+        (x@(_, s_step, _, _, _), y@(_, e_step, _, _, _)) -> 
+          --the +1 is because 
+          if s_step < e_step then Just (x, y) else Nothing 
+        ) <%> lrmostPrefixSuffixes
+      guard $ length ans > 1
+      pure ans 
     makeGuessHist :: Int -> Int -> Maybe (NonEmpty (Natural, [(Phase, ExpTape s InfCount)], [ReadShift]))
     makeGuessHist s e = do 
       listOfPairs <- makePair s e 
@@ -167,16 +174,20 @@ makeScaffoldHypotheses filteredHist unfilteredHist
         $ munge4 . sliceHist <$> histIndexPairs 
       where 
         sliceHist ((slice_start, slice_end), (hist_start, _hist_end, hist)) = 
+          let start_i = (slice_start - hist_start)
+              end_i = (slice_end - hist_start) 
+          in 
           --trace ("slice-ing" <> show (slice_start, slice_end) <> show (hist_start, hist_end))
-          slice (slice_start - hist_start) (slice_end - hist_start) hist 
+          assertMsg (start_i < end_i) ("slice too small:" <> showP (start_i, end_i) <> "\nhist: " <> showP hist) 
+          slice start_i end_i hist 
         munge4 :: [(a,b,c,d)] -> ([(b,c)],[d])
         munge4 = foldr (\(_a,b,c,d) (bcs, ds) -> ((b,c):bcs, d:ds)) ([],[])
     --this is a list of guesses. where each guess is a nonempty list of the example
     --histories we've seen corresponding to that guess. 
-    guessHists = --trace (showP lrmostPrefixSuffixes) 
+    guessHists = trace ("lrmost: " <> showP lrmostPrefixSuffixes) 
       catMaybes $ makeGuessHist <$> [0, 1.. length (lrmostPrefixSuffixes ^. ix 0 . _3) - 1] 
         <*> [0, 1.. length (lrmostPrefixSuffixes ^. ix 0 . _4) - 1]
-    generalizedHistories = generalizeHistories <$> guessHists 
+    generalizedHistories = trace ("len ghs" <> show (length guessHists)) generalizeHistories <$> guessHists 
  
 proveByScaffold :: forall s. (TapeSymbol s) => Turing -> SkipBook s 
     -> TapeHist s InfCount -> ReadShiftHist 
@@ -197,4 +208,5 @@ proveByScaffold machine book th rsh = do
         --     then trace ("machine: " <> showP machine <> "skip:" <> showP skip 
         --                 <> "bvs:" <> show bvs) 
         --     else id) 
-        U.head bvs 
+        assertMsg (not (null bvs)) ("empty skip: " <> showP skip)
+         U.head bvs 

@@ -71,7 +71,8 @@ atE i = at i . iso (fromMaybe Empty) Just
 -- TODO: Use Vector package?
 --inclusive of the endpoints 
 slice :: Partial => Int -> Int -> [a] -> [a]
-slice from to xs = assert (from <= to) takeExact (to - from + 1) (dropExact from xs)
+slice from to xs = if from > to then error ("from: " <> show from <> " to: " <> show to) else 
+  takeExact (to - from + 1) (dropExact from xs)
 
 allEqual :: (Eq s) => [s] -> Bool
 allEqual [] = True
@@ -87,7 +88,9 @@ putPretty :: (Pretty a) => a -> IO ()
 putPretty = putText . show . pretty
 
 neZipExact :: Partial => NonEmpty a -> NonEmpty b -> NonEmpty (a, b)
-neZipExact as bs = assert (length as == length bs) $ NE.zip as bs
+neZipExact as bs = assertMsg (length as == length bs) 
+  ("lengths differ: " <> showP (length as, length bs))
+   $ NE.zip as bs
 
 showP :: (Pretty a, IsString s) => a -> s
 showP = show . pretty
@@ -153,3 +156,6 @@ second3 f (x, a, y) = (x, f a, y)
 (!!!) list i = assert (i < length list) $ case (!!?) list i of
    Nothing -> error ("index " <> show i <> " list length " <> show (length list))
    Just a -> a 
+
+assertMsg :: Partial => Bool -> Text -> a -> a 
+assertMsg cond msg out = if cond then out else error  msg

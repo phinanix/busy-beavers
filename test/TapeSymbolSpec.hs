@@ -59,3 +59,39 @@ spec = do
               (TwoBit (Bit False) (Bit False), One)])))
         (FinCount 50)
         )
+    it "chains correctly something it previously didn't" $ do 
+      {-
+      *** Exception: chainArb bug, inp: in 0 steps we turn
+phase: 0  (F, 2) (T, 0 + 1*x_0 ) |>F<|(T, 1)
+into:
+phase: 0(T, 1 + 1*x_0 ) |>F<|(T, 2)
+
+
+incorrect output:in 50 steps we turn
+phase: 0  (F, 0 + 2*x_1 ) (T, 0 + 1*x_0 ) |>F<|(T, 1 + 1*x_1 )
+into:
+phase: 0(T, 0 + 1*x_0 1*x_1 ) |>F<|(T, 1)
+      -}
+      chainArbitrary (Skip 
+        (Config (Phase 0)
+        [(Bit True, boundVarCount (BoundVar 0) 1), (Bit False, One <> One)]
+        (Bit False) 
+        [(Bit True, One)]
+        )
+        (SkipStepped (Phase 0) (Middle (ExpTape 
+        [(Bit True, One <> boundVarCount (BoundVar 0) 1)] 
+        (Bit False)
+        [(Bit True, One <> One)])))
+        Empty 
+       ) `shouldBe` Right (Skip 
+        (Config (Phase 0)
+        [(Bit True, boundVarCount (BoundVar 0) 1), (Bit False, boundVarCount (BoundVar 1) 2)]
+        (Bit False) 
+        [(Bit True, One)]
+        )
+        (SkipStepped (Phase 0) (Middle (ExpTape 
+        [(Bit True, boundVarCount (BoundVar 0) 1 <> boundVarCount (BoundVar 1) 1)] 
+        (Bit False)
+        [(Bit True, One <> boundVarCount (BoundVar 1) 1)])))
+        Empty 
+       )

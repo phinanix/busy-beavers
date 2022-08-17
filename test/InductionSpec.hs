@@ -77,16 +77,16 @@ spec = do
   describe "generalizeFromCounts" $ do
     it "generalizes identical ints" $ do
       generalizeFromCounts (fromList $ replicate 5 (finiteCount 5, finiteCount 5))
-        `shouldBe` Just (finiteCount 5, finiteCount 5)
+        `shouldBe` Right (finiteCount 5, finiteCount 5)
     {- it "generalizes infinity" $ do 
       generalizeFromCounts (unsafeL1 $ replicate 5 (Infinity, Infinity))
         `shouldBe` Just (Infinity, Infinity) -}
     it "generalizes a basic additive function" $ do
       generalizeFromCounts ((c 3, c 5) :| [(c 8, c 10), (c 2, c 4)])
-        `shouldBe` Just (newBoundVar 0, newBoundVar 0 <> finiteCount 2)
+        `shouldBe` Right (newBoundVar 0, newBoundVar 0 <> finiteCount 2)
     it "generalizes a subtractive function" $ do
       generalizeFromCounts ((c 5, c 3) :| [(c 10, c 8), (c 4, c 2)])
-        `shouldBe` Just (newBoundVar 0 <> finiteCount 2, newBoundVar 0)
+        `shouldBe` Right (newBoundVar 0 <> finiteCount 2, newBoundVar 0)
     it "generalizes a multiplicative function" $ do -- 3x - 2
       --3x - 2 is not implemented by (x-2, 3x) !! that is 3x - 6 (eg 5-2 = 3, times 3 = 9 != 13)
       --(x-1, 3x + 1) should implement this eg 
@@ -94,13 +94,13 @@ spec = do
       --  10-1 = 9 * 3 + 1 = 28
       --  2-1 = 1 * 3 + 1 = 4
       generalizeFromCounts ((c 5, c 13) :| [(c 10, c 28), (c 2, c 4)])
-        `shouldBe` Just (newBoundVar 0 <> finiteCount 1, nTimes 3 (newBoundVar 0) <> finiteCount 1)
+        `shouldBe` Right (newBoundVar 0 <> finiteCount 1, nTimes 3 (newBoundVar 0) <> finiteCount 1)
     it "fails to generalize when it isn't a pattern" $ do
       generalizeFromCounts ((c 5, c 13) :| [(c 10, c 42), (c 2, c 4)])
-        `shouldBe` Nothing
+        `shouldSatisfy` has _Left
     it "fails to generalize when the third doesn't match the first two " $ do -- 3x - 2
       generalizeFromCounts ((c 5, c 13) :| [(c 10, c 18), (c 2, c 4)])
-        `shouldBe` Nothing
+        `shouldSatisfy` has _Left
     --TODO, write basic tests for the 3 cases of generalizeFromInfCounts 
     --write several tests for guessInductionHypothesis    
   describe "guessInductionHypothesis" $ do
@@ -108,7 +108,7 @@ spec = do
       -- at step 176, F (T, 5) F >F<
       -- at step 366, (T, 6)   F >F<
       --both phase 0
-       makeIndGuess 1000 weird3 `assertPrettySkip` Skip
+       makeIndGuess @Bit 1000 weird3 `assertPrettySkip` Skip
         (Config (Phase 2) [(Bit False, c 1)] (Bit False) [(Bit True, Count 0 Empty (fromList [(BoundVar 0,Sum 1)])), (Bit False, c 1)])
         (SkipStepped (Phase 2) $ Middle (ExpTape [] (Bit False) [(Bit True, Count 1 Empty (fromList [(BoundVar 0,Sum 1)])), (Bit False, c 1)]))
         Empty
@@ -117,7 +117,7 @@ spec = do
       -- at step 15, F >F< (T, 3)
       -- at step 24, >F< (T, 4)
       --both phase 0
-      makeIndGuess 1000 simple_sweeper `assertPrettySkip` Skip
+      makeIndGuess @Bit 1000 simple_sweeper `assertPrettySkip` Skip
         (Config (Phase 0) [(Bit False, c 1)] (Bit False) [(Bit True, Count 0 Empty (fromList [(BoundVar 0, Sum 1)])), (Bit False, c 1)])
         (SkipStepped (Phase 0) $ Middle (ExpTape [] (Bit False) [(Bit True, Count 1 Empty (fromList [(BoundVar 0, Sum 1)])), (Bit False, c 1)]))
         Empty
@@ -125,7 +125,7 @@ spec = do
       -- at step 6, F (T, 3) >F< F
       -- at step 15, (T, 5) >F<
       -- both phase 1 
-      makeIndGuess 1000 checkerboardSweeper `assertPrettySkip` Skip
+      makeIndGuess @Bit 1000 checkerboardSweeper `assertPrettySkip` Skip
         (Config (Phase 1)
             [(Bit True, Count 0 Empty (fromList [(BoundVar 0, Sum 1)])), (Bit False, c 1)] (Bit False) [(Bit False, c 1)])
         (SkipStepped (Phase 1) $ Middle (ExpTape
@@ -137,4 +137,4 @@ spec = do
   describe "calcCommonSig" $ do
     it "works on a real example" $
       calcCommonSig (Signature [Bit False] (Bit False) [Bit True,Bit False]) (Signature [] (Bit False) [Bit True,Bit False])
-        `shouldBe` Just (True, False)
+        `shouldBe` Just (StartDrop, NoDrop)

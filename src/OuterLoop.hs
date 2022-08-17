@@ -225,20 +225,21 @@ basicSimLoop = simulation $ simLoop 300 $ simulateStepPartial maxInt :|
   runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof,
   runIfCond (atRightOfTape . view s_tape) attemptOtherEndOfTapeProof
   , runAtCount 145 proveByLR
-  , runAtCount 146 proveSimply
+  , runAtCount 297 proveSimply
+  --, runAtCount 298 proveByInd
   , runAtCount 299 proveByIndV1
   ])
 
-twoBitSimLoop :: Tactic
-twoBitSimLoop = simulation @TwoBit $ simLoop 300 $ simulateStepPartial maxInt :| 
+oldtwoBitSimLoop :: Tactic
+oldtwoBitSimLoop = simulation @TwoBit $ simLoop 300 $ simulateStepPartial maxInt :| 
   (liftOneToMulti <$> [checkSeenBefore
   , liftModifyState recordHist
   , liftModifyState recordDispHist
   , runAtCount 10 proveByLR
   -- , runAtCount 40 proveSimply
-  -- , runAtCount 45 proveByInd
+  --, runAtCount 45 proveByInd
   , runAtCount 145 proveByLR
-  --, runAtCount 146 proveSimply
+  , runAtCount 146 proveSimply
   , runAtCount 299 proveByIndV1
   ])
 
@@ -250,16 +251,17 @@ twoBitDispLoop = simLoop 150 $ simulateStepPartial maxInt :|
   ])
 
 baseSimLoop :: (TapeSymbol s) => Turing -> ([Turing],[(Turing, SimResult InfCount s)])
-baseSimLoop = simLoop 300 $ simulateStepPartial maxInt :| 
+baseSimLoop = trace "hi" simLoop 2000 $ simulateStepPartial maxInt :| 
   (liftOneToMulti <$> [checkSeenBefore
   , liftModifyState recordHist
   , liftModifyState recordDispHist
   , runAtCount 10 proveByLR
   , runAtCount 40 proveSimply
   , runAtCount 145 proveByLR
-  , runAtCount 298 proveSimply
-  , runAtCount 299 proveByIndV1
+  , runAtCount 598 proveSimply
+  , runAtCount 1999 proveByIndV1
   ])
+
 {-# SPECIALISE baseSimLoop :: Turing -> ([Turing],[(Turing, SimResult InfCount Bit)]) #-}
 {-# SPECIALISE baseSimLoop :: Turing -> ([Turing],[(Turing, SimResult InfCount (Vec 2 Bit))]) #-}
 {-# SPECIALISE baseSimLoop :: Turing -> ([Turing],[(Turing, SimResult InfCount (Vec 3 Bit))]) #-}
@@ -276,6 +278,9 @@ indV1Loop = simLoop 300 $ simulateStepPartial maxInt :|
   , runAtCount 299 proveByIndV1
   ])  
 
+
+twoBitSimLoop :: Tactic
+twoBitSimLoop = simulation @(Vec 2 Bit) baseSimLoop
 
 threeBitSimLoop :: Tactic
 threeBitSimLoop = simulation @(Vec 3 Bit) baseSimLoop

@@ -338,3 +338,11 @@ matchSkipTape (Skip config end _hops) tape = do
     SkipUnknownEdge _e -> pure ()
     SkipNonhaltProven _hp -> pure ()
   pure out 
+
+
+
+isSameInAsOut :: forall c s. (Monoid c, Eq c) => Skip c s -> Bool
+isSameInAsOut (Skip start end _) = addUp start == addUp end
+  where
+    addUp :: (Bifoldable b) => b c s -> c
+    addUp = bifoldMap id (const mempty)

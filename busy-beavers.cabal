@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 72953e130a2812ae15a73451a124752bf2e5b863e19c01c1e8471a817261d9eb
+-- hash: 3b60c39ac371786683be27c450241a808989a8ed2fd3a26a2f21c854ec9b4454
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -199,7 +199,6 @@ test-suite busy-beavers-test
       NotationSpec
       SimulateSkipSpec
       SimulateSpec
-      SimulateVecBitTest
       SimulationLoopsSpec
       SkipSpec
       TapeSymbolSpec
