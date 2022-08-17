@@ -93,5 +93,5 @@ phase: 0(T, 0 + 1*x_0 1*x_1 ) |>F<|(T, 1)
         [(Bit True, boundVarCount (BoundVar 0) 1 <> boundVarCount (BoundVar 1) 1)] 
         (Bit False)
         [(Bit True, One <> boundVarCount (BoundVar 1) 1)])))
-        Empty 
+        (FinCount 50)
        )

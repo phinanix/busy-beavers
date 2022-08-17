@@ -122,25 +122,25 @@ in which case we change it to
 -}
 chainArbitrary :: forall s. (Eq s, Pretty s) => Skip Count s -> Either Text (Skip Count s)
 chainArbitrary skip@(Skip start end _steps) = case end of
-  SkipStepped endPh (Side dir [(c, One)]) -> case start of 
-    (Config startPh [] b []) -> do 
+  SkipStepped endPh (Side dir [(c, One)]) -> case start of
+    (Config startPh [] b []) -> do
       guardMsg (startPh == endPh) "phases not equal"
-      case dir of 
+      case dir of
         --TODO handle steps obviously
-        R -> Right $ Skip 
-          (Config startPh [] b [(b, boundVarCount newVar 1)]) 
-          (SkipStepped startPh (Side R [(c, One <> boundVarCount newVar 1)])) 
+        R -> Right $ Skip
+          (Config startPh [] b [(b, boundVarCount newVar 1)])
+          (SkipStepped startPh (Side R [(c, One <> boundVarCount newVar 1)]))
           (FinCount 50)
-        L -> Right $ Skip 
-          (Config startPh [(b, boundVarCount newVar 1)] b []) 
-          (SkipStepped startPh (Side L [(c, One <> boundVarCount newVar 1)])) 
+        L -> Right $ Skip
+          (Config startPh [(b, boundVarCount newVar 1)] b [])
+          (SkipStepped startPh (Side L [(c, One <> boundVarCount newVar 1)]))
           (FinCount 50)
     _ -> Left "startconfig was the wrong shape"
       where
   SkipStepped ph (Middle et) -> do
     (newStart, newEnd) <- matchConfigs start $ etToConfig ph et
     let (endPh, endTape) = configToET newEnd
-        ans = (Skip newStart (SkipStepped endPh $ Middle endTape) (FinCount 50)) --TODO handle steps obviously
+        ans = Skip newStart (SkipStepped endPh $ Middle endTape) (FinCount 50) --TODO handle steps obviously
     assertMsg (isSameInAsOut ans) ("chainArb bug, inp: " <> showP skip <> "\nincorrect output:" <> showP ans) $ pure ans
   _ -> Left "wasn't middle or side w/1"
   where
@@ -155,33 +155,35 @@ chainArbitrary skip@(Skip start end _steps) = case end of
     (newRs, newYs) <- matchLists newVar rs ys
     pure (Config ph newLs p newRs, Config ph newXs p newYs)
 
-matchLists :: (Eq s, Pretty s) => BoundVar -> [(s, Count)] -> [(s, Count)] 
+matchLists :: (Eq s, Pretty s) => BoundVar -> [(s, Count)] -> [(s, Count)]
   -> Either Text ([(s, Count)], [(s, Count)])
-matchLists newVar xs ys = bind (applyLeftover newVar) $ commonPartAndLeftover newVar xs ys
+matchLists newVar xs ys = trace ("matching" <> showP (xs, ys)) $ 
+  bind (applyLeftover newVar) $ commonPartAndLeftover newVar xs ys
 
-commonPartAndLeftover :: (Eq s) => BoundVar -> [(s, Count)] -> [(s, Count)] 
+commonPartAndLeftover :: (Eq s) => BoundVar -> [(s, Count)] -> [(s, Count)]
   -> Either Text (([(s, Count)], [(s, Count)]), Leftover s)
 commonPartAndLeftover newVar xs ys = do
   --maybeRes :: Either Text [((s, Count), (s, Count))]
   --maybeRes <- traverse (uncurry matchPairs) (zip xs ys) --zip discards longer 
-  (maybeRes, maybeLeftover1) <- case unsnoc $ zip xs ys of 
+  (maybeRes, maybeLeftover1) <- case unsnoc $ zip xs ys of
     Nothing -> Right ([], Nothing)
-    Just (initInp, last) -> do 
-      initRes <- traverse (uncurry (matchPairs newVar)) initInp 
-      (l1, l2, maybeLeft) <- uncurry (matchLastPairs newVar) last 
+    Just (initInp, last) -> do
+      initRes <- traverse (uncurry (matchPairs newVar)) initInp
+      (l1, l2, maybeLeft) <- uncurry (matchLastPairs newVar) last
       pure (initRes ++ [(l1, l2)], maybeLeft)
   let maybeLeftover2 = case remainingLonger xs ys of
-        Left [] -> Nothing 
+        Left [] -> Nothing
         Left xs_left -> Just $ Start xs_left
         Right ys_left -> Just $ End ys_left
-  leftover <- case (maybeLeftover1, maybeLeftover2) of 
+  leftover <- case (maybeLeftover1, maybeLeftover2) of
     (Just _, Just _) -> Left "we got two leftovers at once and don't know how to handle"
-    (Nothing, Nothing) -> Right $ Start [] 
-    (Just a, Nothing) -> Right a 
+    (Nothing, Nothing) -> Right $ Start []
+    (Just a, Nothing) -> Right a
     (Nothing, Just b) -> Right b
   pure (unzip maybeRes, leftover)
+
 applyLeftover :: (Eq s, Pretty s) => BoundVar -> (([(s, Count)], [(s, Count)]), Leftover s) -> Either Text ([(s, Count)], [(s, Count)])
-applyLeftover newVar ((starts, ends), lo) = case lo of
+applyLeftover newVar ((starts, ends), lo) = trace ("lo was " <> showP lo) $ case lo of
   Start [] -> Right (starts, ends)
   End [] -> Right (starts, ends)
   Start [(s, FinCount n)] -> Right (invariantifyList $ starts ++ [(s, boundVarCount newVar n)], ends)
@@ -206,35 +208,35 @@ matchCounts newVar c d = let rom = showP c <> " and " <> showP d in -- "rest of 
       (FinCount incNat) -> let base =  OneVar n as 1 x in Right (base, base <> boundVarCount newVar incNat)
       _ -> Left $ "amt of increase was not finite: " <> showP increaseAmt <> "\n" <> rom
   _ -> Left $ "couldn't match counts:" <> rom
-matchLastPairs :: (Eq s) => BoundVar -> (s, Count) -> (s, Count) 
+matchLastPairs :: (Eq s) => BoundVar -> (s, Count) -> (s, Count)
   -> Either Text ((s, Count), (s, Count), Maybe (Leftover s))
-matchLastPairs newVar (s, c) (t, d) = do 
+matchLastPairs newVar (s, c) (t, d) = do
   guardMsg (s == t) "two bits didn't match"
-  (c', d', maybeLeft) <- matchLastCounts newVar s c d 
+  (c', d', maybeLeft) <- matchLastCounts newVar s c d
   pure ((s, c'), (t, d'), maybeLeft)
 --the leftover is what's left after matching
 matchLastCounts :: BoundVar -> s -> Count -> Count -> Either Text (Count, Count, Maybe (Leftover s))
 matchLastCounts newVar sym c d = let rom = showP c <> " and " <> showP d in -- "rest of message" 
-  case matchCounts newVar c d of 
-  Right (x, y) -> Right (x, y, Nothing) 
-  Left _ -> case (c, d) of 
+  case matchCounts newVar c d of
+  Right (x, y) -> Right (x, y, Nothing)
+  Left _ -> case (c, d) of
     (FinCount n, FinCount m) -> let res = FinCount $ min n m
         in
-      case compare n m of 
+      case compare n m of
         EQ -> error "unreachable matchLastCounts"
         GT -> Right (res, res, Just $ Start [(sym, FinCount (n - m))])
-        LT -> Right (res, res, Just $ Start [(sym, FinCount (m - n))])
+        LT -> Right (res, res, Just $ End [(sym, FinCount (m - n))])
     _ -> Left $ "couldn't match counts:" <> rom
-    
+
 addChainedToBook ::(Ord s, Pretty s) => SkipBook s -> SkipBook s
 addChainedToBook sb = addMultipleToBook newSkipAndOrigins sb where
   allSkips = M.keys =<< M.elems sb
   mbChained = chainArbitrary <$> allSkips
-  makeMBskipOrigin = \case 
+  makeMBskipOrigin = \case
     (skipIn, Right newSkip) -> Just (newSkip, ChainedFrom skipIn)
-    _ -> Nothing 
-  newSkipAndOrigins = let ans = mapMaybe makeMBskipOrigin $ zipExact allSkips mbChained 
-    in 
+    _ -> Nothing
+  newSkipAndOrigins = let ans = mapMaybe makeMBskipOrigin $ zipExact allSkips mbChained
+    in
     --trace ("added " <> mconcat (showP . fst <$> ans))
     ans
 
