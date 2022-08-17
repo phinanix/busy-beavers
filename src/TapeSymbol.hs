@@ -157,7 +157,7 @@ chainArbitrary skip@(Skip start end _steps) = case end of
 
 matchLists :: (Eq s, Pretty s) => BoundVar -> [(s, Count)] -> [(s, Count)]
   -> Either Text ([(s, Count)], [(s, Count)])
-matchLists newVar xs ys = trace ("matching" <> showP (xs, ys)) $ 
+matchLists newVar xs ys = --trace ("matching" <> showP (xs, ys)) $ 
   bind (applyLeftover newVar) $ commonPartAndLeftover newVar xs ys
 
 commonPartAndLeftover :: (Eq s) => BoundVar -> [(s, Count)] -> [(s, Count)]
@@ -183,7 +183,7 @@ commonPartAndLeftover newVar xs ys = do
   pure (unzip maybeRes, leftover)
 
 applyLeftover :: (Eq s, Pretty s) => BoundVar -> (([(s, Count)], [(s, Count)]), Leftover s) -> Either Text ([(s, Count)], [(s, Count)])
-applyLeftover newVar ((starts, ends), lo) = trace ("lo was " <> showP lo) $ case lo of
+applyLeftover newVar ((starts, ends), lo) = case lo of
   Start [] -> Right (starts, ends)
   End [] -> Right (starts, ends)
   Start [(s, FinCount n)] -> Right (invariantifyList $ starts ++ [(s, boundVarCount newVar n)], ends)

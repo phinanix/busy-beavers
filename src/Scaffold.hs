@@ -56,7 +56,7 @@ obtainHistorySlices th@(TapeHist tapeHist) (ReadShiftHist readShiftHist) = do
   -- TODO: trying drop 1 to fix startup effects
   -- it looks like we shoudl maybe try drop 0, 1, 2, etc. and see
   -- or maybe we should truncate to only 3 or 4 things, instead of dropping
-  let indices = trace ("machine configs: " <> showP machineConfigs) drop 0 $ fst <$> snd machineConfigs
+  let indices = trace ("machine configs: " <> showP machineConfigs) drop 1 $ fst <$> snd machineConfigs
       pairedIndices = zip (U.init indices) (U.tail indices)
   nonemptyPairs <- --trace ("pairedIndices" <> show pairedIndices <> "length" <> show (length labelledTapeHist) <> show (length readShiftHist) ) 
     failMsg (error "pairs were empty") $ nonEmpty pairedIndices
