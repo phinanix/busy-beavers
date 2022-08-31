@@ -553,7 +553,7 @@ obtainCriticalIndicesConfigs (TapeHist hist) = do
   criticalConfig@(criticalPhase, _criticalSignature) <- guessCriticalConfiguration hist
   let
     configIndicesAndConfigs = let ans = obtainConfigIndices hist criticalConfig in
-      --trace ("configs were:\n" <> showP ans)
+      trace ("configs were:\n" <> showP ans)
       ans
   pure (criticalPhase, configIndicesAndConfigs)
 
@@ -572,6 +572,10 @@ guessInductionHypothesis th rsh = force $ do
      trace ("guessed indhyp:\n" <> showP indGuess) $
      assert ((thingContainsVar <$> indGuess) /= Right False)
      indGuess
+
+generalizeNumberSquare :: ([NonEmpty (Count, Count)], [NonEmpty (Count, Count)]) 
+  -> Either Text ([(Count, Count)], [(Count, Count)]) 
+generalizeNumberSquare = bitraverseBoth (traverse generalizeFromCounts)
 
 guessInductionHypWithIndices :: (Pretty s, Eq s, Partial) => TapeHist s InfCount -> ReadShiftHist -> Phase -> [(Int, (Phase, ExpTape s InfCount))] -> Either Text (Skip Count s)
 guessInductionHypWithIndices (TapeHist hist) (ReadShiftHist rsHist) criticalPhase configIndicesAndConfigs =

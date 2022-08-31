@@ -138,3 +138,19 @@ spec = do
     it "works on a real example" $
       calcCommonSig (Signature [Bit False] (Bit False) [Bit True,Bit False]) (Signature [] (Bit False) [Bit True,Bit False])
         `shouldBe` Just (StartDrop, NoDrop)
+  describe "generalizeNumberSquare" $ do 
+    it "generalizes a square it didn't before" $ do 
+      let n = FinCount
+      {-slicepairs were:
+[ ((|FF|, 1) |>|FT|<|(|FT|, 19) (|FF|, 23)  , |>|FT|<|(|FT|, 43)  )
+, ((|FF|, 1) |>|FT|<|(|FT|, 43) (|FF|, 47)  , |>|FT|<|(|FT|, 91)  )
+, ((|FF|, 1) |>|FT|<|(|FT|, 91) (|FF|, 95)  , |>|FT|<|(|FT|, 187)  )
+, ((|FF|, 1) |>|FT|<|(|FT|, 187) (|FF|, 191)  , |>|FT|<|(|FT|, 379)  )
+, ((|FF|, 1) |>|FT|<|(|FT|, 379) (|FF|, 383)  , |>|FT|<|(|FT|, 763)  ) ]
+-}
+      generalizeNumberSquare (
+        [(n 1, n 0) :| [(n 1, n 0), (n 1, n 0), (n 1, n 0), (n 1, n 0)]], 
+        [(n 19, n 43) :| [(n 43, n 91), (n 91, n 187), (n 187, n 379), (n 379, n 763)], 
+         (n 23, n 0) :| [(n 47, n 0), (n 95, n 0), (n 191, n 0), (n 383, n 0)]]) 
+        `shouldSatisfy` has _Right
+  
