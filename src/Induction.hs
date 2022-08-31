@@ -360,7 +360,7 @@ simulateViaDFS stepLim depthLim book (Skip startConfig skipEnd _hops)
       Just endConfig -> dfs stepLim depthLim (getNextConfigs book) (== endConfig) startConfig
 
 transposeNE :: NonEmpty [a] -> [NonEmpty a]
-transposeNE (x :| xs) = assertMsg (all (\y -> length y == length x) xs) ("not all same length: " <> showP (length x, length <$> xs)) 
+transposeNE (x :| xs) = assertMsg (all (\y -> length y == length x) xs) ("not all same length: " <> showP (length x, length <$> xs))
   getZipList $ (:|) <$> ZipList x <*> ZipList (transpose xs)
 
 transposeOverPair :: forall a. NonEmpty ([a], [a]) -> ([NonEmpty a], [NonEmpty a])
@@ -573,12 +573,53 @@ guessInductionHypothesis th rsh = force $ do
      assert ((thingContainsVar <$> indGuess) /= Right False)
      indGuess
 
-generalizeNumberSquare :: ([NonEmpty (Count, Count)], [NonEmpty (Count, Count)]) 
-  -> Either Text ([(Count, Count)], [(Count, Count)]) 
-generalizeNumberSquare = bitraverseBoth (traverse generalizeFromCounts)
+type FunctionExamples = (NonEmpty (Count, Count), (Maybe Count, Maybe Count))
 
-guessInductionHypWithIndices :: (Pretty s, Eq s, Partial) => TapeHist s InfCount -> ReadShiftHist -> Phase -> [(Int, (Phase, ExpTape s InfCount))] -> Either Text (Skip Count s)
-guessInductionHypWithIndices (TapeHist hist) (ReadShiftHist rsHist) criticalPhase configIndicesAndConfigs =
+generalizeNumberSquare :: ([NonEmpty (Count, Count)], [NonEmpty (Count, Count)])
+  -> Either Text ([(Count, Count)], [(Count, Count)])
+generalizeNumberSquare ns = bitraverseBoth (traverse generalizeFromCounts) ns where
+  myGeneralize countPairs = case generalizeFromCounts countPairs of
+    Right (inC, outC) -> (Just inC, Just outC)
+    Left _msg -> (Nothing, Nothing)
+  partiallyGeneralized :: ([FunctionExamples], [FunctionExamples])
+  partiallyGeneralized = bimapBoth (fmap (\cps -> (cps, myGeneralize cps))) ns
+  --right now this works on the first thing. we'll make it more general in a sec ok man
+  generalizeBitAgainstOtherBit :: (FunctionExamples, FunctionExamples) 
+    -> (FunctionExamples, FunctionExamples)
+  generalizeBitAgainstOtherBit inp@(lh@(fromCL, (Just fromIn, Just fromOut)), (toCL, (Nothing, mbToOut))) 
+    = case generalizeFromCounts (neZipExact (fst <$> fromCL) (fst <$> toCL)) of 
+      Left _msg -> inp 
+      --instead of compare, this should be like, get the shared parts and the different parts
+      Right (toFromCount, toCount) -> case likeTerms fromIn toFromCount of 
+        (_newFromIn, Empty, Empty) -> (lh, (toCL, (Just toCount, mbToOut)))
+        --add to fromIn and fromOut 
+        (_likeTerm, extraForTo, extraForFrom) 
+          -> assert (toFromCount <> extraForTo == fromIn <> extraForFrom)
+            ((fromCL, (Just (fromIn <> extraForFrom), Just (fromOut <> extraForFrom))), 
+              (toCL, (Just (toCount <> extraForTo), mbToOut))) 
+  generalizeBitAgainstOtherBit notGeneralizeable = notGeneralizeable
+      
+  --apply this
+  genAllEqual :: NonEmpty Count -> Maybe Count 
+  genAllEqual cl = if list1AllEqual cl then Just (head cl) else Nothing 
+  generalizeAllEqual :: FunctionExamples -> FunctionExamples
+  generalizeAllEqual (cpl, pair) = case pair of 
+    (Nothing, Nothing) -> (cpl, (genAllEqual (fst <$> cpl), genAllEqual (snd <$> cpl))) 
+    (Just _, Just _) -> (cpl, pair)
+    (_, _) -> error "generalizeAllEqual invariant"
+  allEqualEverything :: ([FunctionExamples], [FunctionExamples]) 
+    -> ([FunctionExamples], [FunctionExamples])
+  allEqualEverything = bimapBoth (fmap generalizeAllEqual)
+
+  --now we need to run generalizeBitAgainstOtherBit on all possible pairs of bits
+  --and then we need to do that again in a loop until we hit a fixpoint and return the result
+
+
+guessInductionHypWithIndices :: (Pretty s, Eq s, Partial) 
+  => TapeHist s InfCount -> ReadShiftHist -> Phase -> [(Int, (Phase, ExpTape s InfCount))] 
+  -> Either Text (Skip Count s)
+guessInductionHypWithIndices (TapeHist hist) (ReadShiftHist rsHist) 
+                              criticalPhase configIndicesAndConfigs =
   let
     configIndices = let ans = fst <$> configIndicesAndConfigs in
       trace ("configIndices were: " <> showP ans)
@@ -591,7 +632,7 @@ guessInductionHypWithIndices (TapeHist hist) (ReadShiftHist rsHist) criticalPhas
       --trace ("allsigs were: " <> showP ans) 
       ans
   in do
-  guardMsg (length configIndices >= 3) "less than 2 examples of the thing happening"
+  guardMsg (length configIndices >= 3) "less than 3 examples of the thing happening"
   --only proceed from here if all the pairs have the same signature at both the start and the end
   if allEqual allSigs then Right () else Left "sigs were not all equal"
   --to finish from here, our goal is for each transition start -> end, make a bunch of pairs of counts 
@@ -659,7 +700,7 @@ zipSigToET :: (Partial, Show b, Pretty c) => Signature b -> ([c], [c]) -> ExpTap
 zipSigToET sig@(Signature b_ls p b_rs) pair@(c_ls, c_rs) = let
     ans = ExpTape (zipExact b_ls c_ls) p (zipExact b_rs c_rs)
     in
-    trace ("zipping:\n" <> show (show sig <> "\n" <> pretty pair) <> "\nzipped\n") 
+    trace ("zipping:\n" <> show (show sig <> "\n" <> pretty pair) <> "\nzipped\n")
     ans
 
 --gets the simulation history and the displacement history
