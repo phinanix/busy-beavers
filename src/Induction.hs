@@ -577,48 +577,106 @@ type FunctionExamples = (NonEmpty (Count, Count), (Maybe Count, Maybe Count))
 
 generalizeNumberSquare :: ([NonEmpty (Count, Count)], [NonEmpty (Count, Count)])
   -> Either Text ([(Count, Count)], [(Count, Count)])
-generalizeNumberSquare ns = bitraverseBoth (traverse generalizeFromCounts) ns where
+generalizeNumberSquare ns = case bitraverseBoth (traverse generalizeFromCounts) ns of
+  Right ans -> Right ans
+  Left _msg -> collectAns $ generalizeAllPairs $ allEqualEverything partiallyGeneralized
+  where
   myGeneralize countPairs = case generalizeFromCounts countPairs of
     Right (inC, outC) -> (Just inC, Just outC)
     Left _msg -> (Nothing, Nothing)
   partiallyGeneralized :: ([FunctionExamples], [FunctionExamples])
   partiallyGeneralized = bimapBoth (fmap (\cps -> (cps, myGeneralize cps))) ns
   --right now this works on the first thing. we'll make it more general in a sec ok man
-  generalizeBitAgainstOtherBit :: (FunctionExamples, FunctionExamples) 
+  generalizeBitAgainstOtherBit :: (FunctionExamples, FunctionExamples)
     -> (FunctionExamples, FunctionExamples)
-  generalizeBitAgainstOtherBit inp@(lh@(fromCL, (Just fromIn, Just fromOut)), (toCL, (Nothing, mbToOut))) 
-    = case generalizeFromCounts (neZipExact (fst <$> fromCL) (fst <$> toCL)) of 
-      Left _msg -> inp 
+  generalizeBitAgainstOtherBit inp@(lh@(fromCL, (Just fromIn, Just fromOut)), (toCL, (Nothing, mbToOut)))
+    = case generalizeFromCounts (neZipExact (fst <$> fromCL) (fst <$> toCL)) of
+      Left _msg -> inp
       --instead of compare, this should be like, get the shared parts and the different parts
-      Right (toFromCount, toCount) -> case likeTerms fromIn toFromCount of 
+      Right (toFromCount, toCount) -> case likeTerms fromIn toFromCount of
         (_newFromIn, Empty, Empty) -> (lh, (toCL, (Just toCount, mbToOut)))
         --add to fromIn and fromOut 
-        (_likeTerm, extraForTo, extraForFrom) 
+        (_likeTerm, extraForTo, extraForFrom)
           -> assert (toFromCount <> extraForTo == fromIn <> extraForFrom)
-            ((fromCL, (Just (fromIn <> extraForFrom), Just (fromOut <> extraForFrom))), 
-              (toCL, (Just (toCount <> extraForTo), mbToOut))) 
+            ((fromCL, (Just (fromIn <> extraForFrom), Just (fromOut <> extraForFrom))),
+              (toCL, (Just (toCount <> extraForTo), mbToOut)))
   generalizeBitAgainstOtherBit notGeneralizeable = notGeneralizeable
-      
+
   --apply this
-  genAllEqual :: NonEmpty Count -> Maybe Count 
-  genAllEqual cl = if list1AllEqual cl then Just (head cl) else Nothing 
+  genAllEqual :: NonEmpty Count -> Maybe Count
+  genAllEqual cl = if list1AllEqual cl then Just (head cl) else Nothing
   generalizeAllEqual :: FunctionExamples -> FunctionExamples
-  generalizeAllEqual (cpl, pair) = case pair of 
-    (Nothing, Nothing) -> (cpl, (genAllEqual (fst <$> cpl), genAllEqual (snd <$> cpl))) 
+  generalizeAllEqual (cpl, pair) = case pair of
+    (Nothing, Nothing) -> (cpl, (genAllEqual (fst <$> cpl), genAllEqual (snd <$> cpl)))
     (Just _, Just _) -> (cpl, pair)
     (_, _) -> error "generalizeAllEqual invariant"
-  allEqualEverything :: ([FunctionExamples], [FunctionExamples]) 
+  allEqualEverything :: ([FunctionExamples], [FunctionExamples])
     -> ([FunctionExamples], [FunctionExamples])
   allEqualEverything = bimapBoth (fmap generalizeAllEqual)
 
   --now we need to run generalizeBitAgainstOtherBit on all possible pairs of bits
   --and then we need to do that again in a loop until we hit a fixpoint and return the result
+  --laterphina realized you only have to run it once, because if it's possible to solve the grid
+  --with current methods, then you can solve it on the first go-round
+  composeLenses :: Lens' s a -> ReifiedLens' a b -> ReifiedLens' s b
+  composeLenses a (Lens b) = Lens $ a . b  
 
+  generalizeFromList :: [FunctionExamples] -> [ReifiedLens' [FunctionExamples] FunctionExamples]
+  generalizeFromList fexs = mapMaybe mkLens $ zip [0,1..] fexs where
+    mkLens (i, (_cl, (c1, c2))) = case (c1, c2) of 
+      (Just _, Just _) -> trace ("from " <> show i) Just $ Lens $ ixListLens i
+      _ -> Nothing 
 
-guessInductionHypWithIndices :: (Pretty s, Eq s, Partial) 
-  => TapeHist s InfCount -> ReadShiftHist -> Phase -> [(Int, (Phase, ExpTape s InfCount))] 
+  eligibleGeneralizeFrom :: ([FunctionExamples], [FunctionExamples])
+    -> [ReifiedLens' ([FunctionExamples], [FunctionExamples]) FunctionExamples]
+  eligibleGeneralizeFrom (ls, rs) 
+    = (composeLenses _1 <$> lsOptics) ++ (composeLenses _2 <$> rsOptics) 
+    where
+    lsOptics = generalizeFromList ls
+    rsOptics = generalizeFromList rs
+
+  generalizeToList :: [FunctionExamples] -> [ReifiedLens' [FunctionExamples] FunctionExamples]
+  generalizeToList fexs = mapMaybe mkLens $ zip [0,1..] fexs where 
+    mkLens (i, (_cl, (c1, c2))) = case (c1, c2) of 
+      (Nothing, _) -> trace ("to " <> show i) Just $ Lens $ ixListLens i 
+      _ -> Nothing 
+
+  eligibleGeneralizeTo :: ([FunctionExamples], [FunctionExamples])
+    -> [ReifiedLens' ([FunctionExamples], [FunctionExamples]) FunctionExamples]
+  eligibleGeneralizeTo (ls, rs) 
+    = (composeLenses _1 <$> lsOptics) ++ (composeLenses _2 <$> rsOptics)
+    where 
+    lsOptics = generalizeToList ls 
+    rsOptics = generalizeToList rs 
+
+  generalizeTwoBitsGivenLens :: ReifiedLens' ([FunctionExamples], [FunctionExamples]) FunctionExamples
+   -> ReifiedLens' ([FunctionExamples], [FunctionExamples]) FunctionExamples
+   -> ([FunctionExamples], [FunctionExamples]) -> ([FunctionExamples], [FunctionExamples])
+  generalizeTwoBitsGivenLens (Lens from) (Lens to) stuff 
+    = stuff & combinedLens %~ generalizeBitAgainstOtherBit where 
+      combinedLens = from /\ to
+  generalizeAllPairs :: ([FunctionExamples], [FunctionExamples])
+    -> ([FunctionExamples], [FunctionExamples])
+  generalizeAllPairs inp = let
+    froms = eligibleGeneralizeFrom inp
+    tos = eligibleGeneralizeTo inp
+    genFuncs = generalizeTwoBitsGivenLens <$> froms <*> tos
+    in
+    foldr (\func fe -> func fe) inp genFuncs
+
+  collectList :: [FunctionExamples] -> Either Text [(Count, Count)]
+  collectList = traverse (\(cl, (mbC1, mbC2)) -> case (mbC1, mbC2) of
+    (Just c1, Just c2) -> Right (c1, c2)
+    _ -> Left ("failed to generalize: " <> showP cl <> "\ngot: " <> show (mbC1, mbC2))
+    )
+  collectAns :: ([FunctionExamples], [FunctionExamples])
+    -> Either Text ([(Count, Count)], [(Count, Count)])
+  collectAns = bitraverseBoth collectList
+
+guessInductionHypWithIndices :: (Pretty s, Eq s, Partial)
+  => TapeHist s InfCount -> ReadShiftHist -> Phase -> [(Int, (Phase, ExpTape s InfCount))]
   -> Either Text (Skip Count s)
-guessInductionHypWithIndices (TapeHist hist) (ReadShiftHist rsHist) 
+guessInductionHypWithIndices (TapeHist hist) (ReadShiftHist rsHist)
                               criticalPhase configIndicesAndConfigs =
   let
     configIndices = let ans = fst <$> configIndicesAndConfigs in

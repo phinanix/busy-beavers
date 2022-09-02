@@ -6,7 +6,7 @@ import Data.Map.Monoidal ( MonoidalMap )
 import qualified Data.Set as S 
 
 import Control.Lens
-import Safe.Exact (takeExact, dropExact)
+import Safe.Exact (takeExact, dropExact, splitAtExact)
 import Safe.Partial
 import Prettyprinter
 import qualified Data.List.NonEmpty as NE
@@ -159,3 +159,44 @@ second3 f (x, a, y) = (x, f a, y)
 
 assertMsg :: Partial => Bool -> Text -> a -> a 
 assertMsg cond msg out = if cond then out else error  msg
+
+(/\)
+    :: (Functor f)
+    => ((a -> (a, a)) -> (c -> (a, c)))
+    -- ^ Lens' c a
+    -> ((b -> (b, b)) -> (c -> (b, c)))
+    -- ^ Lens' c b
+    -> (((a, b) -> f (a, b)) -> (c -> f c))
+    -- ^ Lens' c (a, b)
+(lens1 /\ lens2) f c0 =
+    let (a, _) = lens1 (\a_ -> (a_, a_)) c0
+        (b, _) = lens2 (\b_ -> (b_, b_)) c0
+        fab = f (a, b)
+    in fmap (\(a, b) ->
+            let (_, c1) = lens1 (\a_ -> (a_, a)) c0
+                (_, c2) = lens2 (\b_ -> (b_, b)) c1
+            in c2
+            ) fab
+
+infixl 7 /\
+
+--this function is not actually writeable 
+combineTraversal :: --Traversal' s a -> Traversal' s b -> Traversal' s (a,b)
+  forall f a b s. (Applicative f)
+  => (forall g. Applicative g => (a -> g a) -> s -> g s)
+  -> (forall h. Applicative h => (b -> h b) -> s -> h s)
+  -> ((a,b) -> f (a,b)) -> s -> f s 
+combineTraversal ta tb = undefined where 
+  helper :: (Applicative f) => (a -> f a) -> (b -> f b) -> ((a,b) -> f (a, b))
+  helper f g (a,b) = (,) <$> f a <*> g b 
+  invHelper :: (Applicative f) => ((a,b) -> f (a, b)) -> (a -> f a, b -> f b)
+  invHelper fg = undefined --((), ())
+
+ixListLens :: Int -> Lens' [s] s 
+ixListLens i = lens get set where 
+  get :: [s] -> s 
+  get = flip (U.!!) i
+  set :: [s] -> s -> [s]
+  set xs newX = case splitAtExact i xs of 
+    (pref, (_oldX:suf)) -> pref ++ (newX:suf)
+    _ -> error ("length: " <> show (length xs) <> " index: " <> show i)
