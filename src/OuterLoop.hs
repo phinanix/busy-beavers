@@ -113,6 +113,9 @@ Amanda, full of good ideas, suggested I write this down. I'm having a problem wh
   ReadShiftHistory, but then it just gets ignored by guessInductionHypothesis. It should
   be pretty straightforward to rewrite guessInductionHypothesis to append all the ReadShifts
   together instead of using the displacements. 
+
+2 Sep current ghci command that we're trying to make work
+outerLoop (V.fromList [twoBitSimLoop]) (unproven_size4_24jul U.!! 9)
 -}
 
 {-

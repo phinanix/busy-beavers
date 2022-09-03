@@ -157,7 +157,7 @@ spec = do
           ans = ([(n 1, n 0)],
             [(boundVarCount (BoundVar 0) 1, n 5 <> boundVarCount (BoundVar 0) 2)
              , (n 4 <> boundVarCount (BoundVar 0) 1, n 0)])
-          flipPair (a, b) = (b, a)
+          
       generalizeNumberSquare ns `shouldBe` Right ans
 -- (        [(n 1, n 0) :| [(n 1, n 0), (n 1, n 0), (n 1, n 0), (n 1, n 0)]],         [(n 19, n 43) :| [(n 43, n 91), (n 91, n 187), (n 187, n 379), (n 379, n 763)],          (n 23, n 0) :| [(n 47, n 0), (n 95, n 0), (n 191, n 0), (n 383, n 0)]]) 
 

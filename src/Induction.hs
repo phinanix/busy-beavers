@@ -732,7 +732,7 @@ guessInductionHypWithIndices (TapeHist hist) (ReadShiftHist rsHist)
     bitraverseBoth (traverse nonEmpty) $ transposePairs countPairListList
   --the pair here is over left and right, then the list is over the "signature dimension", and the internal
   --pair is over start -> finish
-  allThingsGeneralized <- bitraverseBoth (traverse generalizeFromCounts) thingsToGeneralizeList
+  allThingsGeneralized <- generalizeNumberSquare thingsToGeneralizeList
   --we want to pull the pair from start -> finish out to the front, then have the left right pair, then have the 
   --"signature dimension"
   let startCounts = bimapBoth (fmap fst) allThingsGeneralized
