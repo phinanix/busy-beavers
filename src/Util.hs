@@ -192,6 +192,7 @@ combineTraversal ta tb = undefined where
   invHelper :: (Applicative f) => ((a,b) -> f (a, b)) -> (a -> f a, b -> f b)
   invHelper fg = undefined --((), ())
 
+--this is the unsafe lens that asserts the thing is there
 ixListLens :: Int -> Lens' [s] s 
 ixListLens i = lens get set where 
   get :: [s] -> s 

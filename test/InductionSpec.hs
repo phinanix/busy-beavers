@@ -20,6 +20,7 @@ import HaltProof
 import MoreSimulationLoops
 import Util
 import TapeSymbol
+import Relude.Extra
 
 checkerboardFalseGoal :: Skip Count Bit
 checkerboardFalseGoal = Skip
@@ -138,8 +139,8 @@ spec = do
     it "works on a real example" $
       calcCommonSig (Signature [Bit False] (Bit False) [Bit True,Bit False]) (Signature [] (Bit False) [Bit True,Bit False])
         `shouldBe` Just (StartDrop, NoDrop)
-  describe "generalizeNumberSquare" $ do 
-    it "generalizes a square it didn't before" $ do 
+  describe "generalizeNumberSquare" $ do
+    it "generalizes a square it didn't before" $ do
       let n = FinCount
       {-slicepairs were:
 [ ((|FF|, 1) |>|FT|<|(|FT|, 19) (|FF|, 23)  , |>|FT|<|(|FT|, 43)  )
@@ -148,10 +149,35 @@ spec = do
 , ((|FF|, 1) |>|FT|<|(|FT|, 187) (|FF|, 191)  , |>|FT|<|(|FT|, 379)  )
 , ((|FF|, 1) |>|FT|<|(|FT|, 379) (|FF|, 383)  , |>|FT|<|(|FT|, 763)  ) ]
 -}
-      generalizeNumberSquare (
-        [(n 1, n 0) :| [(n 1, n 0), (n 1, n 0), (n 1, n 0), (n 1, n 0)]], 
-        [(n 19, n 43) :| [(n 43, n 91), (n 91, n 187), (n 187, n 379), (n 379, n 763)], 
-         (n 23, n 0) :| [(n 47, n 0), (n 95, n 0), (n 191, n 0), (n 383, n 0)]]) 
-        `shouldSatisfy` has _Right
-  
+          ns = (
+            [(n 1, n 0) :| [(n 1, n 0), (n 1, n 0), (n 1, n 0), (n 1, n 0)]],
+            [(n 19, n 43) :| [(n 43, n 91), (n 91, n 187), (n 187, n 379), (n 379, n 763)],
+            (n 23, n 0) :| [(n 47, n 0), (n 95, n 0), (n 191, n 0), (n 383, n 0)]])
+          --ans: [(1, 0)] [(x, 2x+5), (x+4, 0)]
+          ans = ([(n 1, n 0)],
+            [(boundVarCount (BoundVar 0) 1, n 5 <> boundVarCount (BoundVar 0) 2)
+             , (n 4 <> boundVarCount (BoundVar 0) 1, n 0)])
+          flipPair (a, b) = (b, a)
+      generalizeNumberSquare ns `shouldBe` Right ans
 -- (        [(n 1, n 0) :| [(n 1, n 0), (n 1, n 0), (n 1, n 0), (n 1, n 0)]],         [(n 19, n 43) :| [(n 43, n 91), (n 91, n 187), (n 187, n 379), (n 379, n 763)],          (n 23, n 0) :| [(n 47, n 0), (n 95, n 0), (n 191, n 0), (n 383, n 0)]]) 
+
+      --square: x is 2, 5, 8, 11
+      {-
+        [(3, 2), (3, 5), (3, 8), (3, 11)]
+        [[(2, 5), (5, 8), (8, 11), (11, 14)]
+         [(2, 0), (5, 0), (8, 0), (11, 0)]
+        ]
+      -}
+      --new ans: [(3, x)] [(x, x+3), (x, 0)]
+    it "generalizes a test square I made up" $ do
+      let n = FinCount 
+          ns = ([(n 3, n 2) :| [(n 3, n 5), (n 3, n 8), (n 3, n 11)]], 
+                [(n 2, n 5) :| [(n 5, n 8), (n 8, n 11), (n 11, n 14)], 
+                 (n 2, n 0) :| [(n 5, n 0), (n 8, n 0), (n 11, n 0)]
+                ])
+          ans = ([(n 3, boundVarCount (BoundVar 0) 1)], 
+            [(boundVarCount (BoundVar 0) 1, n 3 <> boundVarCount (BoundVar 0) 1), 
+             (boundVarCount (BoundVar 0) 1, n 0)])
+
+      generalizeNumberSquare ns `shouldBe` Right ans
+--([(n 3, n 2) :| [(n 3, n 5), (n 3, n 8), (n 3, n 11)]], [(n 2, n 5) :| [(n 5, n 8), (n 8, n 11), (n 11, n 14)],                (n 2, n 0) :| [(n 5, n 0), (n 8, n 0), (n 11, n 0)]                ])

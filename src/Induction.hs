@@ -574,6 +574,12 @@ guessInductionHypothesis th rsh = force $ do
      indGuess
 
 type FunctionExamples = (NonEmpty (Count, Count), (Maybe Count, Maybe Count))
+data FlipFE = NoFlip | Flip deriving (Eq, Ord, Show, Generic)
+
+flipFEs :: (FunctionExamples, FunctionExamples) -> (FunctionExamples, FunctionExamples)
+flipFEs ((fromCl, (mFI, mFO)), (toCL, (mTI, mTO)))
+ = ((flipPair <$> fromCl, (mFO, mFI)), (flipPair <$> toCL, (mTO, mTI))) 
+  where flipPair (a, b) = (b, a)
 
 generalizeNumberSquare :: ([NonEmpty (Count, Count)], [NonEmpty (Count, Count)])
   -> Either Text ([(Count, Count)], [(Count, Count)])
@@ -589,8 +595,10 @@ generalizeNumberSquare ns = case bitraverseBoth (traverse generalizeFromCounts) 
   --right now this works on the first thing. we'll make it more general in a sec ok man
   generalizeBitAgainstOtherBit :: (FunctionExamples, FunctionExamples)
     -> (FunctionExamples, FunctionExamples)
-  generalizeBitAgainstOtherBit inp@(lh@(fromCL, (Just fromIn, Just fromOut)), (toCL, (Nothing, mbToOut)))
-    = case generalizeFromCounts (neZipExact (fst <$> fromCL) (fst <$> toCL)) of
+  generalizeBitAgainstOtherBit inp@(lh@(fromCL, (Just fromIn, Just fromOut)),
+                                       (toCL, (Nothing, mbToOut)))
+    = --trace ("genrealizing: " <> showP fromCL <> "and" <> showP toCL) $
+      case generalizeFromCounts (neZipExact (fst <$> fromCL) (fst <$> toCL)) of
       Left _msg -> inp
       --instead of compare, this should be like, get the shared parts and the different parts
       Right (toFromCount, toCount) -> case likeTerms fromIn toFromCount of
@@ -601,6 +609,11 @@ generalizeNumberSquare ns = case bitraverseBoth (traverse generalizeFromCounts) 
             ((fromCL, (Just (fromIn <> extraForFrom), Just (fromOut <> extraForFrom))),
               (toCL, (Just (toCount <> extraForTo), mbToOut)))
   generalizeBitAgainstOtherBit notGeneralizeable = notGeneralizeable
+
+  generalizeBitBitWithFlip fe inp = case fe of
+    NoFlip -> generalizeBitAgainstOtherBit inp
+    Flip -> flipFEs (generalizeBitAgainstOtherBit (flipFEs inp))
+      
 
   --apply this
   genAllEqual :: NonEmpty Count -> Maybe Count
@@ -619,41 +632,42 @@ generalizeNumberSquare ns = case bitraverseBoth (traverse generalizeFromCounts) 
   --laterphina realized you only have to run it once, because if it's possible to solve the grid
   --with current methods, then you can solve it on the first go-round
   composeLenses :: Lens' s a -> ReifiedLens' a b -> ReifiedLens' s b
-  composeLenses a (Lens b) = Lens $ a . b  
+  composeLenses a (Lens b) = Lens $ a . b
 
   generalizeFromList :: [FunctionExamples] -> [ReifiedLens' [FunctionExamples] FunctionExamples]
   generalizeFromList fexs = mapMaybe mkLens $ zip [0,1..] fexs where
-    mkLens (i, (_cl, (c1, c2))) = case (c1, c2) of 
-      (Just _, Just _) -> trace ("from " <> show i) Just $ Lens $ ixListLens i
-      _ -> Nothing 
+    mkLens (i, (_cl, (c1, c2))) = case (c1, c2) of
+      (Just _, Just _) -> Just $ Lens $ ixListLens i
+      _ -> Nothing
 
   eligibleGeneralizeFrom :: ([FunctionExamples], [FunctionExamples])
     -> [ReifiedLens' ([FunctionExamples], [FunctionExamples]) FunctionExamples]
-  eligibleGeneralizeFrom (ls, rs) 
-    = (composeLenses _1 <$> lsOptics) ++ (composeLenses _2 <$> rsOptics) 
+  eligibleGeneralizeFrom (ls, rs)
+    = (composeLenses _1 <$> lsOptics) ++ (composeLenses _2 <$> rsOptics)
     where
     lsOptics = generalizeFromList ls
     rsOptics = generalizeFromList rs
 
-  generalizeToList :: [FunctionExamples] -> [ReifiedLens' [FunctionExamples] FunctionExamples]
-  generalizeToList fexs = mapMaybe mkLens $ zip [0,1..] fexs where 
-    mkLens (i, (_cl, (c1, c2))) = case (c1, c2) of 
-      (Nothing, _) -> trace ("to " <> show i) Just $ Lens $ ixListLens i 
-      _ -> Nothing 
+  generalizeToList :: [FunctionExamples] -> [(FlipFE, ReifiedLens' [FunctionExamples] FunctionExamples)]
+  generalizeToList fexs = catMaybes $ bind mkLenses $ zip [0,1..] fexs where
+    mkLenses (i, (_cl, (c1, c2))) = case (c1, c2) of
+      (Nothing, _) -> [Just (NoFlip, Lens $ ixListLens i)]
+      (_, Nothing) -> [Just (Flip, Lens $ ixListLens i)]
+      _ -> [Nothing]
 
   eligibleGeneralizeTo :: ([FunctionExamples], [FunctionExamples])
-    -> [ReifiedLens' ([FunctionExamples], [FunctionExamples]) FunctionExamples]
-  eligibleGeneralizeTo (ls, rs) 
-    = (composeLenses _1 <$> lsOptics) ++ (composeLenses _2 <$> rsOptics)
-    where 
-    lsOptics = generalizeToList ls 
-    rsOptics = generalizeToList rs 
+    -> [(FlipFE, ReifiedLens' ([FunctionExamples], [FunctionExamples]) FunctionExamples)]
+  eligibleGeneralizeTo (ls, rs)
+    = (second (composeLenses _1) <$> lsOptics) ++ (second (composeLenses _2) <$> rsOptics)
+    where
+    lsOptics = generalizeToList ls
+    rsOptics = generalizeToList rs
 
   generalizeTwoBitsGivenLens :: ReifiedLens' ([FunctionExamples], [FunctionExamples]) FunctionExamples
-   -> ReifiedLens' ([FunctionExamples], [FunctionExamples]) FunctionExamples
+   -> (FlipFE, ReifiedLens' ([FunctionExamples], [FunctionExamples]) FunctionExamples)
    -> ([FunctionExamples], [FunctionExamples]) -> ([FunctionExamples], [FunctionExamples])
-  generalizeTwoBitsGivenLens (Lens from) (Lens to) stuff 
-    = stuff & combinedLens %~ generalizeBitAgainstOtherBit where 
+  generalizeTwoBitsGivenLens (Lens from) (fe, Lens to) stuff
+    = stuff & combinedLens %~ generalizeBitBitWithFlip fe where
       combinedLens = from /\ to
   generalizeAllPairs :: ([FunctionExamples], [FunctionExamples])
     -> ([FunctionExamples], [FunctionExamples])
@@ -1029,7 +1043,7 @@ generalizeFromCounts xs = case  allEqualPair <|> additivePair <|> affinePair of
         ans = uncurry subNats <$$> naturalPairs
         msg = "differences were\n" <> show ans
       in
-        --trace msg ans
+        --trace msg 
         ans
     newBoundVarBad :: Count
     newBoundVarBad = newBoundVar 0
@@ -1085,6 +1099,7 @@ generalizeFromCounts xs = case  allEqualPair <|> additivePair <|> affinePair of
             guard (y1 /= y2)
           --the idea here is we're going to subtract x1 from x2, and then divide by it, so it has to be strictly positive
           --while we're going to subtract y1 from y2 but not divide by it so it just has to be at least 0
+          --note: this function can't handle division, but it could be upgraded to
             m <- if (x2 > x1) && (y2 >= y1)
                 then (y2 - y1) `maybeDiv` (x2 - x1)
                 else if (x1 > x2) && (y1 >= y2)
