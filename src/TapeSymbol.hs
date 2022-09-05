@@ -28,6 +28,7 @@ data SkipOrigin s = Initial --from an atomic transition of the machine
                   | Induction (SkipBook s) Int --from stepping forward the given number of times, with the given skipbook
                   | InductionHypothesis
                   | ChainedFrom (Skip Count s)
+                  | PairGen Steps Steps Natural --first to second steps are when we generalized from, natural is number of simsteps
                   deriving (Eq, Ord, Show, Generic)
 instance (NFData s) => NFData (SkipOrigin s)
 
@@ -35,6 +36,8 @@ instance (NFData s) => NFData (SkipOrigin s)
 --the "Phase, s" is the Phase on start and the "s" that the point is made of
 type SkipBook s = Map (Phase,  s) (Map (Skip Count s) (SkipOrigin s))
 
+getSkipsFromBook :: SkipBook s -> [Skip Count s] 
+getSkipsFromBook book = foldMap M.keys $ M.elems book 
 
 class (Ord s, Show s, Pretty s, Typeable s, NFData s) => TapeSymbol s where
   blank :: s
@@ -237,7 +240,7 @@ addChainedToBook sb = addMultipleToBook newSkipAndOrigins sb where
     _ -> Nothing
   newSkipAndOrigins = let ans = mapMaybe makeMBskipOrigin $ zipExact allSkips mbChained
     in
-    --trace ("added " <> mconcat (showP . fst <$> ans))
+    trace ("added chained " <> mconcat (showP . fst <$> ans))
     ans
 
 instance TapeSymbol Bit where

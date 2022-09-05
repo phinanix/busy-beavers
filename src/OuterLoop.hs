@@ -254,15 +254,16 @@ twoBitDispLoop = simLoop 150 $ simulateStepPartial maxInt :|
   ])
 
 baseSimLoop :: (TapeSymbol s) => Turing -> ([Turing],[(Turing, SimResult InfCount s)])
-baseSimLoop = trace "hi" simLoop 3000 $ simulateStepPartial maxInt :| 
+baseSimLoop = simLoop 1000 $ simulateStepPartial maxInt :| 
   (liftOneToMulti <$> [checkSeenBefore
   , liftModifyState recordHist
   , liftModifyState recordDispHist
   , runAtCount 10 proveByLR
   , runAtCount 40 proveSimply
   , runAtCount 145 proveByLR
+  , runAtCount 597 addSinglePairRule
   , runAtCount 598 proveSimply
-  , runAtCount 2999 proveByIndV1
+  --, runAtCount 999 proveByIndV1
   ])
 
 {-# SPECIALISE baseSimLoop :: Turing -> ([Turing],[(Turing, SimResult InfCount Bit)]) #-}

@@ -24,6 +24,8 @@ import TapeSymbol
 import SimulateTwoBit (TwoBit)
 import ExpTape
 import Scaffold
+import Relude.Extra (bimapBoth)
+import Safe.Exact
 
 attemptInductionGuess :: Turing -> SimState Bit
   -> Either (SimResult InfCount Bit) (SimState Bit)
@@ -89,18 +91,18 @@ proveByInd machine state = --force $ --trace ("proveByInd on:\n" <> showP machin
 {-# SPECIALISE proveByInd :: SimOneAction TwoBit #-}
 
 
-proveByIndV1 ::(TapeSymbol s) => SimOneAction s 
+proveByIndV1 ::(TapeSymbol s) => SimOneAction s
 proveByIndV1 machine state =
-  case mbProof of 
-    Left _msg -> Right state 
-    Right hp -> Left $ ContinueForever hp 
-  where 
+  case mbProof of
+    Left _msg -> Right state
+    Right hp -> Left $ ContinueForever hp
+  where
     hist = state ^. s_history
     rsHist = state ^. s_readshift_history
-    mbProof = do 
-      indGuess <- guessInductionHypothesis hist rsHist 
+    mbProof = do
+      indGuess <- guessInductionHypothesis hist rsHist
       (scaffoldSkip, scaffoldOrigin) <-
-       proveByScaffold machine (state ^. s_book) hist rsHist 
+       proveByScaffold machine (state ^. s_book) hist rsHist
       let newBook = addSkipToBook scaffoldSkip scaffoldOrigin (state ^. s_book)
       --this is where we obtain the skipOrigin that proves indGUess
       n <- trace ("indguess: " <> showP indGuess <> "scaffoldSkip: " <> showP scaffoldSkip)
@@ -109,24 +111,83 @@ proveByIndV1 machine state =
               --x, rather than with x+1, and proveInductively does that for you, which is helpful
         --first fst $ proveBySimulating 100 machine newBook indGuess
          first fst $ proveInductively 100 machine newBook indGuess (BoundVar 0)
-      arbSkip <- trace ("succeeded at proving indhyp") chainArbitrary indGuess  
+      arbSkip <- trace ("succeeded at proving indhyp") chainArbitrary indGuess
       trace ("arbskip: " <> showP arbSkip) skipAppliesForeverInHist arbSkip hist
 
 proveSimply :: (TapeSymbol s) => SimOneAction s
 proveSimply machine state = case mbProof of
-  Left txt -> --trace (toString $ "provesimply failed because: " <> txt <> "\nEOM\n") $ 
+  Left txt -> trace (toString $ "provesimply failed because: " <> txt <> "\nEOM\n") $ 
     Right state
   Right hp -> Left $ ContinueForever hp
   where
   mbProof = do
     indHyp <- guessInductionHypothesis (state ^. s_history) (state ^. s_readshift_history)
-    first fst $ proveBySimulating 100 machine (state ^. s_book) indHyp
+    first fst $ proveSimLinearAndTree 100 100 machine (state ^. s_book) indHyp
     arbSkip <- --trace ("indhyp suceeded") $ 
       chainArbitrary indHyp
     skipAppliesForeverInHist arbSkip (state ^. s_history)
 {-# SPECIALISE proveSimply :: SimOneAction Bit #-}
 {-# SPECIALISE proveSimply :: SimOneAction TwoBit #-}
 
+{-
+algorithm: for all configs which occur at least twice in the history of complexity at most 5:
+find the last two times the config occured
+create the rule that involves adding the differences 
+  (you can add one thing to each edge, but at most 1)
+try to prove that rule
+if successful, then add the rule to the rulebook 
+-}
+addSinglePairRule :: forall s. (TapeSymbol s) => SimOneAction s
+addSinglePairRule machine state = Right $ state & s_book .~ newBook where
+  (TapeHist hist) = state ^. s_history
+  (ReadShiftHist rsHist) = state ^. s_readshift_history
+  book = state ^. s_book
+  configs :: Set (Phase, Signature s)
+  configs = fromList $ second tapeSignature <$> hist
+  newSkips :: [(Skip Count s, SkipOrigin s)]
+  newSkips = let ans = mapMaybe generalizeConfig $ toList configs in 
+    trace ("new skips were: " <> foldMap showP (fst <$> ans)) ans
+  newBook = addChainedToBook $ addMultipleToBook newSkips book
+  generalizeConfig :: (Phase, Signature s) -> Maybe (Skip Count s, SkipOrigin s)
+  generalizeConfig (ph, sig) = case reverse $ filter (\(_i, (ph', tape)) -> (ph == ph') && sig == tapeSignature tape) $ zip [0, 1..] hist of
+    [] -> Nothing
+    [_] -> Nothing
+    ((lastIndex, _lastConfig) : ((sndLastIndex, _sndLastConfig) : _rest)) -> do 
+      let (startTape, endTape) = getReadShiftSlicePair hist rsHist sndLastIndex lastIndex
+      let (startSig, endSig) = (tapeSignature startTape, tapeSignature endTape)
+      skip <- makeAdditiveSkip ph startTape endTape 
+      case proveSimLinearAndTree 100 100 machine book skip of 
+        Left _ -> Nothing
+        Right numProveSteps -> Just (skip, PairGen sndLastIndex lastIndex numProveSteps)
+
+makeAdditiveSkip :: (TapeSymbol s) => Phase 
+  -> ExpTape s Count -> ExpTape s Count
+  -> Maybe (Skip Count s)
+makeAdditiveSkip ph startTape endTape = do 
+  let (startSig, endSig) = trace ("startend tape" <> showP (startTape, endTape)) (tapeSignature startTape, tapeSignature endTape)
+  toDrop <- calcCommonSig startSig endSig 
+  let ((sCls, sCrs), (eCls, eCrs)) = addZeros toDrop $ bimapBoth getCounts (startTape, endTape)
+      lrPairs = (zipExact sCls eCls, zipExact sCrs eCrs)
+  genPairs <- bitraverseBoth (traverse genCountAdd) lrPairs 
+  --assembly from here is same as in guessInductionHypWithIndices
+  pure $ assembleSkip genPairs ph (startSig, endSig)
+
+genCountAdd :: (Count, Count) -> Maybe (Count, Count) 
+genCountAdd pair@(_, Empty) = Just pair 
+genCountAdd pair@(Empty, _) = Just pair 
+genCountAdd (FinCount n, FinCount m) = case compare n m of 
+  EQ -> Just (FinCount n, FinCount m)
+  LT -> let 
+    diff = m - n 
+    bvc = boundVarCount (BoundVar 0) 1
+    in 
+      Just (bvc, bvc <> FinCount diff)
+  GT -> let 
+    diff = n - m 
+    bvc = boundVarCount (BoundVar 0) 1
+    in 
+      Just (bvc <> FinCount diff, bvc)
+genCountAdd (_, _) = Nothing 
 {-
 goal: write a function which runs 1) LR 2) cycle finding 3) end-of-tape
 and checks that 1 iff (2 or 3)

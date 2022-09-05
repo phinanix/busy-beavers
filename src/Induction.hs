@@ -267,14 +267,14 @@ proveBySimulating limit t book (Skip start skipEnd _) = case skipEnd of
         <> "\nans:" <> showP ans
     in
     --force $ 
-    --trace msg 
+    trace msg
     ans where
     -- four conditions: we've taken more steps than the limit,
     -- we've succeeded, stepping fails for some reason, or we continue 
     loop :: Natural -> Phase -> ExpTape s InfCount -> Count -> Either (Text, Maybe (Config Count s)) Natural
     loop numSteps p tape curCount
-        -- | trace (Unsafe.init $ toString $ "PS: steps:" <> show numSteps <> " count:" <> showP curCount <>
-        --            " p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
+        | trace (Unsafe.init $ toString $ "PS: steps:" <> show numSteps <> " count:" <> showP curCount <>
+                   " p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
       --we have to check the limit before checking for success, 
       --because we don't want to succeed in 101 steps if the limit is 100 steps
       | numSteps > limit = Left ("exceeded limit while simulating", Nothing)
@@ -292,8 +292,9 @@ proveBySimulating limit t book (Skip start skipEnd _) = case skipEnd of
                 in
                 Left (msg, Just stuckConfig)
             Stepped Infinity _ _ _ _ _ -> Left ("hopped to infinity", Nothing)
-            Stepped (NotInfinity hopsTaken) newPhase newTape _ _ _
-                -> loop (numSteps + 1) newPhase newTape (curCount <> hopsTaken)
+            Stepped (NotInfinity hopsTaken) newPhase newTape skipUsed _ _
+                -> trace ("used skip: " <> showP skipUsed)
+                loop (numSteps + 1) newPhase newTape (curCount <> hopsTaken)
     indMatch :: Phase -> ExpTape s InfCount -> (Phase, TapePush Count s) -> Bool
     indMatch cur_p et (goalPh, goalTP) = case bitraverse pure mbdeInfCount et of
         Nothing -> False
@@ -319,13 +320,21 @@ proveBySimulating limit t book (Skip start skipEnd _) = case skipEnd of
         mbdeInfCount Infinity = Nothing
         mbdeInfCount (NotInfinity c) = Just c
 
+getAllVars :: Bifoldable p => p Count b -> Set BoundVar
+getAllVars = fromList . bifoldMap getCountVars (const []) where
+  getCountVars (Count _n _as xs) = toList $ keys xs
+
 --TODO, it's really dumb we have to "deInfCount here"
 getNextConfigs :: forall s. (Ord s, Pretty s, Show s)
   => SkipBook s -> Config Count s -> [Config Count s]
-getNextConfigs book curConfig = ans
+getNextConfigs book curConfig = f ans
  where
-  f = if any thingContainsVar skipsUsed then trace msg else id
-  msg = ("skips used:\n" <> showP skipsUsed)
+  f = trace msg
+  msg = "next possible configs:\n" <> foldMap (\x -> showP x <> "\n") ans
+          <> "skips used: " <> foldMap (\x -> showP x <> "\n") skipsUsed
+          <> "available book skips: " <> foldMap (\x -> showP x <> "\n") 
+              (filter (\skip -> length (getAllVars skip) > 1) $ getSkipsFromBook book)
+          <> "\n"
   skipsUsed = mapMaybe getSkip choices
   ans =  first deInfCount <$> mapMaybe getConfig choices
   getConfig :: PartialStepResult InfCount s -> Maybe (Config InfCount s)
@@ -578,7 +587,7 @@ data FlipFE = NoFlip | Flip deriving (Eq, Ord, Show, Generic)
 
 flipFEs :: (FunctionExamples, FunctionExamples) -> (FunctionExamples, FunctionExamples)
 flipFEs ((fromCl, (mFI, mFO)), (toCL, (mTI, mTO)))
- = ((flipPair <$> fromCl, (mFO, mFI)), (flipPair <$> toCL, (mTO, mTI))) 
+ = ((flipPair <$> fromCl, (mFO, mFI)), (flipPair <$> toCL, (mTO, mTI)))
   where flipPair (a, b) = (b, a)
 
 generalizeNumberSquare :: ([NonEmpty (Count, Count)], [NonEmpty (Count, Count)])
@@ -613,7 +622,7 @@ generalizeNumberSquare ns = case bitraverseBoth (traverse generalizeFromCounts) 
   generalizeBitBitWithFlip fe inp = case fe of
     NoFlip -> generalizeBitAgainstOtherBit inp
     Flip -> flipFEs (generalizeBitAgainstOtherBit (flipFEs inp))
-      
+
 
   --apply this
   genAllEqual :: NonEmpty Count -> Maybe Count
@@ -687,7 +696,7 @@ generalizeNumberSquare ns = case bitraverseBoth (traverse generalizeFromCounts) 
     -> Either Text ([(Count, Count)], [(Count, Count)])
   collectAns = bitraverseBoth collectList
 
-guessInductionHypWithIndices :: (Pretty s, Eq s, Partial)
+guessInductionHypWithIndices :: (Pretty s, Eq s, Show s, Partial)
   => TapeHist s InfCount -> ReadShiftHist -> Phase -> [(Int, (Phase, ExpTape s InfCount))]
   -> Either Text (Skip Count s)
 guessInductionHypWithIndices (TapeHist hist) (ReadShiftHist rsHist)
@@ -716,7 +725,6 @@ guessInductionHypWithIndices (TapeHist hist) (ReadShiftHist rsHist)
   let
     countListPairPairs :: [(([Count], [Count]), ([Count], [Count]))]
     countListPairPairs = bimapBoth getCounts <$> slicePairs
-    --fmap over the list, then use second to only add zeros to the end signatures
     augCountPairPairs = fmap (addZeros toDrop) countListPairPairs
     doubleZipExact :: (([a], [x]), ([b], [y])) -> ([(a, b)], [(x, y)])
     doubleZipExact ((as, xs), (bs, ys)) = (zipExact as bs, zipExact xs ys)
@@ -733,29 +741,32 @@ guessInductionHypWithIndices (TapeHist hist) (ReadShiftHist rsHist)
   --the pair here is over left and right, then the list is over the "signature dimension", and the internal
   --pair is over start -> finish
   allThingsGeneralized <- generalizeNumberSquare thingsToGeneralizeList
-  --we want to pull the pair from start -> finish out to the front, then have the left right pair, then have the 
-  --"signature dimension"
-  let startCounts = bimapBoth (fmap fst) allThingsGeneralized
-      endCounts =  bimapBoth (fmap snd) allThingsGeneralized
-      startConfig = combineIntoConfig criticalPhase startCounts startSig
-      (endPh, endTape) = configToET $ combineIntoConfig criticalPhase endCounts endSig
-      ans = Skip startConfig (SkipStepped endPh (Middle endTape)) Empty
-      msg = "guessed " <> showP ans
+  pure $ assembleSkip allThingsGeneralized criticalPhase (startSig, endSig)
+
+assembleSkip :: (Pretty s, Show s) => ([(Count, Count)], [(Count, Count)]) -> Phase -> (Signature s, Signature s)
+  -> Skip Count s
+assembleSkip countPairListPair phase (startSig, endSig)= let
+  startCounts = bimapBoth (fmap fst) countPairListPair
+  endCounts =  bimapBoth (fmap snd) countPairListPair
+  startConfig = combineIntoConfig phase startCounts startSig
+  (endPh, endTape) = configToET $ combineIntoConfig phase endCounts endSig
+  ans = Skip startConfig (SkipStepped endPh (Middle endTape)) Empty
+  msg = "guessed " <> showP ans
+  in
   --force $
   --trace msg $
-  assert (isSameInAsOut ans) $ pure ans
-  --finishing from here is just munging - we have the common signature (almost), we have the common count 
-  --pairlists, we just need to assemble them all into the skip of our dreams
-  where
-  combineIntoConfig :: Phase -> ([Count], [Count]) -> Signature s -> Config Count s
-  combineIntoConfig phase (leftCounts, rightCounts) (Signature leftBits p rightBits) =
-    Config phase (zipExact leftBits (deleteZerosAtEnd leftCounts)) p
-        (zipExact rightBits (deleteZerosAtEnd rightCounts))
-  deleteZerosAtEnd :: [Count] -> [Count]
-  deleteZerosAtEnd = \case
-    [] -> []
-    xs@(Empty : _rest) -> assert (allEqual xs) []
-    notEmpty : rest -> notEmpty : deleteZerosAtEnd rest
+  assert (isSameInAsOut ans) ans
+
+
+combineIntoConfig :: (Show s) => Phase -> ([Count], [Count]) -> Signature s -> Config Count s
+combineIntoConfig phase (leftCounts, rightCounts) sig@(Signature leftBits p rightBits) =
+  Config phase (zipExact leftBits (deleteZerosAtEnd leftCounts)) p
+      (zipExact rightBits (deleteZerosAtEnd rightCounts))
+deleteZerosAtEnd :: [Count] -> [Count]
+deleteZerosAtEnd = \case
+  [] -> []
+  xs@(Empty : _rest) -> assert (allEqual xs) []
+  notEmpty : rest -> notEmpty : deleteZerosAtEnd rest
 
 
 timesSimplestNOccured :: Natural -> [(Phase, ExpTape Bit InfCount)] -> [Int]
