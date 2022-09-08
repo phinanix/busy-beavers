@@ -1,0 +1,19 @@
+in 50 steps we turn
+phase: 0  (|TT|, 0 + 1*x_1 ) (|FT|, 2) |>|FT|<|(|FT|, 0 + 1*x_0 ) (|FF|, 0 + 1*x_1 )
+into:
+phase: 0(|FT|, 2) |>|FT|<|(|FT|, 0 + 1*x_0 2*x_1 )
+
+phase: 0  (|FF|, 1) (|TT|, 0 + 1*x_0 ) (|FT|, 2) |>|FT|<|(|FT|, 1) (|FF|, 1 + 1*x_0 )
+
+I think the problem is boundvars don't match other boundvars 
+but I'm not sure
+which would be fixable by making simulate via dfs swap all boundvars to symbolvars 
+and then swap back at the end
+well (BoundVar 0)  does match against (BoundVar 1) so I am not sure what the issue is 
+next todo: write a unit test for the above skip matching the above tape and see what happens
+
+exploring at depth: 7 
+next possible configs:
+phase: 0  (|FF|, 1) (|TT|, 0 + 1*x_0 ) (|FT|, 4) |>|FF|<|(|FF|, 0 + 1*x_0 )
+phase: 0  (|FF|, 1) (|TT|, 0 + 1*x_0 ) (|FT|, 3) |>|FT|<|(|FF|, 1 + 1*x_0 )
+
