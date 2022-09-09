@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-overlapping-patterns #-}
 module Skip where
 
 import Relude hiding (mapMaybe)
@@ -6,6 +7,7 @@ import Witherable
 import Prettyprinter
 import Data.Bitraversable (Bitraversable)
 import Data.Bifoldable (Bifoldable)
+import qualified Data.List.NonEmpty as NE 
 
 import Turing 
 import Count
@@ -13,6 +15,7 @@ import Util
 import ExpTape
 import HaltProof
 import Tape
+import Relude.Extra
 
 --when the machine halts, there are two ends of the tape plus a thing we push in the middle
 data FinalTape c s = FinalTape ([(s, c)], [(s, c)]) (TapePush c Bit)
@@ -224,7 +227,26 @@ matchTapeHeads (sb, skipC) (tb, tapeC) = do
 --one thing left
 data TapeMatch s = Perfect
                  | TapeLeft (NonEmpty (s, InfCount))
-                 | SkipLeft (NonEmpty (s, Count)) deriving (Eq, Ord, Show)
+                 | SkipLeft (NonEmpty (s, Count)) 
+                 deriving (Eq, Ord, Show)
+
+tapeMatchToMaybeTapeLeft :: TapeMatch s -> Maybe [(s, InfCount)]
+tapeMatchToMaybeTapeLeft = \case 
+  Perfect -> Just [] 
+  TapeLeft (x :| xs) -> Just (x : xs) 
+  SkipLeft _ -> Nothing 
+
+pattern ETapeLeft :: [(s, InfCount)] -> TapeMatch s
+pattern ETapeLeft xs <- (tapeMatchToMaybeTapeLeft -> (Just xs)) where 
+  ETapeLeft [] = Perfect 
+  ETapeLeft (x : xs) = TapeLeft (x :| xs) 
+
+--pattern ESkipLeft 
+
+-- mbTapeLeft :: [(s, InfCount)] -> TapeMatch s
+-- mbTapeLeft [] = Perfect 
+-- mbTapeLeft (x : xs) = TapeLeft (x :| xs)
+
 --TODO:: maybe define a pattern synonym for TapeMatch that either returns a (possibly empty)
 --leftover tape or the skip
 
@@ -234,8 +256,20 @@ data TapeMatch s = Perfect
 --given a skip to match against a tape, returns the remaining tape that's left after consuming
 --all the tape that matches the skip, the rest of the unmatched skip, or
 --fails, returning nothing
---example :: matchBitTape [(F, 2), (T, 1)] [(F, 2), (T, 3), (F, x)] == [(T, 2), (F, x)]
+--example :: matchTape [(F, 2), (T, 1)] [(F, 2), (T, 3), (F, x)] == [(T, 2), (F, x)]
 --returns Nothing if the match fails, else the match
+{-
+so there's a problem, which is that when we get to the last thing in the skip, it may not match the last 
+variable right. consider matchTape [(F, x) (T, 1), (F, x)] [(F, 2), (T, 1), (F, 3)] 
+the answer should be (x -> 2) [(F, 1)], but instead I think we fail. 
+
+The way we solve this, is we match two tapes all the way except for the last pair of each of the
+two skip lists as normal. Then for the last pair on each side, we see if it is already mapped, and if it is, 
+we see if that's compatible with the last matchup, and return the answer if so. If we have now resolved neither 
+side and both sides contain exactly the same boundvar, then we map said boundvar to the intersection of the 
+two relevant tapecounts (or fail if that is zero). Otherwise, we map each last bit which hasn't yet been resolved
+to the maximal thing possible as normal. 
+-}
 matchTape :: (Eq s) => [(s, Count)] -> [(s, InfCount)] -> Equations (TapeMatch s)
 matchTape [] [] = pure Perfect
 matchTape [] (t:ts) = pure $ TapeLeft (t :| ts)
@@ -247,6 +281,86 @@ matchTape (skipHead:restSkip) (tapeHead:restTape) = matchTapeHeads skipHead tape
   --else we have a leftover bit of tape and match against it
   --TODO:: I think we can short circuit and skip the rest of the match here if the skip has the invariant
   (TapeHLeft tapeHead) -> matchTape restSkip (tapeHead:restTape)
+
+matchTwoCounts :: (Count, Count) -> (InfCount, InfCount) -> Equations (InfCount, InfCount) 
+matchTwoCounts (lC, rC) (lT, rT) = undefined 
+
+matchTwoTapes :: forall s. (Eq s) => ([(s, Count)], [(s, InfCount)]) -> ([(s, Count)], [(s, InfCount)])
+  -> Equations (TapeMatch s, TapeMatch s)
+matchTwoTapes (lsS, lsT) (rsS, rsT) = case (unsnoc lsS, unsnoc rsS) of 
+  (Nothing, Nothing) -> pure (ETapeLeft lsT, ETapeLeft rsT) 
+  (Nothing, Just (rSstart, rSlast)) -> let 
+    lRes = ETapeLeft lsT in
+   case matchTape rSstart rsT of 
+     Equations (Left msg) -> Equations $ Left msg 
+     Equations (Right (map, SkipLeft rSLeft)) -> let 
+      rRes = SkipLeft (rSLeft <> (rSlast :| [])) 
+      in Equations (Right (map, (lRes, rRes)))
+     Equations (Right (map, Perfect)) -> let 
+      rRes = SkipLeft $ rSlast :| [] 
+      in Equations (Right (map, (lRes, rRes)))
+     Equations (Right (map, TapeLeft (rTapeHead :| rTapeRest))) -> 
+      {-
+      what we do here is 
+        1) send any boundVars in rSlast to what they are bound to, using map
+        2) match rSlast and rTapeHead
+        3) case on the result and pack up the answer
+      -}
+      let rSlastBound = second (partiallyUpdateCount map) rSlast 
+      in case matchTapeHeads rSlastBound rTapeHead of 
+          Equations (Left msg) -> Equations $ Left $ msg <> "\nalso some boundVar shenanigans happened"
+          Equations (Right (subMap, PerfectH)) -> case mergeEqns map subMap of 
+            Left msg -> error $ "merge failed, but I think it shouldn't ever fail: " <> msg 
+            Right newMap -> Equations $ Right (newMap, (lRes, ETapeLeft rTapeRest))
+          Equations (Right (subMap, TapeHLeft thl)) -> case mergeEqns map subMap of 
+            Left msg -> error $ "merge failed, but I think it shouldn't ever fail: " <> msg 
+            Right newMap -> Equations $ Right (newMap, (lRes, TapeLeft (thl :| rTapeRest)))
+  (Just (lSstart, lSlast), Nothing) -> undefined 
+  (Just (lSstart, (lSlastS, lSlastC)), Just (rSstart, (rSlastS, rSlastC))) 
+    -> case bisequence (matchTape lSstart lsT, matchTape rSstart rsT) of 
+    Equations (Left msg) -> Equations (Left msg)
+    Equations (Right (map, _)) -> undefined 
+    Equations (Right (map, (TapeLeft ((lTS, lTC) :| lTapeRest), TapeLeft ((rTS, rTC) :| rTapeRest)))) -> let
+      (lSCBound, rSCBound) = bimapBoth (partiallyUpdateCount map) (lSlastC, rSlastC)
+      secondEqns = do 
+        matchBits lSlastS lTS 
+        matchBits rSlastS rTS 
+        (lCrem, rCrem) <- matchTwoCounts (lSCBound, rSCBound) (lTC, rTC) 
+        pure (ETapeLeft $ delHeadZero $ (lTS, lCrem) :| lTapeRest, 
+              ETapeLeft $ delHeadZero $ (rTS, rCrem) :| rTapeRest)
+      in case secondEqns of 
+        Equations (Left msg) -> Equations $ Left $ msg <> "\nalso some boundVar shenanigans happened"
+        Equations (Right (subMap, ans)) -> case mergeEqns map subMap of 
+          Left msg -> error $ "merge failed, but I think it shouldn't ever fail: " <> msg 
+          Right newMap -> Equations $ Right (newMap, ans) 
+  where 
+    delHeadZero ((s, c) :| rest) = case c of 
+      Empty -> rest 
+      ne -> (s, ne) : rest 
+    answerOneSide :: [(s, Count)] -> (s, Count) -> [(s, InfCount)] -> Equations (TapeMatch s)
+    answerOneSide skipStart skipLast tapeHalf = case matchTape skipStart tapeHalf of 
+     Equations (Left msg) -> Equations $ Left msg 
+     Equations (Right (map, SkipLeft skipLeft)) -> 
+       Equations (Right (map, SkipLeft (skipLeft <> (skipLast :| []))))
+     Equations (Right (map, Perfect)) ->
+       Equations (Right (map, SkipLeft $ skipLast :| [] ))
+     Equations (Right (map, TapeLeft (rTapeHead :| rTapeRest))) -> 
+      {-
+      what we do here is 
+        1) send any boundVars in rSlast to what they are bound to, using map
+        2) match rSlast and rTapeHead
+        3) case on the result and pack up the answer
+      -}
+      let rSlastBound = second (partiallyUpdateCount map) skipLast  
+      in case matchTapeHeads rSlastBound rTapeHead of 
+          Equations (Left msg) -> Equations $ Left $ msg <> "\nalso some boundVar shenanigans happened"
+          Equations (Right (subMap, PerfectH)) -> case mergeEqns map subMap of 
+            Left msg -> error $ "merge failed, but I think it shouldn't ever fail: " <> msg 
+            Right newMap -> Equations $ Right (newMap, ETapeLeft rTapeRest)
+          Equations (Right (subMap, TapeHLeft thl)) -> case mergeEqns map subMap of 
+            Left msg -> error $ "merge failed, but I think it shouldn't ever fail: " <> msg 
+            Right newMap -> Equations $ Right (newMap, TapeLeft (thl :| rTapeRest))
+
 
 getTapeRemain :: TapeMatch s -> Maybe [(s, InfCount)]
 getTapeRemain Perfect = Just Empty

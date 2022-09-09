@@ -248,7 +248,7 @@ matchCount (Count 0 Empty xs) c@(Count m bs ys) = case assocs xs of
     Nothing -> nothingES "tried to divCount 1 var and vailed"
     Just Empty -> nothingES "cannot send a variable to zero"
     Just reducedC -> addEquation (x, NotInfinity reducedC) $ pure Empty
-  xs -> case containsOne xs of
+  xs -> trace "Warning: matchcount might send to zero" $ case containsOne xs of
     --TODO, we might send a variable to zero in here
     (maybeX1, xs') -> foldrM matchVar (eitherKeys bs ys, []) xs' >>= \case
       --now we've matched all the vars we can against other vars, so we proceed
@@ -433,6 +433,15 @@ updateCount m (Count n as xs) = Count n as Empty
     getVar m x = case m^.at x of 
       Just c -> c 
       Nothing -> boundVarCount x 1
+
+partiallyUpdateCount :: Map BoundVar InfCount -> Count -> Count 
+partiallyUpdateCount m (Count n as (MonoidalMap xs))
+ = Count n as Empty <> foldMap (updateVar m) (M.assocs xs) where 
+  updateVar m (x, Sum n) = case m ^. at x of 
+    Nothing -> Count 0 Empty (MonoidalMap $ one (x, Sum n))
+    Just (NotInfinity c) -> n `nTimes` c 
+    --TODO: what do we do here?
+    Just Infinity -> error "infinity in partialupdate"
 
 updateCountToInf :: Map BoundVar InfCount -> Count -> InfCount
 updateCountToInf m (Count n as (MonoidalMap xs))

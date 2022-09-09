@@ -264,7 +264,7 @@ checkSeenBefore _machine state = case seenBeforeProof state of
 
 
 --applies the skip to everything in the list, checks if any of them have just 
-skipAppliedInHist :: (Eq s, Pretty s) => Skip Count s -> TapeHist s InfCount -> Bool
+skipAppliedInHist :: (Eq s, Pretty s, Show s) => Skip Count s -> TapeHist s InfCount -> Bool
 skipAppliedInHist skip hist = any (has _Just) $ applySkip skip <$> getTapeHist hist
 
 --checks whether we've put an infinity in some place on the tape that is not the two ends
@@ -275,7 +275,7 @@ tapePostInfinity :: ExpTape s InfCount -> Bool
 tapePostInfinity (ExpTape ls _p rs) = elem Infinity cs where
   cs = snd <$> Unsafe.init ls ++ Unsafe.init rs
 
-skipAppliesForeverInHist :: (Eq s, Pretty s)
+skipAppliesForeverInHist :: (Eq s, Pretty s, Show s)
   => Skip Count s -> TapeHist s InfCount -> Either Text (HaltProof s)
 skipAppliesForeverInHist skip hist = case forevers of
   [] -> Left "did not apply forever"

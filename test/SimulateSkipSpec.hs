@@ -103,7 +103,6 @@ spec = do
   -- describe "simulateByGluing" $ do 
   --   it "produces the same results as normal simulation" $ 
   --     simulatesSameForAll simulateBasicAndGlue 40 bb3
-  describe "applySkip" $ do 
     it "applies a skip which it didn't and I am confused about why (regression test-ish)" $ do 
       {-
       in 50 steps we turn
@@ -126,3 +125,16 @@ spec = do
           tapeEx2 = (Phase 0, ExpTape [(ft, ci 2), (tt, bvi 0 1), (ff, ci 1)] 
                                       ft [(ft, ci 1), (ff, ci 1 <> bvi 0 1)])                     
       applySkip skipEx2 tapeEx2 `shouldSatisfy` has _Just
+  describe "matchTape" $ do
+    it "applies a skip when a var is sent to two things" $ do 
+      {-
+      matchTape [(F, x) (T, 1), (F, x)] [(F, 2), (T, 1), (F, 3)] 
+      the answer should be (x -> 2) [(F, 1)]
+      -}
+      let bv x = boundVarCount (BoundVar x)
+          c = FinCount
+          ci = NotInfinity . FinCount 
+          tape1 = [(Bit False, bv 1 1), (Bit True, c 1), (Bit False, bv 1 1)]
+          tape2 = [(Bit False, ci 2), (Bit True, ci 1), (Bit False, ci 3)]
+          ansTape = (Bit False, ci 1) :| []
+      getEquations (matchTape tape1 tape2) `shouldBe` Just (TapeLeft ansTape)
