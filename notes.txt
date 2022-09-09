@@ -1,3 +1,35 @@
+9 Sep 2022 Plan
+Goal: I would like to get a score on the BB(5) challenge 
+There are a bunch of steps I'd have to do to do that: 
+- make the enumeration and early deciders run faster
+  - profiling
+  - use Shawn's fast lin recur detector idea
+- make the outputs better
+  - figure out how to make haltproofs print to short strings
+  - every 1k or 10k machines, dump the machines which are done + the current state to the disk
+  - simple functions for aggregating done machines and for computing things about them 
+- additional deciders (not strictly required): 
+  - CTL 
+  - halting segment
+- better step-counting (not needed until later)
+I think my current sense is something like the following:
+130M size 5 machines to enumerate
+43M halt leaving 87M
+84M cycle or Lin recur, leaving 3M 
+1.5M bwsearch leaving 1.5M
+1M CTL leaving 0.5M 
+(later numbers much more unsure): 
+250K? halting segment leaving 250K
+100K?? simple ind leaving 150K
+60K?? complex ind leaving 90K 
+but last numbers could vary a lot. 
+
+It would be great to get a sense of where I'm at though and see what kind of things remain. 
+------------
+
+I found the bug below. In short, the issue is that one half of the tape sends x_1 -> x_0 and the other 
+sends x_1 -> 1 + x_0, and then when we merge these we go "conflict, fail". 
+
 in 50 steps we turn
 phase: 0  (|TT|, 0 + 1*x_1 ) (|FT|, 2) |>|FT|<|(|FT|, 0 + 1*x_0 ) (|FF|, 0 + 1*x_1 )
 into:
