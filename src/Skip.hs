@@ -305,20 +305,26 @@ getTapeRemain (SkipLeft _) = Nothing
 
 --match a config to a tape, and return the lists that remain on each side of the
 --tape after matching
-matchConfigTape :: (Eq s) => Config Count s -> ExpTape s InfCount
+matchConfigTape :: (Eq s, Show s, Pretty s) => Config Count s -> ExpTape s InfCount
   -> Equations ([(s, InfCount)], [(s, InfCount)])
 matchConfigTape (Config _p lsC pointC rsC) (ExpTape lsT pointT rsT)
   = do
     matchBits pointC pointT
-    matchSides lsT rsT
+    let thing = matchSides lsT rsT
+    trace ("thing mct " <> show thing) thing 
   where
-  matchSides left right = bisequence (mapMaybe getTapeRemain $ matchTape lsC left
-                                     , mapMaybe getTapeRemain $ matchTape rsC right)
+  matchSides left right = trace ("lst rst" <> showP lsT <> " " <> showP rsT) $ let 
+    leftAns = mapMaybe getTapeRemain $ matchTape lsC left
+    rightAns = mapMaybe getTapeRemain $ matchTape rsC right
+    in trace ("leftAns " <> showP (getEquations leftAns) <> " rightAns " <> showP (getEquations rightAns)) 
+      bisequence (leftAns, rightAns)
 
-matchSkipTape :: (Eq s) => Skip Count s -> ExpTape s InfCount
+
+matchSkipTape :: (Eq s, Show s, Pretty s) => Skip Count s -> ExpTape s InfCount
   -> Equations ([(s, InfCount)], [(s, InfCount)])
 matchSkipTape (Skip config end _hops) tape = do
   out@(lRem, rRem) <- matchConfigTape config tape
+  
   let checkTP :: forall g. (TapePush Count g -> Equations ()) = \case 
         (Side L _xs) -> case lRem of
           [] -> nothingES "matched and fell off left side, but left side was end of tape"
@@ -328,7 +334,7 @@ matchSkipTape (Skip config end _hops) tape = do
           _x1 : _x2 -> pure ()
         _ -> pure ()
 
-  case end of     
+  case trace ("mst out was: " <> showP out ) end of     
     SkipStepped _ph tp -> do 
       checkTP tp 
       pure () 
@@ -337,6 +343,7 @@ matchSkipTape (Skip config end _hops) tape = do
       pure ()
     SkipUnknownEdge _e -> pure ()
     SkipNonhaltProven _hp -> pure ()
+  
   pure out 
 
 

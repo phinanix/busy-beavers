@@ -16,6 +16,7 @@ import ExpTape
 import Skip
 import Simulate  
 import SimulateSkip
+import SimulateTwoBit
 
 --blindly assumes the Turing machine here is a total one 
 -- simulateBasicAndSkip :: Int -> Turing -> (SimResult Bit (Tape Bit), SimResult Bit SkipTape)
@@ -102,4 +103,26 @@ spec = do
   -- describe "simulateByGluing" $ do 
   --   it "produces the same results as normal simulation" $ 
   --     simulatesSameForAll simulateBasicAndGlue 40 bb3
-  pure ()
+  describe "applySkip" $ do 
+    it "applies a skip which it didn't and I am confused about why (regression test-ish)" $ do 
+      {-
+      in 50 steps we turn
+      phase: 0  (|TT|, 0 + 1*x_1 ) (|FT|, 2) |>|FT|<|(|FT|, 0 + 1*x_0 ) (|FF|, 0 + 1*x_1 )
+      into:
+      phase: 0(|FT|, 2) |>|FT|<|(|FT|, 0 + 1*x_0 2*x_1 )
+
+      phase: 0  (|FF|, 1) (|TT|, 0 + 1*x_0 ) (|FT|, 2) |>|FT|<|(|FT|, 1) (|FF|, 1 + 1*x_0 )
+      -}
+      let ff = TwoBit (Bit False) (Bit False)
+          ft = TwoBit (Bit False) (Bit True)
+          tt = TwoBit (Bit True) (Bit True)
+          c = FinCount
+          ci = NotInfinity . FinCount 
+          bv x = boundVarCount (BoundVar x)
+          bvi x = boundVarInfCount (BoundVar x)
+          skipEx2 = Skip (Config (Phase 0) [(ft, c 2), (tt, bv 1 1)] ft [(ft, bv 0 1), (ff, bv 1 1)]) 
+            (SkipStepped (Phase 0) (Middle (ExpTape [] ft []))) 
+            (c 50)
+          tapeEx2 = (Phase 0, ExpTape [(ft, ci 2), (tt, bvi 0 1), (ff, ci 1)] 
+                                      ft [(ft, ci 1), (ff, ci 1 <> bvi 0 1)])                     
+      applySkip skipEx2 tapeEx2 `shouldSatisfy` has _Just

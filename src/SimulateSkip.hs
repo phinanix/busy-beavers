@@ -21,6 +21,7 @@ import HaltProof
 import Results
 import Simulate (initSimState)
 import TapeSymbol
+import SimulateTwoBit
 
 {-
 Morning of 9 May 22
@@ -229,7 +230,7 @@ instance (Ord s, Pretty s) => Pretty (SkipBook s) where
               $ assocs skipPile
 
 --returns nothing if the skip is inapplicable, else returns the result
-applySkip :: forall s. (Eq s, Pretty s, Partial) => Skip Count s -> (Phase, ExpTape s InfCount)
+applySkip :: forall s. (Eq s, Pretty s, Show s, Partial) => Skip Count s -> (Phase, ExpTape s InfCount)
   -> Maybe (PartialStepResult InfCount s)
 applySkip skip@(Skip s _ _) (p, tape)
   = guard (s^.cstate == p) >> either (const Nothing) Just
@@ -519,3 +520,18 @@ weird3Goal = Skip
         [(Bit True, finiteCount 1 <> newBoundVar 0)] (Bit True) [(Bit False, finiteCount 1)]))
     (finiteCount 0) --obviously this is fake for now 
 
+
+
+-- garbage for ghci 
+ff = TwoBit (Bit False) (Bit False)
+ft = TwoBit (Bit False) (Bit True)
+tt = TwoBit (Bit True) (Bit True)
+c = FinCount
+ci = NotInfinity . FinCount 
+bv x = boundVarCount (BoundVar x)
+bvi x = boundVarInfCount (BoundVar x)
+skipEx2 = Skip (Config (Phase 0) [(ft, c 2), (tt, bv 1 1)] ft [(ft, bv 0 1), (ff, bv 1 1)]) 
+  (SkipStepped (Phase 0) (Middle (ExpTape [] ft []))) 
+  (c 50)
+tapeEx2 = (Phase 0, ExpTape [(ft, ci 2), (tt, bvi 0 1), (ff, ci 1)] 
+                            ft [(ft, ci 1), (ff, ci 1 <> bvi 0 1)])    

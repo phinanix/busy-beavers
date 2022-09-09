@@ -385,7 +385,9 @@ addEquations = appEndo . foldMap (Endo . addEquation)
 
 mergeEqns :: Map BoundVar InfCount -> Map BoundVar InfCount -> Either Text (Map BoundVar InfCount)
 mergeEqns = mergeA preserveMissing preserveMissing
-  (zipWithAMatched (\_k v1 v2 -> if v1 == v2 then Right v1 else Left "values failed to match"))
+  (zipWithAMatched (\k v1 v2 -> if v1 == v2 then Right v1 
+    else Left ("values failed to match: " 
+      <> show k <> " sent to " <> show v1 <> " and " <> show v2)))
 
 newtype Equations a = Equations
   {runEquations :: Either Text (Map BoundVar InfCount, a)}
