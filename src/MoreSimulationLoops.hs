@@ -116,14 +116,14 @@ proveByIndV1 machine state =
 
 proveSimply :: (TapeSymbol s) => SimOneAction s
 proveSimply machine state = case mbProof of
-  Left txt -> trace (toString $ "provesimply failed because: " <> txt <> "\nEOM\n") $ 
+  Left txt -> trace (toString $ "provesimply failed because: " <> txt <> "\nEOM\n") $
     Right state
   Right hp -> Left $ ContinueForever hp
   where
   mbProof = do
     indHyp <- guessInductionHypothesis (state ^. s_history) (state ^. s_readshift_history)
     first fst $ proveSimLinearAndTree 100 100 machine (state ^. s_book) indHyp
-    arbSkip <- trace ("indhyp suceeded") $ first (\s -> "chainArbitrary failed: " <> s) $ 
+    arbSkip <- trace ("indhyp suceeded") $ first ("chainArbitrary failed: " <>) $
       chainArbitrary indHyp
     skipAppliesForeverInHist arbSkip (state ^. s_history)
 {-# SPECIALISE proveSimply :: SimOneAction Bit #-}
@@ -145,49 +145,49 @@ addSinglePairRule machine state = Right $ state & s_book .~ newBook where
   configs :: Set (Phase, Signature s)
   configs = fromList $ second tapeSignature <$> hist
   newSkips :: [(Skip Count s, SkipOrigin s)]
-  newSkips = let ans = mapMaybe generalizeConfig $ toList configs in 
+  newSkips = let ans = mapMaybe generalizeConfig $ toList configs in
     trace ("new skips were: " <> foldMap showP (fst <$> ans)) ans
   newBook = addChainedToBook $ addMultipleToBook newSkips book
   generalizeConfig :: (Phase, Signature s) -> Maybe (Skip Count s, SkipOrigin s)
   generalizeConfig (ph, sig) = case reverse $ filter (\(_i, (ph', tape)) -> (ph == ph') && sig == tapeSignature tape) $ zip [0, 1..] hist of
     [] -> Nothing
     [_] -> Nothing
-    ((lastIndex, _lastConfig) : ((sndLastIndex, _sndLastConfig) : _rest)) -> do 
+    ((lastIndex, _lastConfig) : ((sndLastIndex, _sndLastConfig) : _rest)) -> do
       let (startTape, endTape) = getReadShiftSlicePair hist rsHist sndLastIndex lastIndex
       let (startSig, endSig) = (tapeSignature startTape, tapeSignature endTape)
-      skip <- makeAdditiveSkip ph startTape endTape 
-      case proveSimLinearAndTree 100 100 machine book skip of 
+      skip <- makeAdditiveSkip ph startTape endTape
+      case proveSimLinearAndTree 100 100 machine book skip of
         Left _ -> Nothing
         Right numProveSteps -> Just (skip, PairGen sndLastIndex lastIndex numProveSteps)
 
-makeAdditiveSkip :: (TapeSymbol s) => Phase 
+makeAdditiveSkip :: (TapeSymbol s) => Phase
   -> ExpTape s Count -> ExpTape s Count
   -> Maybe (Skip Count s)
-makeAdditiveSkip ph startTape endTape = do 
+makeAdditiveSkip ph startTape endTape = do
   let (startSig, endSig) = trace ("startend tape" <> showP (startTape, endTape)) (tapeSignature startTape, tapeSignature endTape)
-  toDrop <- calcCommonSig startSig endSig 
+  toDrop <- calcCommonSig startSig endSig
   let ((sCls, sCrs), (eCls, eCrs)) = addZeros toDrop $ bimapBoth getCounts (startTape, endTape)
       lrPairs = (zipExact sCls eCls, zipExact sCrs eCrs)
-  genPairs <- bitraverseBoth (traverse genCountAdd) lrPairs 
+  genPairs <- bitraverseBoth (traverse genCountAdd) lrPairs
   --assembly from here is same as in guessInductionHypWithIndices
   pure $ assembleSkip genPairs ph (startSig, endSig)
 
-genCountAdd :: (Count, Count) -> Maybe (Count, Count) 
-genCountAdd pair@(_, Empty) = Just pair 
-genCountAdd pair@(Empty, _) = Just pair 
-genCountAdd (FinCount n, FinCount m) = case compare n m of 
+genCountAdd :: (Count, Count) -> Maybe (Count, Count)
+genCountAdd pair@(_, Empty) = Just pair
+genCountAdd pair@(Empty, _) = Just pair
+genCountAdd (FinCount n, FinCount m) = case compare n m of
   EQ -> Just (FinCount n, FinCount m)
-  LT -> let 
-    diff = m - n 
+  LT -> let
+    diff = m - n
     bvc = boundVarCount (BoundVar 0) 1
-    in 
+    in
       Just (bvc, bvc <> FinCount diff)
-  GT -> let 
-    diff = n - m 
+  GT -> let
+    diff = n - m
     bvc = boundVarCount (BoundVar 0) 1
-    in 
+    in
       Just (bvc <> FinCount diff, bvc)
-genCountAdd (_, _) = Nothing 
+genCountAdd (_, _) = Nothing
 {-
 goal: write a function which runs 1) LR 2) cycle finding 3) end-of-tape
 and checks that 1 iff (2 or 3)

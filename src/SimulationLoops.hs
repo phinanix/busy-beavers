@@ -289,6 +289,29 @@ skipAppliesForeverInHist skip hist = case forevers of
     res ^? _Stepped . _1 == Just Infinity 
     || maybe False tapePostInfinity (res ^? _Stepped . _3))
     apps
+
+{-says on the tin: a check whether, if the skip consumes the live portion of the tape (which contains
+  all the 1s) whether we then have a proof the machine runs forever via applying the skip over and
+  over again. needed because chainArbitrary is not yet powerful enough to deal with x->2x+5. 
+
+  Algorithm: first, ask if you can apply the skip's input to its output. this will likely not work, 
+    but it will leave behind some skip remains that would need to be present. if those skip remains
+    contain only 0s, then if applying the skip once consumes all the 1s (the hypothesis), the
+    0s that surround the live tape will supply an infinite amount of additional applications of the 
+    skip. 
+-}
+skipRunsForeverIfConsumesLiveTape :: (TapeSymbol s) => Skip Count s -> Bool 
+skipRunsForeverIfConsumesLiveTape (Skip (Config startPh startLs startP startRs) end _hops) 
+  = case end of 
+  SkipStepped endPh (Middle (ExpTape endLs endP endRs)) -> startPh == endPh && startP == endP && cond where 
+    cond = case getEquations $ 
+         matchTwoTapes (startLs, NotInfinity <$$> endLs) (startRs, NotInfinity <$$> endRs) 
+         of 
+      Just (ESkipLeft ls, ESkipLeft rs) -> all (\(s, _) -> s == blank) $ ls ++ rs
+      _ -> False 
+  _ -> False 
+
+
 {-
 A thing I need to be very careful about is the interaction between EndOfTape proof and the skipping parts of evaluation
 If we skip over part of the evaluation that involves the maximum inward displacement, then we could assume we had a 
