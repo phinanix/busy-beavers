@@ -122,10 +122,13 @@ proveSimply machine state = case mbProof of
   where
   mbProof = do
     indHyp <- guessInductionHypothesis (state ^. s_history) (state ^. s_readshift_history)
-    first fst $ proveSimLinearAndTree 100 100 machine (state ^. s_book) indHyp
-    arbSkip <- trace ("indhyp suceeded") $ first ("chainArbitrary failed: " <>) $
-      chainArbitrary indHyp
-    skipAppliesForeverInHist arbSkip (state ^. s_history)
+    _n <- first fst $ proveSimLinearAndTree 100 100 machine (state ^. s_book) indHyp
+    skipAppliesForeverInHist indHyp (state ^. s_history)
+    -- TODO: maybe we want this back later? but right now I believe skipAppliesForeverInHist catches 
+    --        all relevant cases
+    -- arbSkip <- trace ("indhyp suceeded") $ first ("chainArbitrary failed: " <>) $
+    --   chainArbitrary indHyp
+    -- skipAppliesForeverInHist arbSkip (state ^. s_history)
 {-# SPECIALISE proveSimply :: SimOneAction Bit #-}
 {-# SPECIALISE proveSimply :: SimOneAction TwoBit #-}
 

@@ -275,19 +275,23 @@ tapePostInfinity :: ExpTape s InfCount -> Bool
 tapePostInfinity (ExpTape ls _p rs) = elem Infinity cs where
   cs = snd <$> Unsafe.init ls ++ Unsafe.init rs
 
-skipAppliesForeverInHist :: (Eq s, Pretty s, Show s)
+skipAppliesForeverInHist :: (TapeSymbol s)
   => Skip Count s -> TapeHist s InfCount -> Either Text (HaltProof s)
 skipAppliesForeverInHist skip hist = case forevers of
   [] -> Left "did not apply forever"
   --TODO the "idx" here is I think in big steps but it's sort of supposed to be in small steps
-  (idx, _res) : _xs -> Right $ SkippedToInfinity idx
+  (idx, _config, _res) : _xs -> Right $ SkippedToInfinity idx
   where
-  apps = let ans = mapMaybe (\(i, entry) -> (i,) <$> applySkip skip entry) (zip [0,1 ..] $ getTapeHist hist) in
+  apps = let 
+    ans = mapMaybe (\(i, config) -> (i,config,) <$> applySkip skip config) 
+                (zip [0,1 ..] $ getTapeHist hist)
+    in
     --trace ("apps len " <> show (length ans)) 
     ans
-  forevers = filter (\(_i, res) -> --trace ("skipRes" <> showP (res)) $ 
+  forevers = filter (\(_i, config, res) -> --trace ("skipRes" <> showP (res)) $ 
     res ^? _Stepped . _1 == Just Infinity 
-    || maybe False tapePostInfinity (res ^? _Stepped . _3))
+    || maybe False tapePostInfinity (res ^? _Stepped . _3)
+    || skipRunsForeverIfConsumesLiveTape skip && skipConsumesLiveTape skip config)
     apps
 
 {-says on the tin: a check whether, if the skip consumes the live portion of the tape (which contains
@@ -311,6 +315,11 @@ skipRunsForeverIfConsumesLiveTape (Skip (Config startPh startLs startP startRs) 
       _ -> False 
   _ -> False 
 
+skipConsumesLiveTape :: (TapeSymbol s) => Skip Count s -> (Phase, ExpTape s InfCount) -> Bool 
+skipConsumesLiveTape skip@(Skip (Config sPH _ _ _) _ _) (ph, tape) = (sPH == ph) &&
+  case getEquations $ matchSkipTape skip tape of 
+    Nothing -> False 
+    Just (ls, rs) -> all (\(s, _) -> s == blank) $ ls ++ rs
 
 {-
 A thing I need to be very careful about is the interaction between EndOfTape proof and the skipping parts of evaluation
