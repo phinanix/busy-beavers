@@ -35,8 +35,8 @@ instance Functor (FinalTape c) where
 instance Tapeable (FinalTape InfCount Bit) where 
   ones (FinalTape (ls,rs) tp) = countList ls + countList rs + ones tp 
 
---a configuration of the machine's state - it is in a given phase, with the point of the tape and the stuff to the 
---left and right looking as specified
+--a configuration of the machine's state - it is in a given phase, with the point of the tape
+--and the stuff to the left and right looking as specified
 data Config c s = Config
   { _cstate :: Phase
   , _ls :: [(s, c)]
@@ -284,38 +284,46 @@ matchTape (skipHead:restSkip) (tapeHead:restTape) = matchTapeHeads skipHead tape
 
 matchTwoCounts :: (Count, Count) -> (InfCount, InfCount) -> Equations (InfCount, InfCount) 
 matchTwoCounts (lC, rC) (lT, rT) = undefined 
+-- try common variables, then if there aren't do the regular thing
+-- then if there are, first reduce common parts (non var parts), 
+-- then do the like, map to the intersection of the rhs thing
 
 matchTwoTapes :: forall s. (Eq s) => ([(s, Count)], [(s, InfCount)]) -> ([(s, Count)], [(s, InfCount)])
   -> Equations (TapeMatch s, TapeMatch s)
 matchTwoTapes (lsS, lsT) (rsS, rsT) = case (unsnoc lsS, unsnoc rsS) of 
   (Nothing, Nothing) -> pure (ETapeLeft lsT, ETapeLeft rsT) 
-  (Nothing, Just (rSstart, rSlast)) -> let 
-    lRes = ETapeLeft lsT in
-   case matchTape rSstart rsT of 
-     Equations (Left msg) -> Equations $ Left msg 
-     Equations (Right (map, SkipLeft rSLeft)) -> let 
-      rRes = SkipLeft (rSLeft <> (rSlast :| [])) 
-      in Equations (Right (map, (lRes, rRes)))
-     Equations (Right (map, Perfect)) -> let 
-      rRes = SkipLeft $ rSlast :| [] 
-      in Equations (Right (map, (lRes, rRes)))
-     Equations (Right (map, TapeLeft (rTapeHead :| rTapeRest))) -> 
-      {-
-      what we do here is 
-        1) send any boundVars in rSlast to what they are bound to, using map
-        2) match rSlast and rTapeHead
-        3) case on the result and pack up the answer
-      -}
-      let rSlastBound = second (partiallyUpdateCount map) rSlast 
-      in case matchTapeHeads rSlastBound rTapeHead of 
-          Equations (Left msg) -> Equations $ Left $ msg <> "\nalso some boundVar shenanigans happened"
-          Equations (Right (subMap, PerfectH)) -> case mergeEqns map subMap of 
-            Left msg -> error $ "merge failed, but I think it shouldn't ever fail: " <> msg 
-            Right newMap -> Equations $ Right (newMap, (lRes, ETapeLeft rTapeRest))
-          Equations (Right (subMap, TapeHLeft thl)) -> case mergeEqns map subMap of 
-            Left msg -> error $ "merge failed, but I think it shouldn't ever fail: " <> msg 
-            Right newMap -> Equations $ Right (newMap, (lRes, TapeLeft (thl :| rTapeRest)))
-  (Just (lSstart, lSlast), Nothing) -> undefined 
+  (Nothing, Just (rSstart, rSlast)) -> do 
+    let lRes = ETapeLeft lsT
+    rRes <- answerOneSide rSstart rSlast rsT 
+    pure (lRes, rRes)
+  --  case matchTape rSstart rsT of 
+  --    Equations (Left msg) -> Equations $ Left msg 
+  --    Equations (Right (map, SkipLeft rSLeft)) -> let 
+  --     rRes = SkipLeft (rSLeft <> (rSlast :| [])) 
+  --     in Equations (Right (map, (lRes, rRes)))
+  --    Equations (Right (map, Perfect)) -> let 
+  --     rRes = SkipLeft $ rSlast :| [] 
+  --     in Equations (Right (map, (lRes, rRes)))
+  --    Equations (Right (map, TapeLeft (rTapeHead :| rTapeRest))) -> 
+  --     {-
+  --     what we do here is 
+  --       1) send any boundVars in rSlast to what they are bound to, using map
+  --       2) match rSlast and rTapeHead
+  --       3) case on the result and pack up the answer
+  --     -}
+  --     let rSlastBound = second (partiallyUpdateCount map) rSlast 
+  --     in case matchTapeHeads rSlastBound rTapeHead of 
+  --         Equations (Left msg) -> Equations $ Left $ msg <> "\nalso some boundVar shenanigans happened"
+  --         Equations (Right (subMap, PerfectH)) -> case mergeEqns map subMap of 
+  --           Left msg -> error $ "merge failed, but I think it shouldn't ever fail: " <> msg 
+  --           Right newMap -> Equations $ Right (newMap, (lRes, ETapeLeft rTapeRest))
+  --         Equations (Right (subMap, TapeHLeft thl)) -> case mergeEqns map subMap of 
+  --           Left msg -> error $ "merge failed, but I think it shouldn't ever fail: " <> msg 
+  --           Right newMap -> Equations $ Right (newMap, (lRes, TapeLeft (thl :| rTapeRest)))
+  (Just (lSstart, lSlast), Nothing) -> do 
+    let rRes = ETapeLeft rsT 
+    lRes <- answerOneSide lSstart lSlast lsT 
+    undefined 
   (Just (lSstart, (lSlastS, lSlastC)), Just (rSstart, (rSlastS, rSlastC))) 
     -> case bisequence (matchTape lSstart lsT, matchTape rSstart rsT) of 
     Equations (Left msg) -> Equations (Left msg)
