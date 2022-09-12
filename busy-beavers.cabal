@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3b60c39ac371786683be27c450241a808989a8ed2fd3a26a2f21c854ec9b4454
+-- hash: 81b96834a37a12ee9eb4942e05be67f9dc04478026cd7d6b7c8ffb4d64f5bf44
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -107,6 +107,7 @@ library
   build-depends:
       QuickCheck
     , base
+    , bifunctors
     , constraints
     , containers
     , either

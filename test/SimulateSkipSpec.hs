@@ -125,7 +125,7 @@ spec = do
           tapeEx2 = (Phase 0, ExpTape [(ft, ci 2), (tt, bvi 0 1), (ff, ci 1)] 
                                       ft [(ft, ci 1), (ff, ci 1 <> bvi 0 1)])                     
       applySkip skipEx2 tapeEx2 `shouldSatisfy` has _Just
-  describe "matchTape" $ do
+  describe "matchTwoTapes" $ do
     it "applies a skip when a var is sent to two things" $ do 
       {-
       matchTape [(F, x) (T, 1), (F, x)] [(F, 2), (T, 1), (F, 3)] 
@@ -137,4 +137,4 @@ spec = do
           tape1 = [(Bit False, bv 1 1), (Bit True, c 1), (Bit False, bv 1 1)]
           tape2 = [(Bit False, ci 2), (Bit True, ci 1), (Bit False, ci 3)]
           ansTape = (Bit False, ci 1) :| []
-      getEquations (matchTape tape1 tape2) `shouldBe` Just (TapeLeft ansTape)
+      getEquations (matchTwoTapes (tape1, tape2) ([], [])) `shouldBe` Just (TapeLeft ansTape, Perfect)

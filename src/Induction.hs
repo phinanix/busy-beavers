@@ -384,9 +384,6 @@ test = sequenceA
 bifoldMapBoth :: (Bifoldable p, Monoid m) => (a -> m) -> p a a -> m
 bifoldMapBoth f = bifoldMap f f
 
-bitraverseBoth :: (Bitraversable p, Applicative f) => (a -> f b) -> p a a -> f (p b b)
-bitraverseBoth f = bitraverse f f
-
 boolToMaybe :: Bool -> Maybe ()
 boolToMaybe True = Just ()
 boolToMaybe False = Nothing

@@ -201,3 +201,6 @@ ixListLens i = lens get set where
   set xs newX = case splitAtExact i xs of 
     (pref, (_oldX:suf)) -> pref ++ (newX:suf)
     _ -> error ("length: " <> show (length xs) <> " index: " <> show i)
+
+bitraverseBoth :: (Bitraversable p, Applicative f) => (a -> f b) -> p a a -> f (p b b)
+bitraverseBoth f = bitraverse f f

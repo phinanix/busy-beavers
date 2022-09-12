@@ -123,7 +123,7 @@ proveSimply machine state = case mbProof of
   mbProof = do
     indHyp <- guessInductionHypothesis (state ^. s_history) (state ^. s_readshift_history)
     first fst $ proveSimLinearAndTree 100 100 machine (state ^. s_book) indHyp
-    arbSkip <- --trace ("indhyp suceeded") $ 
+    arbSkip <- trace ("indhyp suceeded") $ first (\s -> "chainArbitrary failed: " <> s) $ 
       chainArbitrary indHyp
     skipAppliesForeverInHist arbSkip (state ^. s_history)
 {-# SPECIALISE proveSimply :: SimOneAction Bit #-}

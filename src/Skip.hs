@@ -8,6 +8,8 @@ import Prettyprinter
 import Data.Bitraversable (Bitraversable)
 import Data.Bifoldable (Bifoldable)
 import qualified Data.List.NonEmpty as NE 
+import qualified Data.Set as S 
+import qualified Data.Map.Monoidal as MM 
 
 import Turing 
 import Count
@@ -16,6 +18,8 @@ import ExpTape
 import HaltProof
 import Tape
 import Relude.Extra
+import Control.Exception
+import Safe.Partial (Partial)
 
 --when the machine halts, there are two ends of the tape plus a thing we push in the middle
 data FinalTape c s = FinalTape ([(s, c)], [(s, c)]) (TapePush c Bit)
@@ -103,28 +107,6 @@ instance Bitraversable SkipEnd where
     SkipHalt tp -> SkipHalt <$> bitraverse f pure tp 
     SkipUnknownEdge e -> pure $ SkipUnknownEdge e
     SkipNonhaltProven hp -> SkipNonhaltProven <$> (g <%> hp)
-
---Zero and OneDir as they say, BothDirs goes the first count steps left and the second count steps right 
---here's a problem with displacement. it lets you track where the machine ended up, but not which symbols 
---it read to end up there, which is required to detect Lin recurrence. However I guess that's fine as long 
---as machines only depend on the literal things read by a skip? In fact, if that is true, not clear we even 
---need to track displacement. (it might also be trivially derivable from a skip?)
--- data Displacement c = Zero | OneDir Dir c | BothDirs c c deriving (Eq, Ord, Show, Generic, Functor, Foldable, Traversable)
--- instance (NFData c) => NFData (Displacement c)
-
--- dispToInt :: Displacement InfCount -> Int
--- dispToInt = \case
---   Zero -> 0
---   OneDir L (NotInfinity (FinCount n)) -> -1 * fromIntegral n
---   OneDir R (NotInfinity (FinCount n)) -> fromIntegral n
---   BothDirs (NotInfinity (FinCount n)) (NotInfinity (FinCount m)) -> fromIntegral m - fromIntegral n
---   other -> error $ "couldn't convert " <> show other <> " to an int"
-
--- instance (Pretty c) => Pretty (Displacement c) where 
---   pretty = \case 
---     Zero -> "d Zero"
---     OneDir dir c -> show dir <> " " <> pretty c 
---     BothDirs c c' -> "left " <> pretty c <> " and right " <> pretty c'
 
 data Skip c s = Skip
   { _start :: Config c s
@@ -240,15 +222,19 @@ pattern ETapeLeft :: [(s, InfCount)] -> TapeMatch s
 pattern ETapeLeft xs <- (tapeMatchToMaybeTapeLeft -> (Just xs)) where 
   ETapeLeft [] = Perfect 
   ETapeLeft (x : xs) = TapeLeft (x :| xs) 
+{-# COMPLETE ETapeLeft, SkipLeft  #-}
 
---pattern ESkipLeft 
-
--- mbTapeLeft :: [(s, InfCount)] -> TapeMatch s
--- mbTapeLeft [] = Perfect 
--- mbTapeLeft (x : xs) = TapeLeft (x :| xs)
-
---TODO:: maybe define a pattern synonym for TapeMatch that either returns a (possibly empty)
---leftover tape or the skip
+tapeMatchToMaybeSkipLeft :: TapeMatch s -> Maybe [(s, Count)]
+tapeMatchToMaybeSkipLeft = \case 
+  Perfect -> Just []
+  SkipLeft (x :| xs) -> Just (x : xs)
+  TapeLeft _ -> Nothing
+  
+pattern ESkipLeft :: [(s, Count)] -> TapeMatch s 
+pattern ESkipLeft xs <- (tapeMatchToMaybeSkipLeft -> (Just xs)) where 
+  ESkipLeft [] = Perfect 
+  ESkipLeft (x : xs) = SkipLeft (x :| xs) 
+{-# COMPLETE ESkipLeft, TapeLeft  #-}
 
 --note: this routine does not make advantage of the fact that the ExpTape has the invariant
 --that there are never two adjacent blocks with the same symbol - it pessimistically assumes
@@ -282,8 +268,40 @@ matchTape (skipHead:restSkip) (tapeHead:restTape) = matchTapeHeads skipHead tape
   --TODO:: I think we can short circuit and skip the rest of the match here if the skip has the invariant
   (TapeHLeft tapeHead) -> matchTape restSkip (tapeHead:restTape)
 
-matchTwoCounts :: (Count, Count) -> (InfCount, InfCount) -> Equations (InfCount, InfCount) 
-matchTwoCounts (lC, rC) (lT, rT) = undefined 
+matchTwoCounts :: Partial => (Count, Count) -> (InfCount, InfCount) -> Equations (InfCount, InfCount) 
+matchTwoCounts (lC@(Count _n _as xs), rC@(Count _m _bs ys)) (lT, rT) 
+  = case toList $ S.intersection (MM.keysSet xs) (MM.keysSet ys) of 
+    Empty -> do 
+      lRes <- matchInfCount lC lT
+      rRes <- matchInfCount rC rT 
+      pure (lRes, rRes)
+    [cV] -> 
+      -- case (lT, rT) of 
+      -- (NotInfinity lTC, NotInfinity rTC) -> 
+      do 
+        (lVars, lTRem) <- removeCommonConstsInf lC lT
+        (rVars, rTRem) <- removeCommonConstsInf rC rT
+        --TODO: for now we only handle the case where lVars and rVars are exactly 1 var each, 
+        --we'll handle other stuff later 
+        case (MM.assocs lVars, MM.assocs rVars) of 
+          ([], _) -> error "unreachable mTC1"
+          (_, []) -> error "unreachable mTC2"
+          {- Example: 10x into 37 and 11x into 54 gives 
+          10*3 + 7 and 11*4 + 10 and we want to send x to the smaller of 3 and 4 
+          giving x->3 and left: 37 - (10*3) right: 54 - (11*3)
+          -}
+          ([(lV, Sum lCoeff)], [(rV, Sum rCoeff)]) -> assert (lV == rV && rV == cV) $ let 
+            (lQ, _lRem) = divRemInfCount lTRem lCoeff 
+            (rQ, _rRem) = divRemInfCount rTRem rCoeff 
+            (likes, _, _) = likeTermsInf lQ rQ
+            in addEquation (cV, likes) $ 
+              pure (lTRem `unsafeSubInfCountFromInfCount` (lCoeff `nTimes` likes), 
+                     rTRem `unsafeSubInfCountFromInfCount` (rCoeff `nTimes` likes))
+          (_lVs, _rVs) -> error $ "there was more than one variable in matchTwoCounts: " 
+            <> showP lC <> " " <> showP rC
+    _cVs -> error $ "there was more than one common variable in matchTwoCounts: " 
+            <> showP lC <> " " <> showP rC
+
 -- try common variables, then if there aren't do the regular thing
 -- then if there are, first reduce common parts (non var parts), 
 -- then do the like, map to the intersection of the rhs thing
@@ -296,38 +314,24 @@ matchTwoTapes (lsS, lsT) (rsS, rsT) = case (unsnoc lsS, unsnoc rsS) of
     let lRes = ETapeLeft lsT
     rRes <- answerOneSide rSstart rSlast rsT 
     pure (lRes, rRes)
-  --  case matchTape rSstart rsT of 
-  --    Equations (Left msg) -> Equations $ Left msg 
-  --    Equations (Right (map, SkipLeft rSLeft)) -> let 
-  --     rRes = SkipLeft (rSLeft <> (rSlast :| [])) 
-  --     in Equations (Right (map, (lRes, rRes)))
-  --    Equations (Right (map, Perfect)) -> let 
-  --     rRes = SkipLeft $ rSlast :| [] 
-  --     in Equations (Right (map, (lRes, rRes)))
-  --    Equations (Right (map, TapeLeft (rTapeHead :| rTapeRest))) -> 
-  --     {-
-  --     what we do here is 
-  --       1) send any boundVars in rSlast to what they are bound to, using map
-  --       2) match rSlast and rTapeHead
-  --       3) case on the result and pack up the answer
-  --     -}
-  --     let rSlastBound = second (partiallyUpdateCount map) rSlast 
-  --     in case matchTapeHeads rSlastBound rTapeHead of 
-  --         Equations (Left msg) -> Equations $ Left $ msg <> "\nalso some boundVar shenanigans happened"
-  --         Equations (Right (subMap, PerfectH)) -> case mergeEqns map subMap of 
-  --           Left msg -> error $ "merge failed, but I think it shouldn't ever fail: " <> msg 
-  --           Right newMap -> Equations $ Right (newMap, (lRes, ETapeLeft rTapeRest))
-  --         Equations (Right (subMap, TapeHLeft thl)) -> case mergeEqns map subMap of 
-  --           Left msg -> error $ "merge failed, but I think it shouldn't ever fail: " <> msg 
-  --           Right newMap -> Equations $ Right (newMap, (lRes, TapeLeft (thl :| rTapeRest)))
   (Just (lSstart, lSlast), Nothing) -> do 
     let rRes = ETapeLeft rsT 
     lRes <- answerOneSide lSstart lSlast lsT 
-    undefined 
+    pure (lRes, rRes)
   (Just (lSstart, (lSlastS, lSlastC)), Just (rSstart, (rSlastS, rSlastC))) 
     -> case bisequence (matchTape lSstart lsT, matchTape rSstart rsT) of 
     Equations (Left msg) -> Equations (Left msg)
-    Equations (Right (map, _)) -> undefined 
+    Equations (Right (map, (ESkipLeft skipLs, ESkipLeft skipRs))) -> 
+      Equations $ Right (map, (ESkipLeft (skipLs ++ [(lSlastS, lSlastC)]), 
+                              ESkipLeft (skipRs ++ [(rSlastS, rSlastC)])))
+    Equations (Right (map, (ESkipLeft skipLs, TapeLeft (rTapeHead :| rTapeRest)))) -> do 
+      let lRes = ESkipLeft $ skipLs ++ [(lSlastS, lSlastC)]
+      rRes <- lastVarOneSide map (rSlastS, rSlastC) rTapeHead rTapeRest
+      pure (lRes, rRes)
+    Equations (Right (map, (TapeLeft (lTapeHead :| lTapeRest), ESkipLeft skipRs))) -> do 
+      lRes <- lastVarOneSide map (lSlastS, lSlastC) lTapeHead lTapeRest 
+      let rRes = ESkipLeft $ skipRs ++ [(rSlastS, rSlastC)]
+      pure (lRes, rRes)
     Equations (Right (map, (TapeLeft ((lTS, lTC) :| lTapeRest), TapeLeft ((rTS, rTC) :| rTapeRest)))) -> let
       (lSCBound, rSCBound) = bimapBoth (partiallyUpdateCount map) (lSlastC, rSlastC)
       secondEqns = do 
@@ -353,6 +357,10 @@ matchTwoTapes (lsS, lsT) (rsS, rsT) = case (unsnoc lsS, unsnoc rsS) of
      Equations (Right (map, Perfect)) ->
        Equations (Right (map, SkipLeft $ skipLast :| [] ))
      Equations (Right (map, TapeLeft (rTapeHead :| rTapeRest))) -> 
+      lastVarOneSide map skipLast rTapeHead rTapeRest 
+    lastVarOneSide :: Map BoundVar InfCount -> (s, Count) -> (s, InfCount) -> [(s, InfCount)]
+      -> Equations (TapeMatch s) 
+    lastVarOneSide map skipLast rTapeHead rTapeRest =       
       {-
       what we do here is 
         1) send any boundVars in rSlast to what they are bound to, using map
@@ -432,14 +440,13 @@ matchConfigTape :: (Eq s, Show s, Pretty s) => Config Count s -> ExpTape s InfCo
 matchConfigTape (Config _p lsC pointC rsC) (ExpTape lsT pointT rsT)
   = do
     matchBits pointC pointT
-    let thing = matchSides lsT rsT
-    trace ("thing mct " <> show thing) thing 
-  where
-  matchSides left right = trace ("lst rst" <> showP lsT <> " " <> showP rsT) $ let 
-    leftAns = mapMaybe getTapeRemain $ matchTape lsC left
-    rightAns = mapMaybe getTapeRemain $ matchTape rsC right
-    in trace ("leftAns " <> showP (getEquations leftAns) <> " rightAns " <> showP (getEquations rightAns)) 
-      bisequence (leftAns, rightAns)
+    mapMaybe (bitraverseBoth getTapeRemain) $ matchTwoTapes (lsC, lsT) (rsC, rsT) 
+  -- where
+  -- matchSides left right = trace ("lst rst" <> showP lsT <> " " <> showP rsT) $ let 
+  --   leftAns = mapMaybe getTapeRemain $ matchTape lsC left
+  --   rightAns = mapMaybe getTapeRemain $ matchTape rsC right
+  --   in trace ("leftAns " <> showP (getEquations leftAns) <> " rightAns " <> showP (getEquations rightAns)) 
+  --     bisequence (leftAns, rightAns)
 
 
 matchSkipTape :: (Eq s, Show s, Pretty s) => Skip Count s -> ExpTape s InfCount
@@ -456,7 +463,7 @@ matchSkipTape (Skip config end _hops) tape = do
           _x1 : _x2 -> pure ()
         _ -> pure ()
 
-  case trace ("mst out was: " <> showP out ) end of     
+  case end of     
     SkipStepped _ph tp -> do 
       checkTP tp 
       pure () 
