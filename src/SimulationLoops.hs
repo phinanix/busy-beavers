@@ -154,7 +154,7 @@ runAtCounts xs = let setXs = S.fromList xs in
 skipGoesForever :: Skip Count s -> Bool
 skipGoesForever _skip = False
 
-addSkipToStateOrInf :: (Pretty s, Show s, Ord s)
+addSkipToStateOrInf :: (TapeSymbol s)
   => Skip Count s
   -> SkipOrigin s
   -> SimState s
@@ -203,7 +203,9 @@ simulateStepPartial limit machine (SimState ph tape book steps skipTrace hist hi
   --trace ("stepping bigStep: " <> showP counter <> " smallStep: " <> showP steps) $
   if counter > limit
   then Result $ Continue steps ph tape curDisp
-  else --trace ("step:" <> showP counter <> " phase: " <> showP ph <> " curTape: " <> showP tape) $
+  else (if signatureComplexity (tapeSignature tape) > 60 then id 
+      else trace ("step:" <> showP counter <> " smallstep: " <> showP steps 
+              <> " phase: " <> showP ph <> " curTape: " <> showP tape)) $
   case skipStep machine book ph tape of
     Unknown e -> UnknownEdge e
     MachineStuck -> error "machinestuck "
@@ -264,7 +266,7 @@ checkSeenBefore _machine state = case seenBeforeProof state of
 
 
 --applies the skip to everything in the list, checks if any of them have just 
-skipAppliedInHist :: (Eq s, Pretty s, Show s) => Skip Count s -> TapeHist s InfCount -> Bool
+skipAppliedInHist :: (TapeSymbol s) => Skip Count s -> TapeHist s InfCount -> Bool
 skipAppliedInHist skip hist = any (has _Just) $ applySkip skip <$> getTapeHist hist
 
 --checks whether we've put an infinity in some place on the tape that is not the two ends

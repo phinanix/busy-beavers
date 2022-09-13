@@ -112,11 +112,11 @@ loadMachinesFromFile fn = do
   fileContents <- TIO.readFile fn
   pure $ unm <$> lines fileContents
 
-applyTactic :: Vector Tactic -> [Turing] -> [Turing]
+applyTactic :: Vector Tactic -> [Turing] -> [(Int, Turing)]
 applyTactic tac machines = let
     enumMachines = zip [0,1 ..] machines
     runTactic = getContinues . outerLoop tac
-    runTacticPrint (i, m) = trace ("machine: " <> show i) runTactic m
+    runTacticPrint (i, m) = (i,) <$> trace ("machine: " <> show i) runTactic m
     unprovenMachines = bind runTacticPrint enumMachines
   in
     unprovenMachines
@@ -145,7 +145,8 @@ processMachinesViaArgs = do
        <> " machines as input. running: " <> fromString tacticName
        <> "\n"
   putText inputMessage
-  let unprovenMachines = applyTactic tacticVec inputMachines 
+  let unprovenMachinesWNums = applyTactic tacticVec inputMachines 
+      unprovenMachines = snd <$> unprovenMachinesWNums
   putMachinesInFile unprovenMachines outputFile 
   putText inputMessage
   putText $ "finished with " <> show (length unprovenMachines) 

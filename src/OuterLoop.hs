@@ -222,15 +222,15 @@ simLoopFromTape bigStepLimit updateFuncs startMachine startPhase startTape
 
 
 basicSimLoop :: Tactic 
-basicSimLoop = simulation $ simLoop 1000 $ simulateStepPartial maxInt :| 
+basicSimLoop = simulation $ simLoop 400 $ simulateStepPartial maxInt :| 
   (liftOneToMulti <$> [checkSeenBefore, liftModifyState recordHist, 
   liftModifyState recordDispHist,
   runIfCond (atLeftOfTape . view s_tape) attemptEndOfTapeProof,
   runIfCond (atRightOfTape . view s_tape) attemptOtherEndOfTapeProof
   , runAtCount 145 proveByLR
-  , runAtCount 297 proveSimply
-  --, runAtCount 298 proveByInd
-  , runAtCount 999 proveByIndV1
+  , runAtCount 399 addSinglePairRule
+  , runAtCount 399 proveSimply
+  , runAtCount 399 proveByIndV1
   ])
 
 oldtwoBitSimLoop :: Tactic
@@ -254,16 +254,16 @@ twoBitDispLoop = simLoop 150 $ simulateStepPartial maxInt :|
   ])
 
 baseSimLoop :: (TapeSymbol s) => Turing -> ([Turing],[(Turing, SimResult InfCount s)])
-baseSimLoop = simLoop 1000 $ simulateStepPartial maxInt :| 
+baseSimLoop = let limit = 999 in simLoop (limit + 1) $ simulateStepPartial maxInt :| 
   (liftOneToMulti <$> [checkSeenBefore
   , liftModifyState recordHist
   , liftModifyState recordDispHist
   , runAtCount 10 proveByLR
-  , runAtCount 40 proveSimply
-  , runAtCount 145 proveByLR
-  , runAtCount 597 addSinglePairRule
-  , runAtCount 598 proveSimply
-  --, runAtCount 999 proveByIndV1
+  -- , runAtCount 40 proveSimply
+  --, runAtCount limit proveByLR
+  , runAtCount limit addSinglePairRule
+  , runAtCount limit proveSimply
+  , runAtCount limit proveByIndV1
   ])
 
 {-# SPECIALISE baseSimLoop :: Turing -> ([Turing],[(Turing, SimResult InfCount Bit)]) #-}
@@ -274,12 +274,12 @@ baseSimLoop = simLoop 1000 $ simulateStepPartial maxInt :|
 {-# SPECIALISE baseSimLoop :: Turing -> ([Turing],[(Turing, SimResult InfCount (Vec 6 Bit))]) #-}
 
 indV1Loop :: (TapeSymbol s) => Turing -> ([Turing],[(Turing, SimResult InfCount s)])
-indV1Loop = simLoop 300 $ simulateStepPartial maxInt :| 
+indV1Loop = simLoop 400 $ simulateStepPartial maxInt :| 
   (liftOneToMulti <$> [checkSeenBefore
   , liftModifyState recordHist
   , liftModifyState recordDispHist
   , runAtCount 10 proveByLR
-  , runAtCount 299 proveByIndV1
+  , runAtCount 399 proveByIndV1
   ])  
 
 
@@ -299,7 +299,7 @@ sixBitSimLoop :: Tactic
 sixBitSimLoop = simulation @(Vec 6 Bit) baseSimLoop
 
 basicTacticVector :: V.Vector Tactic 
-basicTacticVector = V.fromList [basicSimLoop, twoBitSimLoop] --, tacticBackwardSearch]
+basicTacticVector = V.fromList [basicSimLoop, twoBitSimLoop, threeBitSimLoop] --, tacticBackwardSearch]
 
 m3456TacticVector :: V.Vector Tactic
 m3456TacticVector = V.fromList [threeBitSimLoop, fourBitSimLoop, fiveBitSimLoop, sixBitSimLoop]

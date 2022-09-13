@@ -8,6 +8,7 @@ import Prettyprinter
 import Control.Exception (assert)
 
 import qualified Data.Map as M
+import qualified Data.Map.Monoidal as MM
 import qualified Data.Set as S
 
 import Turing
@@ -122,15 +123,29 @@ proveSimply machine state = case mbProof of
   where
   mbProof = do
     indHyp <- guessInductionHypothesis (state ^. s_history) (state ^. s_readshift_history)
-    _n <- first fst $ proveSimLinearAndTree 100 100 machine (state ^. s_book) indHyp
-    skipAppliesForeverInHist indHyp (state ^. s_history)
-    -- TODO: maybe we want this back later? but right now I believe skipAppliesForeverInHist catches 
-    --        all relevant cases
-    -- arbSkip <- trace ("indhyp suceeded") $ first ("chainArbitrary failed: " <>) $
-    --   chainArbitrary indHyp
-    -- skipAppliesForeverInHist arbSkip (state ^. s_history)
+    let tryProve skip = bimap fst (const skip) $ 
+          proveSimLinearAndTree 100 100 machine (state ^. s_book) skip
+        skipVar = case toList $ getAllVars indHyp of 
+          [x] -> x 
+          _ -> error "more than one var from indHyp"
+    validSkip <- tryProve indHyp `alt` tryProve (add skipVar 1 indHyp) `alt` tryProve (add skipVar 2 indHyp)
+    let mbProof1 = skipAppliesForeverInHist validSkip (state ^. s_history)
+    let mbProof2 = do 
+          arbSkip <- first ("chainArbitrary failed: " <>) $ chainArbitrary validSkip
+          skipAppliesForeverInHist arbSkip (state ^. s_history)
+    mbProof1 `alt` mbProof2 
+      
+  {-we need to try to prove the skip using (x+2) rather than (x) because sometimes you have to break
+  the x into pieces to be able to prove it-}
+  add var n skip = replaceVarInSkip skip var (FinCount n <> boundVarCount var 1)
 {-# SPECIALISE proveSimply :: SimOneAction Bit #-}
 {-# SPECIALISE proveSimply :: SimOneAction TwoBit #-}
+
+alt :: Either Text a -> Either Text a -> Either Text a 
+alt l r = case (l, r) of 
+  (Right out, _) -> Right out 
+  (_, Right out) -> Right out 
+  (Left m1, Left m2) -> Left $ m1 <> "\nand\n" <> m2 
 
 {-
 algorithm: for all configs which occur at least twice in the history of complexity at most 5:
@@ -167,7 +182,7 @@ makeAdditiveSkip :: (TapeSymbol s) => Phase
   -> ExpTape s Count -> ExpTape s Count
   -> Maybe (Skip Count s)
 makeAdditiveSkip ph startTape endTape = do
-  let (startSig, endSig) = trace ("startend tape" <> showP (startTape, endTape)) (tapeSignature startTape, tapeSignature endTape)
+  let (startSig, endSig) = (tapeSignature startTape, tapeSignature endTape)
   toDrop <- calcCommonSig startSig endSig
   let ((sCls, sCrs), (eCls, eCrs)) = addZeros toDrop $ bimapBoth getCounts (startTape, endTape)
       lrPairs = (zipExact sCls eCls, zipExact sCrs eCrs)

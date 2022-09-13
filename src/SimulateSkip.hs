@@ -87,6 +87,7 @@ data PartialStepResult c s = Unknown Edge
                          | NonhaltProven (HaltProof s)
                          | MachineStuck
                         deriving (Eq, Ord, Show, Generic)
+instance (NFData c, NFData s) => NFData (PartialStepResult c s)
 
 --which of these newtypes your history is tracks whether the history is forwards (element 0 is the first thing that happend)
 --or reverse (element 0 is the most recent thing that happened)
@@ -230,11 +231,15 @@ instance (Ord s, Pretty s) => Pretty (SkipBook s) where
               $ assocs skipPile
 
 --returns nothing if the skip is inapplicable, else returns the result
-applySkip :: forall s. (Eq s, Pretty s, Show s, Partial) => Skip Count s -> (Phase, ExpTape s InfCount)
+applySkip :: forall s. (Eq s, Pretty s, Show s, NFData s, Partial) => Skip Count s -> (Phase, ExpTape s InfCount)
   -> Maybe (PartialStepResult InfCount s)
 applySkip skip@(Skip s _ _) (p, tape)
-  = guard (s^.cstate == p) >> either (const Nothing) Just
-      (packageResult skip tape =<< runEquations (matchSkipTape skip tape))
+  = let ans = guard (s^.cstate == p) >> either (const Nothing) Just
+              (packageResult skip tape =<< runEquations (matchSkipTape skip tape))
+        msg = ("applying: " <> showP skip <> "\nto: " <> showP (p, tape))
+        f = id -- if has _Just ans then trace msg else id 
+    in
+    f ans 
   -- = Skipped
   --     (updateCountToInf boundVs hopCount)
   --     (getSkipEndPhase e)
@@ -363,7 +368,8 @@ skipPrecedence res1 res2 = case (res1, res2) of
   (Unknown e, Unknown f) -> compare e f
 
 --simulates one step of a TM using a skip-book
-skipStep :: (TapeSymbol s, Pretty s) => Turing -> SkipBook s -> Phase -> ExpTape s InfCount
+skipStep :: (TapeSymbol s, HasCallStack) 
+  => Turing -> SkipBook s -> Phase -> ExpTape s InfCount
   -> PartialStepResult InfCount s
 skipStep (Turing _ trans) book ph tape@(ExpTape _ls p _rs) =
   let bit = getPoint p in
@@ -374,7 +380,7 @@ skipStep (Turing _ trans) book ph tape@(ExpTape _ls p _rs) =
         --trace ("ans was: " <> show ans)
         ans
 
-getSkipsWhichApply :: (Ord s, Pretty s, Show s, HasCallStack)
+getSkipsWhichApply :: (Ord s, Pretty s, Show s, NFData s, HasCallStack)
   => SkipBook s
   -> Phase
   -> ExpTape s InfCount

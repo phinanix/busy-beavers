@@ -56,7 +56,9 @@ obtainHistorySlices th@(TapeHist tapeHist) (ReadShiftHist readShiftHist) = do
   -- TODO: trying drop 1 to fix startup effects
   -- it looks like we shoudl maybe try drop 0, 1, 2, etc. and see
   -- or maybe we should truncate to only 3 or 4 things, instead of dropping
-  let indices = trace ("machine configs: " <> showP machineConfigs) drop 1 $ fst <$> snd machineConfigs
+  let indices = --trace ("machine configs: " <> showP machineConfigs) 
+           --drop 1 $ 
+           fst <$> snd machineConfigs
       pairedIndices = zip (U.init indices) (U.tail indices)
   nonemptyPairs <- --trace ("pairedIndices" <> show pairedIndices <> "length" <> show (length labelledTapeHist) <> show (length readShiftHist) ) 
     failMsg (error "pairs were empty") $ nonEmpty pairedIndices
@@ -100,10 +102,12 @@ filterHistories' limit m = do
   historySlices <- obtainHistorySlices' limit m 
   pure $ filterHistories historySlices 
   
+
+--filters down the histories to only include signatures which occurred in every history
 filterHistories :: Ord s
   => NonEmpty (Int, Int, [(Int, Phase, ExpTape s InfCount, ReadShift)])
   -> NonEmpty (Int, Int, [(SigID, Int, Phase, ExpTape s InfCount, ReadShift)])
-filterHistories historySlices = trace (showP $ length <$$> historySlices) $
+filterHistories historySlices = trace ("historyslice lengths: " <> showP (length <$$> historySlices)) $
   let sigsWhichOccurred = obtainSigsWhichOccur historySlices 
       sigsToLetters = M.fromList . fmap (second SigID) . flip zip [0, 1..] .  S.toList $ sigsWhichOccurred
       third f (x, y, z) = (x, y, f z)
@@ -137,7 +141,8 @@ makeScaffoldHypotheses filteredHist unfilteredHist
     prefixSuffixPairs :: NonEmpty (Int, Int, 
         [(SigID, Int, Phase, ExpTape s InfCount, ReadShift)], 
         [(SigID, Int, Phase, ExpTape s InfCount, ReadShift)])
-    prefixSuffixPairs = trace ("pre / suf" <> showP (prefix, suffix)) (\(x,y,z) -> (x, y, takeExact (length prefix) z, 
+    prefixSuffixPairs = --trace ("pre / suf" <> showP (prefix, suffix))
+      (\(x,y,z) -> (x, y, takeExact (length prefix) z, 
         reverse $ takeExact (length suffix) $ reverse z)) 
         <$> filteredHist
     (_s, _e, pref, suf) = head prefixSuffixPairs 
@@ -184,7 +189,7 @@ makeScaffoldHypotheses filteredHist unfilteredHist
         munge4 = foldr (\(_a,b,c,d) (bcs, ds) -> ((b,c):bcs, d:ds)) ([],[])
     --this is a list of guesses. where each guess is a nonempty list of the example
     --histories we've seen corresponding to that guess. 
-    guessHists = trace ("lrmost: " <> showP lrmostPrefixSuffixes) 
+    guessHists = --trace ("lrmost: " <> showP lrmostPrefixSuffixes) 
       catMaybes $ makeGuessHist <$> [0, 1.. length (lrmostPrefixSuffixes ^. ix 0 . _3) - 1] 
         <*> [0, 1.. length (lrmostPrefixSuffixes ^. ix 0 . _4) - 1]
     generalizedHistories = trace ("len ghs" <> show (length guessHists)) generalizeHistories <$> guessHists 

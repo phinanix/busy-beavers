@@ -36,8 +36,9 @@ dfs depthLimit nodeLimit getAdjacent isSuccess startVertex = munge $ loop True E
     then (False, Left "hit nodelimit") else 
     case stack of 
       [] -> (searchWasExhaustive, Left "ran out of things to search")
-      (vDepth, v) : vs -> trace ("exploring at depth: " <> showP vDepth <> " " <> showP v
-        <> "\nsuccess: " <> show (isSuccess v)) $
+      (vDepth, v) : vs -> 
+        -- trace ("exploring at depth: " <> showP vDepth <> " " <> showP v
+        -- <> "\nsuccess: " <> show (isSuccess v)) $
        let newPath = takeExact vDepth curPath ++ [v] in 
         if isSuccess v 
           then (searchWasExhaustive, Right newPath)

@@ -196,7 +196,8 @@ proveSimLinearAndTree linStep treeStep machine book skip
   --a node in DFS is a big step, so the nat output here is a big step
   case simulateViaDFS linStep treeStep book skip of
     Right nat -> Right nat
-    Left text -> case proveBySimulating (fromIntegral linStep) machine book skip of
+    Left text -> --trace (toString $ "dfs failed because:" <> text) $
+     case proveBySimulating (fromIntegral linStep) machine book skip of
       --works if you comment out this error and return right, but HOW COULD THAT BE TRUE you should never hit this error
       --the reason for this is simulateViaDFS should guess the same as proveBySimulating as it's first deep path, and should only recurse onto 
       --other paths if that doesn't work
@@ -266,7 +267,7 @@ proveBySimulating limit t book (Skip start skipEnd _) = case skipEnd of
     msg = "starting pos:\n" <> show (pretty start) <> "\nsucceeded: " <> show (has _Right ans)
         <> "\nans:" <> showP ans
     in
-    --force $ 
+    force $ 
     trace msg
     ans where
     -- four conditions: we've taken more steps than the limit,
@@ -277,7 +278,7 @@ proveBySimulating limit t book (Skip start skipEnd _) = case skipEnd of
                    " p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
       --we have to check the limit before checking for success, 
       --because we don't want to succeed in 101 steps if the limit is 100 steps
-      | numSteps > limit = Left ("exceeded limit while simulating", Nothing)
+      | numSteps > limit = Left ("exceeded limit of " <> show limit <> " while simulating", Nothing)
       | indMatch p tape (ph, tp) = pure numSteps
       | otherwise = case skipStep t book p tape of
             Unknown e -> Left ("hit unknown edge" <> show e, Nothing)
@@ -293,7 +294,7 @@ proveBySimulating limit t book (Skip start skipEnd _) = case skipEnd of
                 Left (msg, Just stuckConfig)
             Stepped Infinity _ _ _ _ _ -> Left ("hopped to infinity", Nothing)
             Stepped (NotInfinity hopsTaken) newPhase newTape skipUsed _ _
-                -> trace ("used skip: " <> showP skipUsed)
+                -> --trace ("used skip: " <> showP skipUsed)
                 loop (numSteps + 1) newPhase newTape (curCount <> hopsTaken)
     indMatch :: Phase -> ExpTape s InfCount -> (Phase, TapePush Count s) -> Bool
     indMatch cur_p et (goalPh, goalTP) = case bitraverse pure mbdeInfCount et of
@@ -325,11 +326,11 @@ getAllVars = fromList . bifoldMap getCountVars (const []) where
   getCountVars (Count _n _as xs) = toList $ keys xs
 
 --TODO, it's really dumb we have to "deInfCount here"
-getNextConfigs :: forall s. (Ord s, Pretty s, Show s)
+getNextConfigs :: forall s. (TapeSymbol s)
   => SkipBook s -> Config Count s -> [Config Count s]
 getNextConfigs book curConfig = f ans
  where
-  f = trace msg
+  f = id -- trace msg
   msg = "next possible configs:\n" <> foldMap (\x -> showP x <> "\n") ans
           <> "skips used: " <> foldMap (\x -> showP x <> "\n") skipsUsed
           <> "available book skips: " <> foldMap (\x -> showP x <> "\n") 
@@ -351,7 +352,7 @@ getNextConfigs book curConfig = f ans
     $ snd <$> uncurry (getSkipsWhichApply book) (configToET $ first NotInfinity curConfig)
 
 --the text is why you failed, and the natural is how many big steps 
-simulateViaDFS :: (Ord s, Pretty s, Show s) => Int -> Int -> SkipBook s -> Skip Count s
+simulateViaDFS :: (TapeSymbol s) => Int -> Int -> SkipBook s -> Skip Count s
   -> Either Text Natural
 simulateViaDFS stepLim depthLim book (Skip startConfig skipEnd _hops)
   = case res of
@@ -416,17 +417,28 @@ simplestNSigs n hist = take (fromIntegral n) $
     sortBy (compare `on` signatureComplexity . snd) $
     possibleSignatures hist
 
-orderSignatures :: Signature s -> Signature s -> Ordering
+--pick a signature by simplest, then by 
+orderSignatures :: (Ord s) => Signature s -> Signature s -> Ordering
 orderSignatures s t = case (compare `on` signatureComplexity) s t of
   LT -> LT
   GT -> GT
   EQ -> case (compare `on` leftLen) s t of
     LT -> LT
     GT -> GT
-    EQ -> (compare `on` rightLen) s t
+    EQ -> (compare `on` rightLen) s t 
+      -- case (compare `on` rightLen) s t of 
+      -- LT -> LT 
+      -- GT -> GT 
+      -- EQ -> (flip compare `on` getP) s t
   where
+    getP (Signature _ls p _rs) = p 
     leftLen (Signature ls _p _rs) = length ls
     rightLen (Signature _ls _p rs) = length rs
+
+orderPhaseSigPairs (ph1, s) (ph2, t) = case orderSignatures s t of 
+  LT -> LT 
+  GT -> GT 
+  EQ -> flip compare ph1 ph2 
 
 --given a history, guesses a "critical configuration" 
 -- a simple tape appearance the machine repeatedly returns to
@@ -434,8 +446,8 @@ guessCriticalConfiguration :: (Ord s, Show s, Pretty s) => [(Phase, ExpTape s In
 guessCriticalConfiguration hist = case possibleSignatures hist of
   [] -> Left "no possible criticalconfigs"
   xs ->
-    trace ("possible sigs: " <> showP (nubOrd (filter (\x -> signatureComplexity (snd x) <= 5) xs))) $
-    Right $ minimumBy (orderSignatures `on` snd) xs
+    trace ("possible sigs: " <> showP (nubOrd (filter (\x -> signatureComplexity (snd x) <= 4) xs))) $
+    Right $ minimumBy orderPhaseSigPairs xs --(orderSignatures `on` snd) xs
 
 -- given a particular config, return the list of times that config occurred, plus the integer position in the original list
 obtainConfigIndices :: (Eq s) => [(Phase, ExpTape s InfCount)] -> (Phase, Signature s)
@@ -573,7 +585,7 @@ guessInductionHypothesis th rsh = force $ do
       --this is hacky and bad but it used to be necessary to guess right on trickyChristmasTree so I'll try it for now
       --24 jul 22  update is that it is no longer necessary, so I got rid of it, but we'll see what 
       --happens in the future
-      Left msg -> guessInductionHypWithIndices th rsh criticalPhase (Unsafe.tail $ Unsafe.tail configIndicesAndConfigs)
+      Left msg -> trace (toString $ "ind m1: " <> msg) guessInductionHypWithIndices th rsh criticalPhase (Unsafe.tail $ Unsafe.tail configIndicesAndConfigs)
     in
      trace ("guessed indhyp:\n" <> showP indGuess) $
      assert ((thingContainsVar <$> indGuess) /= Right False)
@@ -700,11 +712,11 @@ guessInductionHypWithIndices (TapeHist hist) (ReadShiftHist rsHist)
                               criticalPhase configIndicesAndConfigs =
   let
     configIndices = let ans = fst <$> configIndicesAndConfigs in
-      trace ("configIndices were: " <> showP ans)
+      --trace ("configIndices were: " <> showP ans)
       ans
     indexPairs = zipExact (U.init configIndices) (U.tail configIndices)
     slicePairs = let ans = uncurry (getReadShiftSlicePair hist rsHist) <$> indexPairs in
-      trace ("slicepairs were:\n" <> showP ans)
+      --trace ("slicepairs were:\n" <> showP ans)
       ans
     allSigs = let ans = fmap (bimapBoth tapeSignature) slicePairs in
       --trace ("allsigs were: " <> showP ans) 
@@ -780,7 +792,7 @@ zipSigToET :: (Partial, Show b, Pretty c) => Signature b -> ([c], [c]) -> ExpTap
 zipSigToET sig@(Signature b_ls p b_rs) pair@(c_ls, c_rs) = let
     ans = ExpTape (zipExact b_ls c_ls) p (zipExact b_rs c_rs)
     in
-    trace ("zipping:\n" <> show (show sig <> "\n" <> pretty pair) <> "\nzipped\n")
+    --trace ("zipping:\n" <> show (show sig <> "\n" <> pretty pair) <> "\nzipped\n")
     ans
 
 --gets the simulation history and the displacement history
