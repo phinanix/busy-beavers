@@ -164,7 +164,8 @@ addSinglePairRule machine state = Right $ state & s_book .~ newBook where
   configs = fromList $ second tapeSignature <$> hist
   newSkips :: [(Skip Count s, SkipOrigin s)]
   newSkips = let ans = mapMaybe generalizeConfig $ toList configs in
-    trace ("new skips were: " <> foldMap showP (fst <$> ans)) ans
+    --trace ("new skips were: " <> foldMap showP (fst <$> ans)) 
+    ans
   newBook = addChainedToBook $ addMultipleToBook newSkips book
   generalizeConfig :: (Phase, Signature s) -> Maybe (Skip Count s, SkipOrigin s)
   generalizeConfig (ph, sig) = case reverse $ filter (\(_i, (ph', tape)) -> (ph == ph') && sig == tapeSignature tape) $ zip [0, 1..] hist of

@@ -149,8 +149,8 @@ proveInductivelyWithX xPlus limit t book goal indVar = let
           <> "\n inducting on:" <> show indVar
           <> "\ngot res" <> showP ans <> "\nEOM\n"
     in
-      force $
-      trace msg $
+     --force $
+     --trace msg $
        assertMsg (isSameInAsOut goal && thingContainsVar goal) (fromString msg)
        ans
     where
@@ -267,15 +267,15 @@ proveBySimulating limit t book (Skip start skipEnd _) = case skipEnd of
     msg = "starting pos:\n" <> show (pretty start) <> "\nsucceeded: " <> show (has _Right ans)
         <> "\nans:" <> showP ans
     in
-    force $ 
-    trace msg
+--    force $ 
+--    trace msg
     ans where
     -- four conditions: we've taken more steps than the limit,
     -- we've succeeded, stepping fails for some reason, or we continue 
     loop :: Natural -> Phase -> ExpTape s InfCount -> Count -> Either (Text, Maybe (Config Count s)) Natural
     loop numSteps p tape curCount
-        | trace (Unsafe.init $ toString $ "PS: steps:" <> show numSteps <> " count:" <> showP curCount <>
-                   " p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
+        -- | trace (Unsafe.init $ toString $ "PS: steps:" <> show numSteps <> " count:" <> showP curCount <>
+        --            " p:" <> dispPhase p <> " tape is: " <> dispExpTape tape) False = undefined
       --we have to check the limit before checking for success, 
       --because we don't want to succeed in 101 steps if the limit is 100 steps
       | numSteps > limit = Left ("exceeded limit of " <> show limit <> " while simulating", Nothing)

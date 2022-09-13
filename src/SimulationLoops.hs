@@ -142,7 +142,6 @@ runIfCond cond act machine state = if cond state
 
 runAtCount :: Int -> SimOneAction s -> SimOneAction s
 runAtCount n = runIfCond (\state ->
-  --trace ("goal:" <> show n <> " actual: " <> show (state ^. s_counter))
   state ^. s_counter == n)
 
 runAtCounts :: [Int] -> SimOneAction s -> SimOneAction s
@@ -203,9 +202,10 @@ simulateStepPartial limit machine (SimState ph tape book steps skipTrace hist hi
   --trace ("stepping bigStep: " <> showP counter <> " smallStep: " <> showP steps) $
   if counter > limit
   then Result $ Continue steps ph tape curDisp
-  else (if signatureComplexity (tapeSignature tape) > 60 then id 
-      else trace ("step:" <> showP counter <> " smallstep: " <> showP steps 
-              <> " phase: " <> showP ph <> " curTape: " <> showP tape)) $
+  else 
+    -- (if signatureComplexity (tapeSignature tape) > 0 then id 
+    --   else trace ("step:" <> showP counter <> " smallstep: " <> showP steps 
+    --           <> " phase: " <> showP ph <> " curTape: " <> showP tape)) $
   case skipStep machine book ph tape of
     Unknown e -> UnknownEdge e
     MachineStuck -> error "machinestuck "

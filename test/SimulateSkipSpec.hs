@@ -128,7 +128,7 @@ spec = do
   describe "matchTwoTapes" $ do
     it "applies a skip when a var is sent to two things" $ do 
       {-
-      matchTape [(F, x) (T, 1), (F, x)] [(F, 2), (T, 1), (F, 3)] 
+      matchTape [(F, x), (T, 1), (F, x)] [(F, 2), (T, 1), (F, 3)] 
       the answer should be (x -> 2) [(F, 1)]
       -}
       let bv x = boundVarCount (BoundVar x)
