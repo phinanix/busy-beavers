@@ -446,7 +446,7 @@ guessCriticalConfiguration :: (Ord s, Show s, Pretty s) => [(Phase, ExpTape s In
 guessCriticalConfiguration hist = case possibleSignatures hist of
   [] -> Left "no possible criticalconfigs"
   xs ->
-    trace ("possible sigs: " <> showP (nubOrd (filter (\x -> signatureComplexity (snd x) <= 4) xs))) $
+    --trace ("possible sigs: " <> showP (nubOrd (filter (\x -> signatureComplexity (snd x) <= 4) xs))) $
     Right $ minimumBy orderPhaseSigPairs xs --(orderSignatures `on` snd) xs
 
 -- given a particular config, return the list of times that config occurred, plus the integer position in the original list
@@ -571,7 +571,7 @@ obtainCriticalIndicesConfigs (TapeHist hist) = do
   criticalConfig@(criticalPhase, _criticalSignature) <- guessCriticalConfiguration hist
   let
     configIndicesAndConfigs = let ans = obtainConfigIndices hist criticalConfig in
-      trace ("configs were:\n" <> showP ans)
+      --trace ("configs were:\n" <> showP ans)
       ans
   pure (criticalPhase, configIndicesAndConfigs)
 
@@ -585,9 +585,10 @@ guessInductionHypothesis th rsh = force $ do
       --this is hacky and bad but it used to be necessary to guess right on trickyChristmasTree so I'll try it for now
       --24 jul 22  update is that it is no longer necessary, so I got rid of it, but we'll see what 
       --happens in the future
-      Left msg -> trace (toString $ "ind m1: " <> msg) guessInductionHypWithIndices th rsh criticalPhase (Unsafe.tail $ Unsafe.tail configIndicesAndConfigs)
+      Left msg -> --trace (toString $ "ind m1: " <> msg) 
+        guessInductionHypWithIndices th rsh criticalPhase (Unsafe.tail $ Unsafe.tail configIndicesAndConfigs)
     in
-     trace ("guessed indhyp:\n" <> showP indGuess) $
+     --trace ("guessed indhyp:\n" <> showP indGuess) $
      assert ((thingContainsVar <$> indGuess) /= Right False)
      indGuess
 

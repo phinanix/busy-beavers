@@ -106,18 +106,18 @@ proveByIndV1 machine state =
        proveByScaffold machine (state ^. s_book) hist rsHist
       let newBook = addSkipToBook scaffoldSkip scaffoldOrigin (state ^. s_book)
       --this is where we obtain the skipOrigin that proves indGUess
-      n <- trace ("indguess: " <> showP indGuess <> "scaffoldSkip: " <> showP scaffoldSkip)
+      n <- --trace ("indguess: " <> showP indGuess <> "scaffoldSkip: " <> showP scaffoldSkip)
              --  <> "book: " <> showP (state ^. s_book))
            --this should really only be proveBySimulating, but the thing is, often you want to prove with
               --x, rather than with x+1, and proveInductively does that for you, which is helpful
         --first fst $ proveBySimulating 100 machine newBook indGuess
          first fst $ proveInductively 100 machine newBook indGuess (BoundVar 0)
-      arbSkip <- trace ("succeeded at proving indhyp") chainArbitrary indGuess
-      trace ("arbskip: " <> showP arbSkip) skipAppliesForeverInHist arbSkip hist
+      arbSkip <- chainArbitrary indGuess
+      skipAppliesForeverInHist arbSkip hist
 
 proveSimply :: (TapeSymbol s) => SimOneAction s
 proveSimply machine state = case mbProof of
-  Left txt -> trace (toString $ "provesimply failed because: " <> txt <> "\nEOM\n") $
+  Left txt -> --trace (toString $ "provesimply failed because: " <> txt <> "\nEOM\n") $
     Right state
   Right hp -> Left $ ContinueForever hp
   where
