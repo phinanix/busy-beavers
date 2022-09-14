@@ -291,7 +291,7 @@ skipAppliesForeverInHist skip hist = case forevers of
     in
     --trace ("apps len " <> show (length ans)) 
     ans
-  forevers = filter (\(_i, config, res) -> trace ("skipRes " <> showP (res)) $ 
+  forevers = filter (\(_i, config, res) -> -- trace ("skipRes " <> showP (res)) $ 
     res ^? _Stepped . _1 == Just Infinity 
     || maybe False tapePostInfinity (res ^? _Stepped . _3)
     || skipRunsForeverIfConsumesLiveTape skip && skipConsumesLiveTape skip config)

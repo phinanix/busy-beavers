@@ -270,6 +270,11 @@ plan to count from X111 to X00001
 -}
 unproven_size4_13sep :: [Turing] 
 unproven_size4_13sep = unm <$> ["TR1___TL2FL3FR0FL2TR0TR3", "TR1FL2FL0TR0TL0FR3TR2___", "TR1___FR2FR1TL2FL3TL0FR3", "TR1TL0FL0TR2FR3FR1TR0___", "TR1FR3TL2TR1FR3FL2TR0___"]
+
+--discovered late at night 13sep22 via causing the program to crash
+failsAssert :: Turing
+failsAssert = unm "TR1FR3TR2___FL0TR0TL2TR3"
+
 --brady 1983 machines
 {-"ternary counter" 
 base state: 2 >F< all the way left

@@ -321,7 +321,7 @@ matchTwoTapes (lsS, lsT) (rsS, rsT) = case (unsnoc lsS, unsnoc rsS) of
     lRes <- answerOneSide lSstart lSlast lsT 
     pure (lRes, rRes)
   (Just (lSstart, (lSlastS, lSlastC)), Just (rSstart, (rSlastS, rSlastC))) 
-    -> case let ans = bisequence (matchTape lSstart lsT, matchTape rSstart rsT) in trace ("biseq" <> show ans) ans of 
+    -> case bisequence (matchTape lSstart lsT, matchTape rSstart rsT) of 
     Equations (Left msg) -> Equations (Left msg)
     Equations (Right (map, (ESkipLeft skipLs, ESkipLeft skipRs))) -> 
       Equations $ Right (map, (ESkipLeft (skipLs ++ [(lSlastS, lSlastC)]), 

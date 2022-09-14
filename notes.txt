@@ -1,3 +1,23 @@
+bug: generalizes 
+slicepairs were:
+[ ((F, 2) |>F<|(T, 1) (F, 1)  , (F, 1) |>F<|(T, 3)  )
+, ((F, 2) |>F<|(T, 3) (F, 5)  , (F, 1) |>F<|(T, 9)  )
+, ((F, 2) |>F<|(T, 9) (F, 17)  , (F, 1) |>F<|(T, 27)  )
+, ((F, 2) |>F<|(T, 27) (F, 53)  , (F, 1) |>F<|(T, 81)  ) ]
+to 
+phase: 3  (F, 2) |>F<|(T, 1 + 1*x_0 ) (F, 1 + 2*x_0 )
+into:
+phase: 3(F, 1) |>F<|(T, 1 + 3*x_0 )
+
+while the correct answer is 
+phase: 3  (F, 2) |>F<|(T, 1 + 1*x_0 ) (F, 1 + 2*x_0 )
+into:
+phase: 3(F, 1) |>F<|(T, 3 + 3*x_0 )
+(also there's some can x be 0 shenanigans here but we can safely ignore that)
+
+rewrite skipRunsForeverIfConsumesLiveTape to drop the ends of the start if they contain blanks instead of the 
+current thing
+
 13 Sep todo: 
 provesimply failed because: skip:in 0 steps we turn
 phase: 3  (F, 3) |>F<|(T, 0 + 1*x_0 ) (F, 7 + 2*x_0 )
