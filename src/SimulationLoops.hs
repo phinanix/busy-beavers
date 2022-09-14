@@ -158,7 +158,8 @@ addSkipToStateOrInf :: (TapeSymbol s)
   -> SkipOrigin s
   -> SimState s
   -> Either (SimResult InfCount s) (SimState s)
-addSkipToStateOrInf skip origin state = if skipGoesForever skip && skipAppliedInHist skip (state ^. s_history)
+addSkipToStateOrInf skip origin state = if skipGoesForever skip && skipAppliedInHist skip 
+    (state ^. s_history)
   then Left (ContinueForever (SkippedToInfinity (state ^. s_steps)))
   else Right $ state & s_book %~ addSkipToBook skip origin
 
@@ -280,7 +281,7 @@ tapePostInfinity (ExpTape ls _p rs) = elem Infinity cs where
 skipAppliesForeverInHist :: (TapeSymbol s)
   => Skip Count s -> TapeHist s InfCount -> Either Text (HaltProof s)
 skipAppliesForeverInHist skip hist = case forevers of
-  [] -> Left "did not apply forever"
+  [] -> Left $ "skip:" <> showP skip <> "\ndid not apply forever"
   --TODO the "idx" here is I think in big steps but it's sort of supposed to be in small steps
   (idx, _config, _res) : _xs -> Right $ SkippedToInfinity idx
   where
@@ -290,7 +291,7 @@ skipAppliesForeverInHist skip hist = case forevers of
     in
     --trace ("apps len " <> show (length ans)) 
     ans
-  forevers = filter (\(_i, config, res) -> --trace ("skipRes" <> showP (res)) $ 
+  forevers = filter (\(_i, config, res) -> trace ("skipRes " <> showP (res)) $ 
     res ^? _Stepped . _1 == Just Infinity 
     || maybe False tapePostInfinity (res ^? _Stepped . _3)
     || skipRunsForeverIfConsumesLiveTape skip && skipConsumesLiveTape skip config)
@@ -307,19 +308,22 @@ skipAppliesForeverInHist skip hist = case forevers of
     skip. 
 -}
 skipRunsForeverIfConsumesLiveTape :: (TapeSymbol s) => Skip Count s -> Bool 
-skipRunsForeverIfConsumesLiveTape (Skip (Config startPh startLs startP startRs) end _hops) 
-  = case end of 
-  SkipStepped endPh (Middle (ExpTape endLs endP endRs)) -> startPh == endPh && startP == endP && cond where 
-    cond = case getEquations $ 
-         matchTwoTapes (startLs, NotInfinity <$$> endLs) (startRs, NotInfinity <$$> endRs) 
-         of 
-      Just (ESkipLeft ls, ESkipLeft rs) -> all (\(s, _) -> s == blank) $ ls ++ rs
-      _ -> False 
-  _ -> False 
+skipRunsForeverIfConsumesLiveTape skip@(Skip (Config startPh startLs startP startRs) end _hops) 
+  = let ans = case end of 
+          SkipStepped endPh (Middle (ExpTape endLs endP endRs)) -> startPh == endPh && startP == endP && cond where 
+            cond = case getEquations $ 
+                matchTwoTapes (startLs, NotInfinity <$$> endLs) (startRs, NotInfinity <$$> endRs) 
+                of 
+              Just (ESkipLeft ls, ESkipLeft rs) -> trace ("ls and rs were: " <> showP (ls ++ rs)) all (\(s, _) -> s == blank) $ ls ++ rs
+              other -> trace ("match Two returned: " <> show other) False 
+          _ -> False 
+  in 
+    trace ("livetape ans: " <> show ans <> "\nskip: " <> showP skip )
+    ans 
 
 skipConsumesLiveTape :: (TapeSymbol s) => Skip Count s -> (Phase, ExpTape s InfCount) -> Bool 
 skipConsumesLiveTape skip@(Skip (Config sPH _ _ _) _ _) (ph, tape) = (sPH == ph) &&
-  case getEquations $ matchSkipTape skip tape of 
+  let ans = getEquations $ matchSkipTape skip tape  in case trace ("livetape ans:\n" <> showP ans) ans of 
     Nothing -> False 
     Just (ls, rs) -> all (\(s, _) -> s == blank) $ ls ++ rs
 

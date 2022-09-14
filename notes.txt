@@ -1,3 +1,14 @@
+13 Sep todo: 
+provesimply failed because: skip:in 0 steps we turn
+phase: 3  (F, 3) |>F<|(T, 0 + 1*x_0 ) (F, 7 + 2*x_0 )
+into:
+phase: 3(F, 1) |>F<|(T, 9 + 3*x_0 )
+
+
+did not apply forever
+but it should. first question: does that skip satisfy skipRunsForeverIfConsumesLiveTape
+next question: keep figuring out what the problem is
+
 9 Sep 2022 Plan
 Goal: I would like to get a score on the BB(5) challenge 
 There are a bunch of steps I'd have to do to do that: 

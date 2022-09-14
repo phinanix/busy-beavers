@@ -17,6 +17,7 @@ import SimulationLoops
 import HaltProof
 import TuringExamples
 import ShortNames 
+import Util 
 
 test :: InfCount 
 test = NotInfinity (c 2)
@@ -58,3 +59,13 @@ spec = do
             (SkipStepped (ph 2) (Middle (ExpTape [] t [(t, c 5 <> bv 0 2)])))
             Empty 
       skipRunsForeverIfConsumesLiveTape s `shouldBe` False
+    it "says another example runs forever" $ do 
+      {-
+      phase: 3  (F, 3) |>F<|(T, 0 + 1*x_0 ) (F, 7 + 2*x_0 )
+      into:
+      phase: 3(F, 1) |>F<|(T, 9 + 3*x_0 )
+      -}
+      let s = Skip (Config (ph 3) [(f, c 3)] f [(t, bv 0 1), (f, bv 0 2 <> c 7)])
+            (SkipStepped (ph 3) (Middle (ExpTape [(f, c 1)] f [(t, bv 0 3 <> c 9)])))
+            Empty
+      trace ("yelling about skip: " <> showP s) skipRunsForeverIfConsumesLiveTape s `shouldBe` True 

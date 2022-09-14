@@ -18,6 +18,7 @@ import ExpTape
 import HaltProof
 import Tape
 import Relude.Extra
+
 import Control.Exception
 import Safe.Partial (Partial)
 
@@ -270,7 +271,8 @@ matchTape (skipHead:restSkip) (tapeHead:restTape) = matchTapeHeads skipHead tape
 
 matchTwoCounts :: Partial => (Count, Count) -> (InfCount, InfCount) -> Equations (InfCount, InfCount) 
 matchTwoCounts (lC@(Count _n _as xs), rC@(Count _m _bs ys)) (lT, rT) 
-  = case toList $ S.intersection (MM.keysSet xs) (MM.keysSet ys) of 
+  = trace ("macthing " <> showP (lC, rC) <> " to " <> showP (lT, rT)) $ 
+  case toList $ S.intersection (MM.keysSet xs) (MM.keysSet ys) of 
     Empty -> do 
       lRes <- matchInfCount lC lT
       rRes <- matchInfCount rC rT 
@@ -306,7 +308,7 @@ matchTwoCounts (lC@(Count _n _as xs), rC@(Count _m _bs ys)) (lT, rT)
 -- then if there are, first reduce common parts (non var parts), 
 -- then do the like, map to the intersection of the rhs thing
 
-matchTwoTapes :: forall s. (Eq s) => ([(s, Count)], [(s, InfCount)]) -> ([(s, Count)], [(s, InfCount)])
+matchTwoTapes :: forall s. (Eq s, Show s) => ([(s, Count)], [(s, InfCount)]) -> ([(s, Count)], [(s, InfCount)])
   -> Equations (TapeMatch s, TapeMatch s)
 matchTwoTapes (lsS, lsT) (rsS, rsT) = case (unsnoc lsS, unsnoc rsS) of 
   (Nothing, Nothing) -> pure (ETapeLeft lsT, ETapeLeft rsT) 
@@ -319,7 +321,7 @@ matchTwoTapes (lsS, lsT) (rsS, rsT) = case (unsnoc lsS, unsnoc rsS) of
     lRes <- answerOneSide lSstart lSlast lsT 
     pure (lRes, rRes)
   (Just (lSstart, (lSlastS, lSlastC)), Just (rSstart, (rSlastS, rSlastC))) 
-    -> case bisequence (matchTape lSstart lsT, matchTape rSstart rsT) of 
+    -> case let ans = bisequence (matchTape lSstart lsT, matchTape rSstart rsT) in trace ("biseq" <> show ans) ans of 
     Equations (Left msg) -> Equations (Left msg)
     Equations (Right (map, (ESkipLeft skipLs, ESkipLeft skipRs))) -> 
       Equations $ Right (map, (ESkipLeft (skipLs ++ [(lSlastS, lSlastC)]), 
@@ -328,7 +330,7 @@ matchTwoTapes (lsS, lsT) (rsS, rsT) = case (unsnoc lsS, unsnoc rsS) of
       let lRes = ESkipLeft $ skipLs ++ [(lSlastS, lSlastC)]
       rRes <- lastVarOneSide map (rSlastS, rSlastC) rTapeHead rTapeRest
       pure (lRes, rRes)
-    Equations (Right (map, (TapeLeft (lTapeHead :| lTapeRest), ESkipLeft skipRs))) -> do 
+    Equations (Right (map, (TapeLeft (lTapeHead :| lTapeRest), ESkipLeft skipRs))) -> trace ("hitem") $ do 
       lRes <- lastVarOneSide map (lSlastS, lSlastC) lTapeHead lTapeRest 
       let rRes = ESkipLeft $ skipRs ++ [(rSlastS, rSlastC)]
       pure (lRes, rRes)
@@ -369,7 +371,8 @@ matchTwoTapes (lsS, lsT) (rsS, rsT) = case (unsnoc lsS, unsnoc rsS) of
       -}
       let rSlastBound = second (partiallyUpdateCount map) skipLast  
       in case matchTapeHeads rSlastBound rTapeHead of 
-          Equations (Left msg) -> Equations $ Left $ msg <> "\nalso some boundVar shenanigans happened"
+          Equations (Left msg) -> Equations $ Right (map, SkipLeft (skipLast :| []))
+            --Left $ msg <> "\nalso some boundVar shenanigans happened"
           Equations (Right (subMap, PerfectH)) -> case mergeEqns map subMap of 
             Left msg -> error $ "merge failed, but I think it shouldn't ever fail: " <> msg 
             Right newMap -> Equations $ Right (newMap, ETapeLeft rTapeRest)

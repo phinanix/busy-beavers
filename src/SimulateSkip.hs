@@ -21,7 +21,7 @@ import HaltProof
 import Results
 import Simulate (initSimState)
 import TapeSymbol
-
+import ShortNames
 
 {-
 Morning of 9 May 22
@@ -88,6 +88,18 @@ data PartialStepResult c s = Unknown Edge
                          | MachineStuck
                         deriving (Eq, Ord, Show, Generic)
 instance (NFData c, NFData s) => NFData (PartialStepResult c s)
+
+dispPartialStepResult :: (Pretty s, Show s, Pretty c, Show c) => PartialStepResult c s -> Text 
+dispPartialStepResult = \case 
+  Unknown e -> "Unknown edge: " <> showP e 
+  Stopped ic ft skip -> "Stopped. took: " <> showP ic <> "hops\n" <> show ft <> "\n" <> showP skip 
+  Stepped ic ph et skip m_n m_rs -> "Stepped " <> showP ic <> " steps\n" <> showP ph <> " " <> showP et 
+      <> "\nusing: " <> showP skip 
+  NonhaltProven hp -> "Halt proven: " <> showP hp 
+  MachineStuck -> "MachineStuck"
+
+instance (Pretty s, Show s, Pretty c, Show c) => Pretty (PartialStepResult c s) where 
+  pretty = prettyText . dispPartialStepResult
 
 --which of these newtypes your history is tracks whether the history is forwards (element 0 is the first thing that happend)
 --or reverse (element 0 is the most recent thing that happened)
@@ -525,3 +537,7 @@ weird3Goal = Skip
     (SkipStepped  (Phase 0) $ Middle (ExpTape
         [(Bit True, finiteCount 1 <> newBoundVar 0)] (Bit True) [(Bit False, finiteCount 1)]))
     (finiteCount 0) --obviously this is fake for now 
+
+skipexample = Skip (Config (ph 3) [(f, c 3)] f [(t, bv 0 1), (f, bv 0 2 <> c 7)])
+            (SkipStepped (ph 3) (Middle (ExpTape [(f, c 1)] f [(t, bv 0 3 <> c 9)])))
+            Empty

@@ -242,6 +242,32 @@ difficultBilateralBouncer =  unm "TR1FL0FR2TR3TL0TL2FL2FR4___TR0"
 unproven_size4_24jul :: [Turing]
 unproven_size4_24jul = unm <$> ["TR1FR1TL2FL1TR0FL1______","TR1TL0FR2FR1TL2FR3___FR0","TR1TR0TL1TR2TR3TL2___FR0","TR1TL2FL2FR1TL3TL1TL0___","TR1___FL2TR0FL3FR1TR0TL2","TR1___TR2TL1FL1TR3FR0FR2","TR1TL2FL2FR1TL0FL3FL2___","TR1TL0FR2TL2TL0FL0______","TR1FL2TL2FR0TL0TL1______","TR1___TL2FR0TR3FL1TR0TR2"]
 
+{-
+noncounters: 1 2 
+1 guesses the right thing and fails to prove
+2 fails to guess at 1k but guesses right thing at 2k
+
+0: base state: >FF< (FF, n) TF
+    makes another TF and pushes it left until it ... 
+    wait this is just a binary counter with 0->FF and 1->TF right...
+1: lr bouncer-in-bouncer thing like machine 9 above, blocksize 2, no idea why unproven
+2: growing bouncer-in-bouncer. block size ?? 4 ??
+3: binary counter of some kind
+4: a binary counter but around the head is T >F< F F (binary number here)
+
+further analysis of 3: 
+ 16 | 1 F (T, 5) >F< F F F
+ 31 | 1 T (TF, 3) T T >F< 
+
+ 103 | 1 F (T, 9) >F< F F F
+ 126 | 1 T (TF, 5) T T >F<
+so from 31 it behaves mostly like a binary counter where 0->TF 1->TT
+but it has 
+  1 FT (TT, x) >FF< FF F
+  1 T (TF, x+1) TT >FF< 
+which has, notice, that "realignment" problem, in addition to being a 
+plan to count from X111 to X00001
+-}
 unproven_size4_13sep :: [Turing] 
 unproven_size4_13sep = unm <$> ["TR1___TL2FL3FR0FL2TR0TR3", "TR1FL2FL0TR0TL0FR3TR2___", "TR1___FR2FR1TL2FL3TL0FR3", "TR1TL0FL0TR2FR3FR1TR0___", "TR1FR3TL2TR1FR3FL2TR0___"]
 --brady 1983 machines
