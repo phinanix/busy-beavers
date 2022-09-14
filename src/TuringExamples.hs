@@ -242,9 +242,42 @@ difficultBilateralBouncer =  unm "TR1FL0FR2TR3TL0TL2FL2FR4___TR0"
 unproven_size4_24jul :: [Turing]
 unproven_size4_24jul = unm <$> ["TR1FR1TL2FL1TR0FL1______","TR1TL0FR2FR1TL2FR3___FR0","TR1TR0TL1TR2TR3TL2___FR0","TR1TL2FL2FR1TL3TL1TL0___","TR1___FL2TR0FL3FR1TR0TL2","TR1___TR2TL1FL1TR3FR0FR2","TR1TL2FL2FR1TL0FL3FL2___","TR1TL0FR2TL2TL0FL0______","TR1FL2TL2FR0TL0TL1______","TR1___TL2FR0TR3FL1TR0TR2"]
 
+unproven_size4_13sep :: [Turing] 
+unproven_size4_13sep = unm <$> ["TR1___TL2FL3FR0FL2TR0TR3", "TR1FL2FL0TR0TL0FR3TR2___", "TR1___FR2FR1TL2FL3TL0FR3", "TR1TL0FL0TR2FR3FR1TR0___", "TR1FR3TL2TR1FR3FL2TR0___"]
+--brady 1983 machines
+{-"ternary counter" 
+base state: 2 >F< all the way left
+after a "big reset" (215) main tape is (TF, x) FT
+just before it is all FT
+0 -> TF 1 -> FF 2 -> FT
+so it's a ternary counter, but 2222 counts to 2000 instead of 1000
+-}
+ternaryCounter :: Turing
+ternaryCounter = unm "TR1FL2TL0TR0FR0FL3___TL2"
 
-{-
-examples of machines for induction
+{-"tail eating dragon" (fast growth)
+base: 0 | >F< F (T, x?)
+9 x =    2
+24 x =   4
+87 x =  10
+390 x = 28
+x -> 3x - 2 or (x + 1) -> (3x + 1) 
+via a sub-state that looks like 
+(TTT, n) (FTT) (TTT, m) >FFF<
+and moves 1 from n to m repeatedly, 
+while grabbing additional tape from the right, hence the "fast" growth
+
+-}
+tailEatingDragonFast :: Turing
+tailEatingDragonFast = unm "TR1FR3TR2___FL0TR0TL2TR3"
+
+{-"tail eating dragon" (slow growth)
+-}
+tailEatingDragonSlow :: Turing
+tailEatingDragonSlow = unm "TR1TL0TR2FR3TL0___FL0TR3"
+
+
+{-examples of machines for induction
 1) a completely vanilla binary counter
   counts to the left. 
   iterates through ph 0 [binnum]>F<

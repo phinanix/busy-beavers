@@ -765,7 +765,7 @@ assembleSkip countPairListPair phase (startSig, endSig)= let
   in
   --force $
   --trace msg $
-  assert (isSameInAsOut ans) ans
+  assertMsg (isSameInAsOut ans) msg ans
 
 
 combineIntoConfig :: (Show s) => Phase -> ([Count], [Count]) -> Signature s -> Config Count s
