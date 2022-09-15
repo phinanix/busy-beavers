@@ -297,7 +297,7 @@ proveBySimulating limit t book (Skip start skipEnd _) = case skipEnd of
                 -> --trace ("used skip: " <> showP skipUsed)
                 loop (numSteps + 1) newPhase newTape (curCount <> hopsTaken)
     indMatch :: Phase -> ExpTape s InfCount -> (Phase, TapePush Count s) -> Bool
-    indMatch cur_p et (goalPh, goalTP) = case bitraverse pure mbdeInfCount et of
+    indMatch cur_p et (goalPh, goalTP) = case secondT mbdeInfCount et of
         Nothing -> False
         Just tape@(ExpTape ls point rs) -> case goalTP of
             Middle (ExpTape goal_ls goal_p goal_rs)
@@ -1062,7 +1062,7 @@ generalizeFromCounts xs = let
         _ -> Nothing
     naturalPairs :: Maybe (NonEmpty (Natural, Natural))
     naturalPairs = let
-        ans = traverse (bitraverse countToMaybeNat countToMaybeNat) xs
+        ans = traverse (bitraverseBoth countToMaybeNat) xs
         msg = "attempting to generalize these pairs:\n" <> show ans
      in
         --trace msg
@@ -1152,7 +1152,7 @@ generalizeFromInfCounts xs = infinityUnit <|> notInfinityCountPair where
         Infinity -> Nothing
         NotInfinity c -> Just c
     maybeAllCounts :: Maybe (NonEmpty (Count, Count))
-    maybeAllCounts = traverse (bitraverse infCountToMaybeCount infCountToMaybeCount) xs
+    maybeAllCounts = traverse (bitraverseBoth infCountToMaybeCount) xs
     packageResult :: Either () (Count, Count) -> (InfCount, InfCount)
     packageResult (Left ()) = (Infinity, Infinity)
     packageResult (Right tup) = bimapBoth NotInfinity tup

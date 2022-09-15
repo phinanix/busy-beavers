@@ -117,26 +117,11 @@ myRecLength counter = \case
 prettyText :: Text -> Doc ann
 prettyText = pretty
 
--- unsnoc :: [a] -> Maybe ([a], a)
--- unsnoc = \case 
---   [] -> Nothing 
---   (x : xs) -> let 
---     ne = x :| xs
---     i = init ne 
---     l = last ne 
---     in 
---       Just (i,l)
-
 ceilDiv :: Natural -> Natural -> Natural
 ceilDiv x y = if x `mod` y == 0 then x `div` y else 1 + (x `div` y)
 
-myPutText :: Text -> IO ()
-myPutText = putText
-
-
 firstT :: (Bitraversable t, Applicative f) => (a -> f c) -> t a d -> f (t c d)
 firstT f = bitraverse f pure
-
 
 secondT :: (Bitraversable t, Applicative f) => (b -> f d) -> t c b -> f (t c d)
 secondT = bitraverse pure 
