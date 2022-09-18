@@ -145,6 +145,10 @@ second3 f (x, a, y) = (x, f a, y)
 assertMsg :: Partial => Bool -> Text -> a -> a 
 assertMsg cond msg out = if cond then out else error  msg
 
+warnMsg :: Partial => Bool -> Text -> a -> a 
+warnMsg cond msg out = if cond then out else 
+  trace (toString $ "Warning:" <> msg) out 
+
 (/\)
     :: (Functor f)
     => ((a -> (a, a)) -> (c -> (a, c)))

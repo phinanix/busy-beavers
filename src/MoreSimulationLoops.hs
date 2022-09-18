@@ -11,7 +11,7 @@ import qualified Data.Map as M
 import qualified Data.Map.Monoidal as MM
 import qualified Data.Set as S
 
-import Turing
+import Turing ( fillInMachine, Bit, Phase, Turing )
 import Count
 import Results
 import SimulateSkip
@@ -123,29 +123,29 @@ proveSimply machine state = case mbProof of
   where
   mbProof = do
     indHyp <- guessInductionHypothesis (state ^. s_history) (state ^. s_readshift_history)
-    let tryProve skip = bimap fst (const skip) $ 
+    let tryProve skip = bimap fst (const skip) $
           proveSimLinearAndTree 100 100 machine (state ^. s_book) skip
-        skipVar = case toList $ getAllVars indHyp of 
-          [x] -> x 
+        skipVar = case toList $ getAllVars indHyp of
+          [x] -> x
           _ -> error "more than one var from indHyp"
     validSkip <- tryProve indHyp `alt` tryProve (add skipVar 1 indHyp) `alt` tryProve (add skipVar 2 indHyp)
     let mbProof1 = skipAppliesForeverInHist validSkip (state ^. s_history)
-    let mbProof2 = do 
+    let mbProof2 = do
           arbSkip <- first ("chainArbitrary failed: " <>) $ chainArbitrary validSkip
           skipAppliesForeverInHist arbSkip (state ^. s_history)
-    mbProof1 `alt` mbProof2 
-      
+    mbProof1 `alt` mbProof2
+
   {-we need to try to prove the skip using (x+2) rather than (x) because sometimes you have to break
   the x into pieces to be able to prove it-}
   add var n skip = replaceVarInSkip skip var (FinCount n <> boundVarCount var 1)
 {-# SPECIALISE proveSimply :: SimOneAction Bit #-}
 {-# SPECIALISE proveSimply :: SimOneAction TwoBit #-}
 
-alt :: Either Text a -> Either Text a -> Either Text a 
-alt l r = case (l, r) of 
-  (Right out, _) -> Right out 
-  (_, Right out) -> Right out 
-  (Left m1, Left m2) -> Left $ m1 <> "\nand\n" <> m2 
+alt :: Either Text a -> Either Text a -> Either Text a
+alt l r = case (l, r) of
+  (Right out, _) -> Right out
+  (_, Right out) -> Right out
+  (Left m1, Left m2) -> Left $ m1 <> "\nand\n" <> m2
 
 {-
 algorithm: for all configs which occur at least twice in the history of complexity at most 5:
@@ -164,20 +164,36 @@ addSinglePairRule machine state = Right $ state & s_book .~ newBook where
   configs = fromList $ second tapeSignature <$> hist
   newSkips :: [(Skip Count s, SkipOrigin s)]
   newSkips = let ans = mapMaybe generalizeConfig $ toList configs in
-    --trace ("new skips were: " <> foldMap showP (fst <$> ans)) 
+    --trace ("new skips were: " <> foldMap showP (fst <$> ans))
     ans
   newBook = addChainedToBook $ addMultipleToBook newSkips book
   generalizeConfig :: (Phase, Signature s) -> Maybe (Skip Count s, SkipOrigin s)
   generalizeConfig (ph, sig) = case reverse $ filter (\(_i, (ph', tape)) -> (ph == ph') && sig == tapeSignature tape) $ zip [0, 1..] hist of
     [] -> Nothing
-    [_] -> Nothing
-    ((lastIndex, _lastConfig) : ((sndLastIndex, _sndLastConfig) : _rest)) -> do
-      let (startTape, endTape) = getReadShiftSlicePair hist rsHist sndLastIndex lastIndex
-      let (startSig, endSig) = (tapeSignature startTape, tapeSignature endTape)
-      skip <- makeAdditiveSkip ph startTape endTape
-      case proveSimLinearAndTree 100 100 machine book skip of
-        Left _ -> Nothing
-        Right numProveSteps -> Just (skip, PairGen sndLastIndex lastIndex numProveSteps)
+    [_] ->  Nothing
+    revIndConfigs@((lastIndex, _lastConfig) : ((sndLastIndex, _sndLastConfig) : _rest)) ->
+      do
+        --we want the last two, the second-last-two and the first-two
+      let configInds = fst <$> revIndConfigs
+          possibleInds = firstTwo configInds : lastTwo configInds : maybeToList (secondLastTwo configInds)
+      asum $ genFromIndices . swap <$> possibleInds
+      where
+      firstTwo (x : y : _) = (x, y)
+      lastTwo (x : y : tail) = let
+        ne1 = y :| tail
+        (lastElm, rest) = (last ne1, init ne1)
+        in (last (x :| rest), lastElm)
+      secondLastTwo ([x, y]) = Nothing
+      secondLastTwo (x : y : z : rest) = Just $ lastTwo $ init (x :| (y : z : rest))
+      genFromIndices :: (Int, Int) -> Maybe (Skip Count s, SkipOrigin s)
+      genFromIndices (genStart, genEnd) = do
+          let (startTape, endTape) = getReadShiftSlicePair hist rsHist genStart genEnd
+              (startSig, endSig) = (tapeSignature startTape, tapeSignature endTape)
+          skip <- makeAdditiveSkip ph startTape endTape
+          case proveSimLinearAndTree 100 100 machine book skip of
+            Left _ -> Nothing
+            Right numProveSteps -> Just (skip, PairGen sndLastIndex lastIndex numProveSteps)
+
 
 makeAdditiveSkip :: (TapeSymbol s) => Phase
   -> ExpTape s Count -> ExpTape s Count

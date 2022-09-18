@@ -116,7 +116,8 @@ applyTactic :: Vector Tactic -> [Turing] -> [(Int, Turing)]
 applyTactic tac machines = let
     enumMachines = zip [0,1 ..] machines
     runTactic = getContinues . outerLoop tac
-    runTacticPrint (i, m) = (i,) <$> trace ("machine: " <> show i) runTactic m
+    runTacticPrint (i, m) = (i,) <$> trace (toString $ "machine: " <> show i <> "\n" 
+      <> machineToNotation m) runTactic m
     unprovenMachines = bind runTacticPrint enumMachines
   in
     unprovenMachines

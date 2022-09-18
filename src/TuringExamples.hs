@@ -308,6 +308,9 @@ tailEatingDragonSlow :: Turing
 tailEatingDragonSlow = unm "TR1TL0TR2FR3TL0___FL0TR3"
 
 
+inSameAsOutFailure18Sep :: Turing
+inSameAsOutFailure18Sep = unm "TR1___FR2FR1TL2FL3TR0FL3"
+
 {-examples of machines for induction
 1) a completely vanilla binary counter
   counts to the left. 

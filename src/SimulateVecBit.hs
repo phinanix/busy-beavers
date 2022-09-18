@@ -11,7 +11,7 @@ import qualified Data.List.NonEmpty as NE ((<|))
 import Data.Map.Strict (keys, keysSet, unions)
 import Witherable
 import Prettyprinter
-import Control.Exception
+import Control.Exception ( assert )
 import Safe.Partial
 import Safe.Exact
 import Control.Monad

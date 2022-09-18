@@ -271,9 +271,8 @@ matchTape (skipHead:restSkip) (tapeHead:restTape) = matchTapeHeads skipHead tape
 
 matchTwoCounts :: Partial => (Count, Count) -> (InfCount, InfCount) -> Equations (InfCount, InfCount) 
 matchTwoCounts (lC@(Count _n _as xs), rC@(Count _m _bs ys)) (lT, rT) 
-  = trace ("macthing " <> showP (lC, rC) <> " to " <> showP (lT, rT)) $ 
-  case toList $ S.intersection (MM.keysSet xs) (MM.keysSet ys) of 
-    Empty -> do 
+  = case toList $ S.intersection (MM.keysSet xs) (MM.keysSet ys) of 
+    Empty -> do  
       lRes <- matchInfCount lC lT
       rRes <- matchInfCount rC rT 
       pure (lRes, rRes)

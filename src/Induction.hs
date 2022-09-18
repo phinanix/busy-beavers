@@ -3,6 +3,7 @@ module Induction where
 import Relude
 import Control.Lens
 import Data.Map.Monoidal (assocs, keysSet, keys)
+import qualified Data.Map.Monoidal as MM
 import qualified Data.Map as M
 import qualified Data.Text as T (concat, intercalate)
 import qualified Data.Set as S
@@ -333,7 +334,7 @@ getNextConfigs book curConfig = f ans
   f = id -- trace msg
   msg = "next possible configs:\n" <> foldMap (\x -> showP x <> "\n") ans
           <> "skips used: " <> foldMap (\x -> showP x <> "\n") skipsUsed
-          <> "available book skips: " <> foldMap (\x -> showP x <> "\n") 
+          <> "available book skips: " <> foldMap (\x -> showP x <> "\n")
               (filter (\skip -> length (getAllVars skip) > 1) $ getSkipsFromBook book)
           <> "\n"
   skipsUsed = mapMaybe getSkip choices
@@ -404,11 +405,11 @@ showTapePhaseList tapes = toString $ T.concat $ (\(p, x) -> dispPhase p <> " " <
 
 possibleSignatures :: forall s. (Ord s, Pretty s)
   => [(Phase, ExpTape s InfCount)] -> [(Phase, Signature s)]
-possibleSignatures hist = let ans = filter (\s -> sigFreqs ^?! ix s >= 3) tapeSignatures in 
+possibleSignatures hist = let ans = filter (\s -> sigFreqs ^?! ix s >= 3) tapeSignatures in
     -- trace (toString $ "possible sigs were:\n" <> T.intercalate "\n\n\n" $ (\s -> showP s <> "\n" 
     --     <> showP (filter (\(p, t) -> (p, tapeSignature t) == s) hist)) 
     --     <$> filter (\(_p, sig) -> signatureComplexity sig <= 3) ans) 
-    ans 
+    ans
   where
     tapeSignatures :: [(Phase, Signature s)]
     tapeSignatures = tapeSignature <$$> hist
@@ -429,20 +430,20 @@ orderSignatures s t = case (compare `on` signatureComplexity) s t of
   EQ -> case (compare `on` leftLen) s t of
     LT -> LT
     GT -> GT
-    EQ -> (compare `on` rightLen) s t 
+    EQ -> (compare `on` rightLen) s t
       -- case (compare `on` rightLen) s t of 
       -- LT -> LT 
       -- GT -> GT 
       -- EQ -> (flip compare `on` getP) s t
   where
-    getP (Signature _ls p _rs) = p 
+    getP (Signature _ls p _rs) = p
     leftLen (Signature ls _p _rs) = length ls
     rightLen (Signature _ls _p rs) = length rs
 
-orderPhaseSigPairs (ph1, s) (ph2, t) = case orderSignatures s t of 
-  LT -> LT 
-  GT -> GT 
-  EQ -> flip compare ph1 ph2 
+orderPhaseSigPairs (ph1, s) (ph2, t) = case orderSignatures s t of
+  LT -> LT
+  GT -> GT
+  EQ -> compare ph1 ph2
 
 --given a history, guesses a "critical configuration" 
 -- a simple tape appearance the machine repeatedly returns to
@@ -450,7 +451,7 @@ guessCriticalConfiguration :: (Ord s, Show s, Pretty s) => [(Phase, ExpTape s In
 guessCriticalConfiguration hist = case possibleSignatures hist of
   [] -> Left "no possible criticalconfigs"
   xs ->
-    trace ("possible sigs: " <> showP (nubOrd (filter (\x -> signatureComplexity (snd x) <= 4) xs))) $
+    --trace ("possible sigs: " <> showP (nubOrd (filter (\x -> signatureComplexity (snd x) <= 5) xs))) $
     Right $ minimumBy orderPhaseSigPairs xs --(orderSignatures `on` snd) xs
 
 -- given a particular config, return the list of times that config occurred, plus the integer position in the original list
@@ -589,11 +590,13 @@ guessInductionHypothesis th rsh = force $ do
       --this is hacky and bad but it used to be necessary to guess right on trickyChristmasTree so I'll try it for now
       --24 jul 22  update is that it is no longer necessary, so I got rid of it, but we'll see what 
       --happens in the future
-      Left msg -> trace (toString $ "ind m1: " <> msg) 
+      Left msg -> trace (toString $ "ind m1: " <> msg)
         guessInductionHypWithIndices th rsh criticalPhase (Unsafe.tail $ Unsafe.tail configIndicesAndConfigs)
+    msg = "guessed indhyp:\n" <> showP indGuess
     in
-     trace ("guessed indhyp:\n" <> showP indGuess) $
-     assert ((thingContainsVar <$> indGuess) /= Right False)
+      
+     trace (toString msg) $
+     warnMsg ((thingContainsVar <$> indGuess) /= Right False) msg 
      indGuess
 
 type FunctionExamples = (NonEmpty (Count, Count), (Maybe Count, Maybe Count))
@@ -604,6 +607,38 @@ flipFEs ((fromCl, (mFI, mFO)), (toCL, (mTI, mTO)))
  = ((flipPair <$> fromCl, (mFO, mFI)), (flipPair <$> toCL, (mTO, mTI)))
   where flipPair (a, b) = (b, a)
 
+{- goal is to get a and x to be equal 
+and to modify b and y as necessary for that to happen
+to do that, we're going to map a and x to likes <> aLeft <> xLeft
+
+example: (x, 3x) (x+1, 2x+1) -> (x+1, 3x+3), (x+1, 2x+1)
+-}
+squareUpPairs :: (Count, Count) -> (Count, Count) -> ((Count, Count), (Count, Count))
+squareUpPairs (a, b) (x, y) = case likeTerms a x of
+  (_likes, Empty, Empty) -> ((a, b), (x, y))
+  (_likes, Empty, xLeft) -> case a of
+    --x is strictly bigger, so we need to get a var out of a and 
+    OneVar _n _as k v -> case xLeft `divCount` k of
+      Nothing -> fail
+      Just addToV -> let
+        map = one (v, NotInfinity (addToV <> boundVarCount v 1))
+        ans = first (bimapBoth $ partiallyUpdateCount map) ((a, b), (x, y))
+        msg =  "inp was: " <> showP ((a,b), (x, y)) <> " ans was: " <> showP ans
+        in assertMsg (uncurry (==) $ bimapBoth fst ans) msg ans
+    _ -> fail
+  (_likes, _aLeft, Empty) -> swap $ squareUpPairs (x, y) (a, b)
+  (_likes, aLeft@(ZeroVar _ _), xLeft@(ZeroVar _ _)) -> case MM.assocs $ bound a of
+    [] -> fail
+    [(v, Sum i)] -> case (aLeft `divCount` i, xLeft `divCount` i) of
+      (Just addA, Just addX) -> let
+        map = one (v, NotInfinity $ addA <> addX)
+        ans = bimapBoth (bimapBoth $ partiallyUpdateCount map) ((a, b), (x, y))
+        in assert (uncurry (==) $ bimapBoth fst ans) ans
+      _ -> fail
+    _ -> fail
+  (_likes, _aLeft, _xLeft) -> fail
+  where
+    fail = error $ "failed to square: " <> showP ((a, b), (x, y))
 generalizeNumberSquare :: ([NonEmpty (Count, Count)], [NonEmpty (Count, Count)])
   -> Either Text ([(Count, Count)], [(Count, Count)])
 generalizeNumberSquare ns = case bitraverseBoth (traverse generalizeFromCounts) ns of
@@ -623,15 +658,21 @@ generalizeNumberSquare ns = case bitraverseBoth (traverse generalizeFromCounts) 
     = --trace ("genrealizing: " <> showP fromCL <> "and" <> showP toCL) $
       case generalizeFromCounts (neZipExact (fst <$> fromCL) (fst <$> toCL)) of
       Left _msg -> inp
-      Right (toFromCount, toCount) -> case likeTerms fromIn toFromCount of
-        (_newFromIn, Empty, Empty) -> (lh, (toCL, (Just toCount, mbToOut)))
-        --add to fromIn and fromOut 
-        (_likeTerm, extraForTo, extraForFrom)
-        --TODO: these lines are where the bug is. it's not adding, it's replacing x with x+1. 
-        --these differ because 3x should become 3x+3, not 3x+1. 
-          -> assert (toFromCount <> extraForTo == fromIn <> extraForFrom)
-            ((fromCL, (Just (fromIn <> extraForFrom), Just (fromOut <> extraForFrom))),
-              (toCL, (Just (toCount <> extraForTo), mbToOut)))
+      Right (toFromCount, toCount) -> let
+        ((newFromIn, newFromOut), (newToFrom,newToCount)) = squareUpPairs (fromIn, fromOut) (toFromCount, toCount)
+        in
+          assert (newFromIn == newToFrom)
+            ((fromCL, (Just newFromIn, Just (newFromOut))),
+              (toCL, (Just newToCount, mbToOut)))
+        -- case likeTerms fromIn toFromCount of
+        -- (_newFromIn, Empty, Empty) -> (lh, (toCL, (Just toCount, mbToOut)))
+        -- --add to fromIn and fromOut 
+        -- (_likeTerm, extraForTo, extraForFrom)
+        -- --TODO: these lines are where the bug is. it's not adding, it's replacing x with x+1. 
+        -- --these differ because 3x should become 3x+3, not 3x+1. 
+        --   -> assert (toFromCount <> extraForTo == fromIn <> extraForFrom)
+        --     ((fromCL, (Just (fromIn <> extraForFrom), Just (fromOut <> extraForFrom))),
+        --       (toCL, (Just (toCount <> extraForTo), mbToOut)))
   generalizeBitAgainstOtherBit notGeneralizeable = notGeneralizeable
 
   generalizeBitBitWithFlip fe inp = case fe of
@@ -772,11 +813,11 @@ assembleSkip countPairListPair phase (startSig, endSig)= let
   --trace msg $
   assertMsg (isSameInAsOut ans) msg ans
 
-
 combineIntoConfig :: (Show s) => Phase -> ([Count], [Count]) -> Signature s -> Config Count s
 combineIntoConfig phase (leftCounts, rightCounts) sig@(Signature leftBits p rightBits) =
   Config phase (zipExact leftBits (deleteZerosAtEnd leftCounts)) p
       (zipExact rightBits (deleteZerosAtEnd rightCounts))
+
 deleteZerosAtEnd :: [Count] -> [Count]
 deleteZerosAtEnd = \case
   [] -> []
@@ -841,7 +882,7 @@ generalizeHistories simWithNums = --trace ("sims were: " <> showP sims)
 
   --generalizes against the numsToSimulateAt from above 
 
-  --the outer maybe is in case we fail. the inner maybe is because sometimes we don't generalize against the simnum at all, 
+  --the outer Either is in case we fail. the inner maybe is because sometimes we don't generalize against the simnum at all, 
   --in which case the simnum is irrelevant 
   generalizeCL :: Partial => NonEmpty Count -> Either Text (Maybe Count, Count)
   generalizeCL cl = if list1AllEqual cl
@@ -964,8 +1005,7 @@ guessWhatHappensNext machine startConfig varToGeneralize
         ans
     --generalizes an ending signature if possible
     generalizeOneSig :: (Phase, Signature s) -> Maybe (Skip Count s)
-    generalizeOneSig pSig = rightToMaybe $ generalizeHistories
-      $ simPairs
+    generalizeOneSig pSig = rightToMaybe $ generalizeHistories simPairs
       where
         munge :: [(Phase, ExpTape s Count)] -> (Int, (Phase, ExpTape s Count))
         munge hist = case findIndex (\(p, t) -> (p, tapeSignature t) == pSig) hist of
@@ -1046,13 +1086,13 @@ guessAndProveWhatHappensNext machine book startConfig varToGeneralize
 -- else, see if they are generated by a function of the form x -> m * x + b 
 -- else give up 
 generalizeFromCounts :: NonEmpty (Count, Count) -> Either Text (Count, Count)
-generalizeFromCounts xs = let 
+generalizeFromCounts xs = let
  ans = case  allEqualPair <|> additivePair <|> affinePair of
   Just x -> Right x
   Nothing -> Left $ "failed to generalize the pairs: " <> showP xs
-  in 
-  trace ("generalized " <> showP xs <> "\nto: " <> showP ans )
-    ans 
+  in
+  --trace ("generalized " <> showP xs <> "\nto: " <> showP ans )
+    ans
   where
     allEqualPair :: Maybe (Count, Count)
     allEqualPair = guard (list1AllEqual xs) >> pure (head xs)

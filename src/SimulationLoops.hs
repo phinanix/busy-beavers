@@ -204,7 +204,7 @@ simulateStepPartial limit machine (SimState ph tape book steps skipTrace hist hi
   if counter > limit
   then Result $ Continue steps ph tape curDisp
   else 
-    -- (if signatureComplexity (tapeSignature tape) > 0 then id 
+    -- (if signatureComplexity (tapeSignature tape) > 40 then id 
     --   else trace ("step:" <> showP counter <> " smallstep: " <> showP steps 
     --           <> " phase: " <> showP ph <> " curTape: " <> showP tape)) $
   case skipStep machine book ph tape of
@@ -314,16 +314,19 @@ skipRunsForeverIfConsumesLiveTape skip@(Skip (Config startPh startLs startP star
             cond = case getEquations $ 
                 matchTwoTapes (startLs, NotInfinity <$$> endLs) (startRs, NotInfinity <$$> endRs) 
                 of 
-              Just (ESkipLeft ls, ESkipLeft rs) -> trace ("ls and rs were: " <> showP (ls ++ rs)) all (\(s, _) -> s == blank) $ ls ++ rs
-              other -> trace ("match Two returned: " <> show other) False 
+              Just (ESkipLeft ls, ESkipLeft rs) -> 
+                --trace ("ls and rs were: " <> showP (ls ++ rs)) 
+                all (\(s, _) -> s == blank) $ ls ++ rs
+              other -> --trace ("match Two returned: " <> show other) 
+                False 
           _ -> False 
   in 
-    trace ("livetape ans: " <> show ans <> "\nskip: " <> showP skip )
+    --trace ("livetape ans: " <> show ans <> "\nskip: " <> showP skip )
     ans 
 
 skipConsumesLiveTape :: (TapeSymbol s) => Skip Count s -> (Phase, ExpTape s InfCount) -> Bool 
 skipConsumesLiveTape skip@(Skip (Config sPH _ _ _) _ _) (ph, tape) = (sPH == ph) &&
-  let ans = getEquations $ matchSkipTape skip tape  in case trace ("livetape ans:\n" <> showP ans) ans of 
+  let ans = getEquations $ matchSkipTape skip tape  in case ans of 
     Nothing -> False 
     Just (ls, rs) -> all (\(s, _) -> s == blank) $ ls ++ rs
 
