@@ -594,9 +594,9 @@ guessInductionHypothesis th rsh = force $ do
         guessInductionHypWithIndices th rsh criticalPhase (Unsafe.tail $ Unsafe.tail configIndicesAndConfigs)
     msg = "guessed indhyp:\n" <> showP indGuess
     in
-      
+
      trace (toString msg) $
-     warnMsg ((thingContainsVar <$> indGuess) /= Right False) msg 
+     warnMsg ((thingContainsVar <$> indGuess) /= Right False) msg
      indGuess
 
 type FunctionExamples = (NonEmpty (Count, Count), (Maybe Count, Maybe Count))
@@ -662,17 +662,8 @@ generalizeNumberSquare ns = case bitraverseBoth (traverse generalizeFromCounts) 
         ((newFromIn, newFromOut), (newToFrom,newToCount)) = squareUpPairs (fromIn, fromOut) (toFromCount, toCount)
         in
           assert (newFromIn == newToFrom)
-            ((fromCL, (Just newFromIn, Just (newFromOut))),
+            ((fromCL, (Just newFromIn, Just newFromOut)),
               (toCL, (Just newToCount, mbToOut)))
-        -- case likeTerms fromIn toFromCount of
-        -- (_newFromIn, Empty, Empty) -> (lh, (toCL, (Just toCount, mbToOut)))
-        -- --add to fromIn and fromOut 
-        -- (_likeTerm, extraForTo, extraForFrom)
-        -- --TODO: these lines are where the bug is. it's not adding, it's replacing x with x+1. 
-        -- --these differ because 3x should become 3x+3, not 3x+1. 
-        --   -> assert (toFromCount <> extraForTo == fromIn <> extraForFrom)
-        --     ((fromCL, (Just (fromIn <> extraForFrom), Just (fromOut <> extraForFrom))),
-        --       (toCL, (Just (toCount <> extraForTo), mbToOut)))
   generalizeBitAgainstOtherBit notGeneralizeable = notGeneralizeable
 
   generalizeBitBitWithFlip fe inp = case fe of
