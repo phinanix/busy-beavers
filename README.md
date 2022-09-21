@@ -2,7 +2,7 @@
 
 An incomplete, in-progress personal project, aiming to prove that BB(5) = 47176870. To do that we need to enumerate all distinct 5 state turing machines and then prove they halt (easy) or don't halt. Obviously, there is no solution in general to the halting problem, so the program uses heuristic techniques that are effective on machines which have sufficiently simple behavior. 
 
-# Build and run
+## Build and run
 Get stack, and build with: 
 
 `stack build` 
