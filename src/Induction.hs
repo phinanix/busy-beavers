@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 module Induction where
 
 import Relude
@@ -643,21 +644,45 @@ generalizeNumberSquare :: ([NonEmpty (Count, Count)], [NonEmpty (Count, Count)])
   -> Either Text ([(Count, Count)], [(Count, Count)])
 generalizeNumberSquare ns = case bitraverseBoth (traverse generalizeFromCounts) ns of
   Right ans -> Right ans
-  Left _msg -> collectAns $ generalizeAllPairs $ allEqualEverything partiallyGeneralized
+  Left _msg -> trace ("first generalized: " <> showP firstGeneralized) first U.head $ collectEithers 
+    $ collectAns . generalizeAllPairs . allEqualEverything <$> firstGeneralized
   where
+  collectEithers :: [Either a b] -> Either [a] b 
+  collectEithers = foldr (\new accum -> case accum of 
+    Right b -> Right b 
+    Left as -> case new of 
+      Right b -> Right b 
+      Left a -> Left (a : as)) (Left [])
   myGeneralize countPairs = case generalizeFromCounts countPairs of
     Right (inC, outC) -> (Just inC, Just outC)
     Left _msg -> (Nothing, Nothing)
+  --todo: I'd like to make partiallyGeneralized instead something where you generalize 
+  --exactly one pair, rather than all of them. 
   partiallyGeneralized :: ([FunctionExamples], [FunctionExamples])
   partiallyGeneralized = bimapBoth (fmap (\cps -> (cps, myGeneralize cps))) ns
+  possibleFirstGeneralize :: [ReifiedLens' ([FunctionExamples], [FunctionExamples]) FunctionExamples]
+  possibleFirstGeneralize = (composeLenses _1 <$> lsOptics) ++ (composeLenses _2 <$> rsOptics)
+    where
+    lsOptics = mkLens <$> [0,1.. length (fst zeroGeneralized)-1]
+    rsOptics = mkLens <$> [0,1.. length (snd zeroGeneralized)-1]
+    mkLens :: Int -> ReifiedLens' [FunctionExamples] FunctionExamples
+    mkLens i = Lens $ ixListLens i
+  genOne :: FunctionExamples -> FunctionExamples
+  genOne (countPairs, (_u,_v))= (countPairs,) $ case generalizeFromCounts countPairs of
+    Right (inC, outC) -> (Just inC, Just outC)
+    Left _msg -> (Nothing, Nothing)
+  zeroGeneralized = bimapBoth (fmap (, (Nothing, Nothing))) ns
+  firstGeneralized :: [([FunctionExamples], [FunctionExamples])]
+  firstGeneralized = (\(Lens lens) fesPair -> fesPair & lens %~ genOne) <$>
+    possibleFirstGeneralize <*> pure zeroGeneralized
   --right now this works on the first thing. we'll make it more general in a sec ok man
   generalizeBitAgainstOtherBit :: (FunctionExamples, FunctionExamples)
     -> (FunctionExamples, FunctionExamples)
   generalizeBitAgainstOtherBit inp@(lh@(fromCL, (Just fromIn, Just fromOut)),
                                        (toCL, (Nothing, mbToOut)))
-    = --trace ("genrealizing: " <> showP fromCL <> "and" <> showP toCL) $
+    = trace ("genrealizing: " <> showP fromCL <> "and" <> showP toCL) $
       case generalizeFromCounts (neZipExact (fst <$> fromCL) (fst <$> toCL)) of
-      Left _msg -> inp
+      Left msg -> trace (toString $ "failed: " <> msg) inp
       Right (toFromCount, toCount) -> let
         ((newFromIn, newFromOut), (newToFrom,newToCount)) = squareUpPairs (fromIn, fromOut) (toFromCount, toCount)
         in
@@ -834,7 +859,7 @@ zipSigToET sig@(Signature b_ls p b_rs) pair@(c_ls, c_rs) = let
     ans
 
 --gets the simulation history and the displacement history
---normally these are output backwards which is of course crazy so we fix them here 
+--normally these are output backwards which is of course crazy so we fix them here  
 simForStepNumFromConfig :: (Partial, TapeSymbol s) => Int -> Turing -> Config Count s -> (TapeHist s Count, ReadShiftHist)
 simForStepNumFromConfig limit machine startConfig
     = (second deInfCount $ finalState ^. s_history, finalState ^. s_readshift_history)

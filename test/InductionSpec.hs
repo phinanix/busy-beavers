@@ -180,4 +180,25 @@ spec = do
              (boundVarCount (BoundVar 0) 1, n 0)])
 
       generalizeNumberSquare ns `shouldBe` Right ans
---([(n 3, n 2) :| [(n 3, n 5), (n 3, n 8), (n 3, n 11)]], [(n 2, n 5) :| [(n 5, n 8), (n 8, n 11), (n 11, n 14)],                (n 2, n 0) :| [(n 5, n 0), (n 8, n 0), (n 11, n 0)]                ])
+    it "generalizes a tricky example that made it crash" $ do 
+      {-
+      slicepairs were:
+      [ ((F, 2) |>F<|(F, 4) (T, 5) (F, 4)  , |>F<|(F, 8) (T, 7)  )
+      , ((F, 4) |>F<|(F, 8) (T, 7) (F, 8)  , |>F<|(F, 16) (T, 11)  )
+      , ((F, 8) |>F<|(F, 16) (T, 11) (F, 16)  , |>F<|(F, 32) (T, 19)  )
+      , ((F, 16) |>F<|(F, 32) (T, 19) (F, 32)  , |>F<|(F, 64) (T, 35)  ) ]
+      phase: 3  (F, x) |>F<|(F, 2x) (T, 3 + x) (F, 2x)
+      into:
+      phase: 3|>F<|(F, 4x) (T, 3 + 2x)
+      -}
+      let n = FinCount 
+          ns = ([(n 2, n 0) :| [(n 4, n 0), (n 8, n 0), (n 16, n 0)]], 
+                [(n 4, n 8) :| [(n 8, n 16), (n 16, n 32), (n 32, n 64)], 
+                 (n 5, n 7) :| [(n 7, n 11), (n 11, n 19), (n 19, n 35)],
+                 (n 4, n 0) :| [(n 8, n 0), (n 16, n 0), (n 32, n 0)]
+                ])
+          x = boundVarCount (BoundVar 0)
+          ans = ([(x 1, n 0)], 
+            [(x 2, x 4), (n 3 <> x 1, n 3 <> x 2), (x 2, n 0)])
+      generalizeNumberSquare ns `shouldBe` Right ans      
+--ns = ([(n 2, n 0) :| [(n 4, n 0), (n 8, n 0), (n 16, n 0)]], [(n 4, n 8) :| [(n 8, n 16), (n 16, n 32), (n 32, n 64)], (n 5, n 7) :| [(n 7, n 11), (n 11, n 19), (n 19, n 35)],(n 4, n 0) :| [(n 8, n 0), (n 16, n 0), (n 32, n 0)]])
