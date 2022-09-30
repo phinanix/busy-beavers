@@ -193,6 +193,11 @@ instance Pretty TwoBit where
 
 instance TapeSymbol TwoBit where
   blank = TwoBit (Bit False) (Bit False)
+  allSymbols = [ TwoBit (Bit False) (Bit False)
+               , TwoBit (Bit True) (Bit False)
+               , TwoBit (Bit False) (Bit True)
+               , TwoBit (Bit True) (Bit True)
+               ]
   --for now, we're going with the "you're always on the left part of the symbol" take
   getPoint (TwoBit x _) = x
   toBits = \case TwoBit bit bit' -> [bit, bit']

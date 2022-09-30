@@ -48,8 +48,6 @@ com = 0 :+ 0
 dimComplex :: Dim Complex :~: 2
 dimComplex = Refl
 
-uniVecBit :: (Vector v Bit) => NonEmpty (v Bit)
-uniVecBit = undefined
 
 allBitsLengthN :: Natural -> NonEmpty [Bit]
 allBitsLengthN n = if n == 0
@@ -172,6 +170,7 @@ instance Arity n => Pretty (Vec n Bit) where
 
 instance (Arity n) => TapeSymbol (Vec n Bit) where
   blank = V.replicate (Bit False)
+  allSymbols = toList $ V.fromList <$> allBitsLengthN (natVal (Proxy @n))
   --for now, we're going with the "you're always on the left part of the symbol" take
   getPoint v = v ! 0
   toBits = V.toList

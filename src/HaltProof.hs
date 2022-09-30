@@ -39,6 +39,8 @@ data HaltProof s
 --commenting out for now to fix a cyclic dependency, may need to move some things around
   | SkippedToInfinity Steps --(Skip Count s)
   | LinRecur Steps Steps 
+  --the width of the near head plus the size of the explored tree
+  | NearHeadAI Int Int 
   deriving (Eq, Ord, Show, Generic, Functor, Foldable, Traversable)
 instance (NFData s) => NFData (HaltProof s)
 

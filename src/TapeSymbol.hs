@@ -36,11 +36,30 @@ instance (NFData s) => NFData (SkipOrigin s)
 --the "Phase, s" is the Phase on start and the "s" that the point is made of
 type SkipBook s = Map (Phase,  s) (Map (Skip Count s) (SkipOrigin s))
 
-getSkipsFromBook :: SkipBook s -> [Skip Count s] 
-getSkipsFromBook book = foldMap M.keys $ M.elems book 
+mapSO :: Ord s => (a -> s) -> SkipOrigin a -> SkipOrigin s
+mapSO f = \case
+    Initial -> Initial 
+    Glued sk1 sk2 -> Glued (f <$> sk1) (f <$> sk2)
+    GlueStepRange n i -> GlueStepRange n i
+    Induction map n -> Induction (mapBook f map) n
+    InductionHypothesis -> InductionHypothesis 
+    ChainedFrom sk -> ChainedFrom $ f <$> sk 
+    PairGen n i nat -> PairGen n i nat 
+
+
+getSkipsFromBook :: SkipBook s -> [Skip Count s]
+getSkipsFromBook book = foldMap M.keys $ M.elems book
+
+mapBook :: forall s t. (Ord t) => (s -> t) -> SkipBook s -> SkipBook t
+mapBook f book = M.mapKeys fKey $ fVal <$> book where
+  fKey :: (Phase, s) -> (Phase, t)
+  fKey = fmap f 
+  fVal :: Map (Skip Count s) (SkipOrigin s) -> Map (Skip Count t) (SkipOrigin t)
+  fVal = M.mapKeys (fmap f) . fmap (mapSO f)
 
 class (Ord s, Show s, Pretty s, Typeable s, NFData s) => TapeSymbol s where
   blank :: s
+  allSymbols :: [s]
   getPoint :: s -> Bit -- the thing under the machinehead at the point
   toBits :: s -> [Bit]
   fromBits :: [Bit] -> ([s], [Bit]) --the second list is the one remaining
@@ -245,6 +264,7 @@ addChainedToBook sb = addMultipleToBook newSkipAndOrigins sb where
 
 instance TapeSymbol Bit where
   blank = Bit False
+  allSymbols = [Bit False, Bit True]
   getPoint = id
   toBits x = [x]
   fromBits = (,[])

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 6aba4e9acc6602bd1db33ac91f213e60880a61390a9a58ead6b4a43cecac4a4c
+-- hash: 7323f265d75251f5e73c336da22a9c2c097f9789207085e3ddcd25e568a48862
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -27,6 +27,7 @@ source-repository head
 
 library
   exposed-modules:
+      AbstractInterpretation
       BackwardSearch
       Config
       Count
