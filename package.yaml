@@ -87,7 +87,8 @@ tests:
     - text
     - witherable
     - either 
-
+    - parsec
+    - fixed-vector
 
 default-extensions:
   - ApplicativeDo

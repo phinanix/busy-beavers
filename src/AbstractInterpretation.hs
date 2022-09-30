@@ -61,15 +61,15 @@ bits of the algorithm:
 
 forwardNearHeadInterp :: forall s. (TapeSymbol s) => Int -> Turing -> Maybe (HaltProof s)
 forwardNearHeadInterp k m = case dfs 1000 1000 getNextConfigs successCond (Just initialConfig) of 
-  Right NoSuccess -> u
-  Left msg -> u 
-  Right (Success _p) -> u 
+  Right NoSuccess -> undefined 
+  Left msg -> undefined 
+  Right (Success _p) -> undefined 
   where
     skips = mapBook Base $ initBook @s m
-    successCond :: Maybe (Phase, ExpTape (AbsAny s) InfCount) 
-    successCond = u
-    initalConfig :: (Phase, ExpTape (AbsAny s) InfCount)
-    initalConfig = (Phase 0, ExpTape [(MultipleAny, NotInfinity One)]
+    successCond :: Maybe (Phase, ExpTape (AbsAny s) InfCount) -> Bool 
+    successCond = undefined
+    initialConfig :: (Phase, ExpTape (AbsAny s) InfCount)
+    initialConfig = (Phase 0, ExpTape [(MultipleAny, NotInfinity One)]
                                blank [(MultipleAny, NotInfinity One)])
     --the nothing is in case we fail due to an unknown edge or halting 
     getNextConfigs :: Maybe (Phase, ExpTape (AbsAny s) InfCount) -> [Maybe (Phase, ExpTape (AbsAny s) InfCount)]

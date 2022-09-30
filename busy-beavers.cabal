@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 7323f265d75251f5e73c336da22a9c2c097f9789207085e3ddcd25e568a48862
+-- hash: 1e9cfbe61b01c8255a495a60f0cf97d1401bd7b1dcedea723a283b6de20ec03a
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -200,6 +200,7 @@ test-suite busy-beavers-test
       LinRecurrenceSpec
       MoreSimulationLoopsSpec
       NotationSpec
+      ParsingSpec
       SimulateSkipSpec
       SimulateSpec
       SimulationLoopsSpec
@@ -256,10 +257,12 @@ test-suite busy-beavers-test
     , busy-beavers
     , containers
     , either
+    , fixed-vector
     , hspec
     , lens
     , monoidal-containers
     , mtl
+    , parsec
     , prettyprinter
     , quickcheck-instances
     , relude
