@@ -173,6 +173,7 @@ outerLoop tacticList startMachine = loop [(startMachine, 0)] [] where
     Just (Simulation f) -> case f tm of
       (newTMs, newRes) -> loop (((,n+1) <$> newTMs) ++ todos) (newRes ++ curRes)
 
+
 tacticBackwardSearch :: Tactic
 tacticBackwardSearch = oneShot @Bit (fmap (Right . ContinueForever) . backwardSearch)
 

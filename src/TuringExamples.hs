@@ -311,6 +311,12 @@ tailEatingDragonSlow = unm "TR1TL0TR2FR3TL0___FL0TR3"
 inSameAsOutFailure18Sep :: Turing
 inSameAsOutFailure18Sep = unm "TR1___FR2FR1TL2FL3TR0FL3"
 
+{-1RB1RD_1LC1LB_0RC0RD_---0RE_1LA1RE
+selected randomly from BBChallenge oct 1 to test my bbchallenge parser
+-}
+bbChallengeExample :: Turing 
+bbChallengeExample = unm "TR1TR3TL2TL1FR2FR3___FR4TL0TR4"
+
 {-examples of machines for induction
 1) a completely vanilla binary counter
   counts to the left. 
