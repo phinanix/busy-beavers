@@ -330,6 +330,35 @@ due I believe to IijiI, has a CTL consisting of (11|01)* or something
 trickyCTLMachine :: Turing 
 trickyCTLMachine = fromBBChallenge "1RB0RB_1LC1RA_0LA1LD_0LE0LC_1RA---"
 
+hardUnilateralBouncer :: Turing 
+hardUnilateralBouncer = fromBBChallenge "1RB0LA_0RC1RD_1LA1LC_0LC0RE_---1RA"
+
+{-someone on the bb challenge discord went through and found a machine which hits each
+different subroutine of skelet's program  -}
+skelet_Incremental_formula :: Turing
+skelet_Incremental_formula = fromBBChallenge "1LC0LB_---1LA_1RD1RD_1LB1RE_1LE1RC"
+skelet_Closed_position :: Turing
+skelet_Closed_position = fromBBChallenge "1LC0RD_---1RD_1RD0LA_1RA1RE_1LE1RB"
+skelet_Closed_transition_modulo :: Turing
+skelet_Closed_transition_modulo = fromBBChallenge "1LC1RB_---0RA_1RD0LD_1LA1RE_1LC1RD"
+skelet_Collatz_like :: Turing
+skelet_Collatz_like = fromBBChallenge "1LC1RA_---0RA_1RD0LA_1LC1RE_1RD0RB"
+skelet_Single_exone :: Turing
+skelet_Single_exone = fromBBChallenge "1LC0RA_---0LA_1RD1LE_1RE1RE_1LB0RD"
+skelet_Spec1_exone :: Turing
+skelet_Spec1_exone = fromBBChallenge "1LC0LC_---0RD_1RD1LA_0RB1RE_1LC0RD"
+skelet_Self_tuning_exone :: Turing
+skelet_Self_tuning_exone = fromBBChallenge "1LC0LB_---1LD_1RD1LD_0LA1RE_1LD0RE"
+skelet_Huffman :: Turing
+skelet_Huffman = fromBBChallenge "1LC1RE_---1LA_0RD0LD_1LB1RD_1LA0RA"
+skelet_BL_1 :: Turing
+skelet_BL_1 = fromBBChallenge "1LB---_0RC0LC_1LE0RD_1RC1RD_1RB0LA"
+skelet_BL_2 :: Turing
+skelet_BL_2 = fromBBChallenge "1LC0RE_0LE---_1LD0LB_1RA0LA_0RA1RE"
+
+skelet_machines :: [Turing]
+skelet_machines = [skelet_Incremental_formula, skelet_Closed_position, skelet_Closed_transition_modulo, skelet_Collatz_like, skelet_Single_exone, skelet_Spec1_exone, skelet_Self_tuning_exone, skelet_Huffman, skelet_BL_1, skelet_BL_2]
+
 {-examples of machines for induction
 1) a completely vanilla binary counter
   counts to the left. 
