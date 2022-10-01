@@ -14,6 +14,8 @@ import Skip
 import Test.QuickCheck
 import Notation
 import Util
+import Text.Parsec
+import Parsing
 
 --woah, this is a counting machine !!!
 weird3 :: Turing
@@ -313,9 +315,20 @@ inSameAsOutFailure18Sep = unm "TR1___FR2FR1TL2FL3TR0FL3"
 
 {-1RB1RD_1LC1LB_0RC0RD_---0RE_1LA1RE
 selected randomly from BBChallenge oct 1 to test my bbchallenge parser
+it's a translated bouncer
 -}
 bbChallengeExample :: Turing 
 bbChallengeExample = unm "TR1TR3TL2TL1FR2FR3___FR4TL0TR4"
+
+
+fromBBChallenge :: Text -> Turing 
+fromBBChallenge = unsafeFromRight . parse (parseBBChallenge 5 <* eof) ""
+{-
+bounces chaotically left and right
+due I believe to IijiI, has a CTL consisting of (11|01)* or something
+-}
+trickyCTLMachine :: Turing 
+trickyCTLMachine = fromBBChallenge "1RB0RB_1LC1RA_0LA1LD_0LE0LC_1RA---"
 
 {-examples of machines for induction
 1) a completely vanilla binary counter
