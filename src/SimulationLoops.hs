@@ -23,6 +23,7 @@ import Skip
 import Util
 import TapeSymbol
 import SimulateTwoBit (TwoBit)
+import LinRecurrence
 
 {-
 We'd like to update this module to have two layers of concepts: 
@@ -170,10 +171,10 @@ simulateStepOneMachine :: (Partial, TapeSymbol s)
   -> Int -> Turing -> SimState s
   -> Either (SimResult InfCount s) (SimState s)
 simulateStepOneMachine handleUnknown limit machine
- state@(SimState ph tape book steps skipTrace hist histSet counter curDisp dispHist rsHist)
+ state@(SimState ph tape book steps skipTrace hist histSet counter curDisp dispHist rsHist fastLRCheck)
   = if counter > limit
     then Left $ Continue steps ph tape curDisp
-    else trace ("steps:" <> show steps <> " p:" <> showP ph <> " t:" <> showP tape) $ 
+    else --trace ("steps:" <> show steps <> " p:" <> showP ph <> " t:" <> showP tape) $ 
     case skipStep machine book ph tape of
     Unknown e -> handleUnknown e state
     MachineStuck -> Left MachineStuckRes
@@ -183,7 +184,7 @@ simulateStepOneMachine handleUnknown limit machine
     Stepped c newPh newTape skipUsed newDisp rs -> case c of
       Infinity -> Left $ ContinueForever (SkippedToInfinity steps)
       c -> Right $ SimState newPh newTape book (steps + infCountToInt c) (skipUsed : skipTrace)
-        hist histSet (counter + 1) (curDisp + fromJust newDisp) dispHist (addToRRSH rs rsHist)
+        hist histSet (counter + 1) (curDisp + fromJust newDisp) dispHist (addToRRSH rs rsHist) fastLRCheck
 
 --this one essentially asserts there is no unknown edge, or otherwise crashes
 simulateStepTotalLoop :: (Partial, TapeSymbol s)
@@ -199,7 +200,7 @@ simulateStepUntilUnknown = simulateStepOneMachine handle where
 
 --this is pretty copied from "simulateOneMachine"
 simulateStepPartial :: (Partial, TapeSymbol s) => Int -> SimMultiAction s
-simulateStepPartial limit machine (SimState ph tape book steps skipTrace hist histSet counter curDisp dispHist rsHist) =
+simulateStepPartial limit machine (SimState ph tape book steps skipTrace hist histSet counter curDisp dispHist rsHist fastLRCheck) =
   --trace ("stepping bigStep: " <> showP counter <> " smallStep: " <> showP steps) $
   if counter > limit
   then Result $ Continue steps ph tape curDisp
@@ -217,7 +218,7 @@ simulateStepPartial limit machine (SimState ph tape book steps skipTrace hist hi
       case c of
       Infinity -> Result $ ContinueForever (SkippedToInfinity steps)
       c -> NewState $ SimState newPh newTape book (steps + infCountToInt c) (skipUsed : skipTrace)
-        hist histSet (counter + 1) (curDisp + fromJust newDisp) dispHist (addToRRSH rs rsHist)
+        hist histSet (counter + 1) (curDisp + fromJust newDisp) dispHist (addToRRSH rs rsHist) fastLRCheck
 
 {-# SPECIALISE simulateStepPartial :: Int -> SimMultiAction Bit #-}
 {-# SPECIALISE simulateStepPartial :: Int -> SimMultiAction TwoBit #-}
@@ -249,6 +250,21 @@ seenBeforeProof state = case state ^. s_history_set . at histEnt of
   histEnt = (state ^. s_phase, state ^. s_tape)
   curStepCount = state ^. s_steps
 
+{-algorithm: keep the config from a particular big step k around + a readshift since then 
+  and compare the past to now. start k at 1 and replace it with 2 * k when we get there. 
+-}
+fastLinRecurCheck :: (TapeSymbol s) => SimState s -> (FastLRCheck s, Maybe (HaltProof s))
+fastLinRecurCheck state = (newFLRC, mbProof) where 
+  (FastLRCheck pastPh pastTape pastRS pastCount) = state ^. s_fast_lr
+  rsToAdd = (state ^. s_reverse_readshift_history . reverseReadShiftHist . ix 0)
+  newRS = pastRS <> rsToAdd
+  (curPh, curTape, curCount) = (state ^. s_phase, state ^. s_tape, state ^. s_counter)
+  mbProof = trace ("past,cur" <> showP pastCount <> ", " <> showP curCount <> " rs: " <> showP newRS <> " rsToAdd: " <> showP rsToAdd) 
+    checkForRecur (pastCount, curCount) (pastPh, pastTape) (curPh, curTape) newRS 
+  nextCount = if pastCount > 0 then 2 * pastCount else 1 
+  newFLRC = if curCount < nextCount then FastLRCheck pastPh pastTape newRS pastCount else 
+    FastLRCheck curPh curTape mempty curCount 
+
 updateHistSet :: (Ord s) => SimOneAction s
 updateHistSet _machine state = Right $ state & s_history_set . at histEnt ?~ curStepCount
   where
@@ -265,6 +281,10 @@ checkSeenBefore _machine state = case seenBeforeProof state of
 {-# SPECIALISE checkSeenBefore :: SimOneAction Bit #-}
 {-# SPECIALISE checkSeenBefore :: SimOneAction TwoBit #-}
 
+fastLRCheckAction :: (TapeSymbol s) => SimOneAction s 
+fastLRCheckAction _m state = case fastLinRecurCheck state of 
+  (_, Just proof) -> Left $ ContinueForever proof 
+  (flr, Nothing) -> Right $ state & s_fast_lr .~ flr 
 
 --applies the skip to everything in the list, checks if any of them have just 
 skipAppliedInHist :: (TapeSymbol s) => Skip Count s -> TapeHist s InfCount -> Bool
@@ -306,6 +326,10 @@ skipAppliesForeverInHist skip hist = case forevers of
     contain only 0s, then if applying the skip once consumes all the 1s (the hypothesis), the
     0s that surround the live tape will supply an infinite amount of additional applications of the 
     skip. 
+
+  TODO: 
+  better algorithm: drop up to 1 thing from both ends of the input to the skip if they are blank
+    then see if the output applies to the input
 -}
 skipRunsForeverIfConsumesLiveTape :: (TapeSymbol s) => Skip Count s -> Bool 
 skipRunsForeverIfConsumesLiveTape skip@(Skip (Config startPh startLs startP startRs) end _hops) 
@@ -450,4 +474,6 @@ getTwoHistAfterTime stepCount turing
   = (guessingState ^. s_history, guessingState ^. s_readshift_history)
   where
     guessingState = getStateAfterTime stepCount turing
+
+
   

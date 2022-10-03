@@ -147,6 +147,9 @@ getReverseReadShiftHist = _reverseReadShiftHist
 getReadShiftHist :: ReadShiftHist -> [ReadShift]
 getReadShiftHist = _readShiftHist
 
+data FastLRCheck s = FastLRCheck Phase (ExpTape s InfCount) ReadShift Int deriving (Eq, Ord, Show, Generic)
+instance (NFData s) => NFData (FastLRCheck s)
+
 data SimState s = SimState
   { _s_phase :: Phase
   , _s_tape :: ExpTape s InfCount
@@ -165,6 +168,7 @@ data SimState s = SimState
   , _s_displacement :: Int
   , _s_reverse_disp_history :: ReverseDispHist
   , _s_reverse_readshift_history :: ReverseReadShiftHist
+  , _s_fast_lr :: FastLRCheck s 
   } deriving (Eq, Ord, Show, Generic)
 instance (NFData s) => NFData (SimState s)
 
@@ -425,6 +429,7 @@ skipStateFromPhTape :: (TapeSymbol s)
 skipStateFromPhTape t ph tape = SimState ph tape (initBook t) 0 []
   (ReverseTapeHist [(ph, tape)]) (one ((Phase 0,tape), 0)) 0 0
   (ReverseDispHist [0]) (ReverseReadShiftHist [])
+  (FastLRCheck (Phase 0) tape mempty 0)
 
 initSkipState :: (TapeSymbol s) => Turing -> SimState s
 initSkipState t = skipStateFromPhTape t (Phase 0) (initExpTape blank)
@@ -434,7 +439,7 @@ simulateOneMachine :: Int -> Turing -> SimState Bit
 simulateOneMachine limit t = \case
   --SimState p tape _book steps@((>= limit) -> True) trace _hist _ _counter -> (trace, Right $ Continue steps p tape)
   state | state ^. s_steps >= limit -> (state ^. s_trace, Right $ Continue (state ^. s_steps) (state ^. s_phase) (state ^. s_tape) (state ^. s_displacement))
-  SimState p tape book steps trace hist histSet counter disp dispHist rsHist -> case skipStep t book p tape of
+  SimState p tape book steps trace hist histSet counter disp dispHist rsHist fastLRCheck -> case skipStep t book p tape of
     MachineStuck -> error "machinestuck"
     Unknown e -> (trace, Left e)
     --TODO: maybe we're supposed to put the nonhaltproving skip on the trace?
@@ -449,7 +454,7 @@ simulateOneMachine limit t = \case
                newDispHist = dispHist & reverseDispHist %~ (disp :)
         in
         simulateOneMachine limit t $ SimState newP newTape book (steps + infCountToInt c) (skip : trace)
-           newHist newHistSet counter (disp + fromJust newDisp) newDispHist (addToRRSH rs rsHist)
+           newHist newHistSet counter (disp + fromJust newDisp) newDispHist (addToRRSH rs rsHist) fastLRCheck
 
 simulateOneTotalMachine :: Int -> Turing -> ([Skip Count Bit], SimResult InfCount Bit)
 simulateOneTotalMachine limit machine = (^?! _Right) <$> simulateOneMachine limit machine (initSkipState machine)

@@ -250,6 +250,16 @@ canProveLR limit m = case proveLRLoop limit m of
   (ContinueForever (SkippedToInfinity _), _ne) -> True
   _ -> False
 
+fastLRLoop :: Int -> Turing -> OneLoopRes Bit 
+fastLRLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit 
+  :| [fastLRCheckAction] 
+
+canProveFastLR :: Int -> Turing -> Bool 
+canProveFastLR limit m = case fastLRLoop limit m of 
+  (ContinueForever (LinRecur _ _), _ne) -> True
+  (ContinueForever (SkippedToInfinity _), _ne) -> True
+  _ -> False
+
 proveCycleLoop :: Int -> Turing -> OneLoopRes Bit
 proveCycleLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
   :| [checkSeenBefore]
@@ -296,6 +306,14 @@ checkLRAssertOneMachine limit unfinishedM = if toAssert then Nothing else Just m
   msg = "assert failed on:\n" <> showP m
     <> " " <> showP [lrWorked, cycleWorked, eotWorked, otherEotWorked]
 
+checkFastLRAssertOneMachine :: Int -> Turing -> Maybe Text 
+checkFastLRAssertOneMachine limit unfinishedM = trace ("machine: " <> showP unfinishedM) $ if lrWorked == fastLRWorked then Nothing else
+  Just msg where 
+  m = fillInMachine unfinishedM
+  lrWorked = canProveLR limit m 
+  fastLRWorked = canProveFastLR (limit*2) m 
+  msg = "m: " <> showP m <> "\nlrWorked: " <> show lrWorked <> " fastLRWorked: " <> show fastLRWorked
+
 --todo run at count being measured in big steps while limit is measured in small steps is bad
 indProveLoop :: Int -> Turing -> OneLoopRes Bit
 indProveLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
@@ -314,6 +332,11 @@ checkLRAssertManyMachines :: Int -> Turing -> [Text]
 checkLRAssertManyMachines limit startMachine = catMaybes texts where
   machines = fst <$> enumerateMachinesLoop limit startMachine
   texts = checkLRAssertOneMachine limit <$> machines
+
+checkFastLRAssertManyMachines :: Int -> Turing -> [Text] 
+checkFastLRAssertManyMachines limit startMachine = catMaybes texts where
+  machines = fst <$> enumerateMachinesLoop limit startMachine
+  texts = checkFastLRAssertOneMachine limit <$> machines
 
 indProveLoopMany :: Int -> Turing -> MultiLoopRes Bit
 indProveLoopMany limit = simulateManyMachinesOuterLoop backwardSearch $

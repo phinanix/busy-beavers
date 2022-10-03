@@ -17,6 +17,7 @@ A list of things which I would like to do in the project eventually.
 [ ] experiment: bottom up rules rather than top down rules 
 [ ] make guessInductionHypothesis work on the "tricky example" 
 [ ] figure out how to reliably decide counters
+[ ] improve skiprunsforeverifconsumeslivetape 
 
 
 ### Not-deciders 

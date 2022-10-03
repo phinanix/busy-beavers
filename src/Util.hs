@@ -193,3 +193,6 @@ ixListLens i = lens get set where
 
 bitraverseBoth :: (Bitraversable p, Applicative f) => (a -> f b) -> p a a -> f (p b b)
 bitraverseBoth f = bitraverse f f
+
+neMConcat :: (Monoid m) => NonEmpty m -> m 
+neMConcat (m :| ms) = foldl' (<>) m ms 

@@ -31,6 +31,7 @@ import Turing
 import SimulateSkip
 import HaltProof
 import TapeSymbol
+import Safe.Partial
 
 --given a list, sorts it and uses this to find whether it contains a duplicate
 hasPair :: (Ord a) => [a] -> Maybe (Int, Int)
@@ -61,7 +62,7 @@ data TapeRegion = UnsafeTapeRegion Int Int deriving (Eq, Ord, Show, Generic)
 instance NFData TapeRegion 
 
 mkTapeRegion :: HasCallStack => Int -> Int -> TapeRegion
-mkTapeRegion l r = assert (l <= 0) assert (r >= 0) UnsafeTapeRegion l r 
+mkTapeRegion l r = assertMsg (l<=r) ("l,r" <> show l <> " " <> show r) UnsafeTapeRegion l r 
 
 liveRegion :: (TapeSymbol s) => [(s, InfCount)] -> Int 
 liveRegion xs = case xs of 
@@ -90,6 +91,13 @@ intersectRegions (UnsafeTapeRegion l r) (UnsafeTapeRegion l' r')
 subsetRegion :: TapeRegion -> TapeRegion -> Bool 
 subsetRegion (UnsafeTapeRegion l r) (UnsafeTapeRegion l' r') = (l >= l') && (r <= r')
 
+-- a - b = bits of a which are not in b, or nothing if they are equal
+subtractRegions :: TapeRegion -> TapeRegion -> Maybe TapeRegion 
+subtractRegions a@(UnsafeTapeRegion l r) b@(UnsafeTapeRegion l' r') = 
+  assertMsg (r - l == r' - l') "" $ case compare l l' of
+    LT -> Just $  UnsafeTapeRegion l (l'-1) 
+    EQ -> Nothing 
+    GT -> Just $ UnsafeTapeRegion (r' + 1) r 
 
 --detects lin recurrence, as determined by the history
 --currently disphist is implemented in a bad way (skips can care about a whole chunk of symbols) so 
@@ -149,33 +157,6 @@ detectLinRecurrence hist@(TapeHist thList) rshist@(ReadShiftHist rshList)
   = --trace ("len hist: " <> show (length thList) <> " recent tape " <> showP (Unsafe.last thList)) $ 
     viaNonEmpty head $ catMaybes allMaybeProofs
   where
-  checkForRecur :: (Int, Int)
-    -> (Phase, ExpTape s InfCount) 
-    -> (Phase, ExpTape s InfCount) 
-    -> ReadShift -> Maybe (HaltProof s)
-  checkForRecur (i,j) 
-    (ph, et@(ExpTape _ls p _rs)) 
-    (ph', et'@(ExpTape _ls' p' _rs'))
-    (ReadShift l r s) = do 
-      guard (ph == ph')
-      guard (p == p') --TODO unnecessary? 
-      
-      --TODO crashes if range does not include 0. but maybe that's actually correct
-      let startRng = sliceExpTape et l r 
-          endRng = sliceExpTape et' l r
-      guard (startRng == endRng) 
-      -- here's where we need to add the new code to check - we need to check that the 
-      -- range the end is reading from intersected with the part of the tape that's live 
-      -- at the endrange step is a subrange of the range we wrote via the start range
-      -- which is the start range shifted by the readshift
-      let writtenRng = -- trace ("l " <> show l <> " r " <> show r <> " s " <> show s) 
-            mkTapeRegion (l - s) (r - s)
-          readRng = mkTapeRegion l r
-          liveAtEndRng = liveTapeRegion et' 
-            {- trace ("written " <> show writtenRng <> " read " <> show readRng 
-           <> " live at end " <> show liveAtEndRng) -}
-      guard $ (readRng `intersectRegions` liveAtEndRng) `subsetRegion` writtenRng 
-      pure $ LinRecur i j
   --i and j are inclusive, in a sense, but that means we want to index into rshList in an 
   -- (incl., excl.) way, 
   checkForRecurAtIndices :: (Int, Int) -> Maybe (HaltProof s)
@@ -185,15 +166,15 @@ detectLinRecurrence hist@(TapeHist thList) rshist@(ReadShiftHist rshList)
         <> show i <> "," <> show j <> "\ntape1:\n"
         <> showP startC <> "\ntape2:\n" <> showP endC
          <> "\nreadShift:\n" <> showP readShift <> 
-        "\nfrom list\n" <> "abridged") --showP rshList)
+        "\nfrom list\n" <> showP (slice i (j-1) rshList))
       else id
     in 
-    --showMsg
+    showMsg
      ans 
     where 
     startC = thList !! fromIntegral i
     endC = thList !! fromIntegral j 
-    readShift = mconcat $ slice i (j-1) rshList 
+    readShift = neMConcat $ fromJust $ nonEmpty $ slice i (j-1) rshList 
   --lenHist is the length of the history, so it minus one is max valid index
   genValidIndices :: Int -> [(Int, Int)]
   genValidIndices lenHist = concat $ genIndicesAtDist lenHist <$> [1, 2 .. lenHist -1]
@@ -205,3 +186,33 @@ detectLinRecurrence hist@(TapeHist thList) rshist@(ReadShiftHist rshList)
     --trace msg $ 
     assert (length thList - 1 == length rshList) $ 
     checkForRecurAtIndices <$> genValidIndices (fromIntegral $ length thList)
+
+--alg 3 oct: anything read which is outside of the written region must be F (todo check)
+checkForRecur :: (Partial, TapeSymbol s) 
+  => (Int, Int)
+  -> (Phase, ExpTape s InfCount) 
+  -> (Phase, ExpTape s InfCount) 
+  -> ReadShift -> Maybe (HaltProof s)
+checkForRecur (i,j) 
+  (ph, et@(ExpTape _ls p _rs)) 
+  (ph', et'@(ExpTape _ls' p' _rs'))
+  (ReadShift l r s) = do 
+    guard (ph == ph')
+    guard (p == p') --TODO unnecessary? 
+    
+    --TODO crashes if range does not include 0. but maybe that's actually correct
+    let startRng = sliceExpTape et l r 
+        endRng = sliceExpTape et' l r
+    guard (startRng == endRng) 
+    -- here's where we need to add the new code to check - we need to check that the 
+    -- range the end is reading from intersected with the part of the tape that's live 
+    -- at the endrange step is a subrange of the range we wrote via the start range
+    -- which is the start range shifted by the readshift
+    let writtenRng = trace ("l " <> show l <> " r " <> show r <> " s " <> show s) 
+          mkTapeRegion (l - s) (r - s)
+        readRng = mkTapeRegion l r
+        liveAtEndRng = liveTapeRegion et' 
+    trace ("written " <> show writtenRng <> " read " <> show readRng 
+          <> " live at end " <> show liveAtEndRng) 
+      guard $ (readRng `intersectRegions` liveAtEndRng) `subsetRegion` writtenRng 
+    pure $ LinRecur i j
