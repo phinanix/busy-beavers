@@ -361,7 +361,7 @@ simulateViaDFS stepLim depthLim book (Skip startConfig skipEnd _hops)
   Right (Success vs) -> Right $ fromIntegral $ length vs
   --the problem here is we sort of want some kind of like 'what did the DFS get stuck on' list 
   --but that's not something we have right now
-  Right NoSuccess -> Left "dfs exhaustively searched with no results"
+  Right (NoSuccess numNodes) -> Left $ "dfs exhaustively searched " <> show numNodes <> " nodes with no results"
   Left message -> Left $ "failed dfs: " <> message
   where
     target = case skipEnd of

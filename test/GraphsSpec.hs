@@ -35,7 +35,7 @@ spec :: Spec
 spec = do 
   describe "dfs" $ do 
     it "exhausts a simple graph" $
-      dfs 5 100 getAdjacentGWB (const False) (GraphWithBranches (4,0)) `shouldBe` (Right NoSuccess)
+      dfs 5 100 getAdjacentGWB (const False) (GraphWithBranches (4,0)) `shouldBe` (Right $ NoSuccess $ 1 + 4 + 3 + 2 + 1)
     it "finds a node" $ 
       dfs 5 100 getAdjacentGWB (== GraphWithBranches (0,0)) (GraphWithBranches (5,0)) `shouldBe` (Right $ Success $ GraphWithBranches . (,0) <$> [5,4..0])
     it "bottoms out if the search isn't deep enough" $
