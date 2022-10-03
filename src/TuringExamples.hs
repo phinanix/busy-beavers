@@ -333,6 +333,10 @@ trickyCTLMachine = fromBBChallenge "1RB0RB_1LC1RA_0LA1LD_0LE0LC_1RA---"
 hardUnilateralBouncer :: Turing 
 hardUnilateralBouncer = fromBBChallenge "1RB0LA_0RC1RD_1LA1LC_0LC0RE_---1RA"
 
+--from cosmo. bounces back and forth but in a difficult way
+weirdBouncer :: Turing
+weirdBouncer = fromBBChallenge "1RB0LE_0RC1LD_1LC0RB_0LA---_1LD1LA"
+
 {-someone on the bb challenge discord went through and found a machine which hits each
 different subroutine of skelet's program  -}
 skelet_Incremental_formula :: Turing
