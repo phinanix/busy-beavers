@@ -156,9 +156,12 @@ processMachinesViaArgs = do
 
 main :: IO ()
 main = do
-    let x = numToLet 5
-    putText (show x) 
-    processMachinesViaArgs
+  let assertTexts = checkFastLRAssertManyMachines 200 $ startMachine1 4
+  putText $ "length assertTexts: " <> show (length assertTexts) <> "\n"
+  for_ assertTexts putText
+
+    --processMachinesViaArgs
+
   -- let results = Simulate.simulate 100 $ startMachine1 4
   -- simProgram dispTape results
 

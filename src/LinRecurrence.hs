@@ -208,11 +208,18 @@ checkForRecur (i,j)
     -- range the end is reading from intersected with the part of the tape that's live 
     -- at the endrange step is a subrange of the range we wrote via the start range
     -- which is the start range shifted by the readshift
-    let writtenRng = trace ("l " <> show l <> " r " <> show r <> " s " <> show s) 
+    let writtenRange = --trace ("l " <> show l <> " r " <> show r <> " s " <> show s) 
           mkTapeRegion (l - s) (r - s)
-        readRng = mkTapeRegion l r
-        liveAtEndRng = liveTapeRegion et' 
-    trace ("written " <> show writtenRng <> " read " <> show readRng 
-          <> " live at end " <> show liveAtEndRng) 
-      guard $ (readRng `intersectRegions` liveAtEndRng) `subsetRegion` writtenRng 
+        readRange = mkTapeRegion l r
+        liveAtStartRange@(UnsafeTapeRegion lLive rLive) = liveTapeRegion et
+    case 
+      -- trace ("written " <> show writtenRange <> " read " <> show readRange
+      --     <> " live at end " <> show liveAtStartRange) 
+       readRange `subtractRegions` writtenRange of 
+      Nothing -> pure ()
+      Just (UnsafeTapeRegion lRead rRead) -> 
+        -- trace ("lrRead: " <> show (lRead, rRead))
+        guard $ rRead < lLive - s || lRead > rLive - s
+        
+
     pure $ LinRecur i j

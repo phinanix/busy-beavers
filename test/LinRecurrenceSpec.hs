@@ -30,6 +30,10 @@ spec = do
       hasPair "0123456289" `shouldBe` Just (2, 7)
     it "doesn't find a pair" $
       hasPair "abcdefghijklmnopqrstuvwxyz" `shouldBe` Nothing
+  describe "liveTapeRegion" $ do 
+    it "finds an example" $ 
+      liveRegion [(Bit False, NotInfinity One), (Bit True, NotInfinity $ FinCount 3), (Bit False, Infinity)]
+      `shouldBe` 4
   describe "detectLinRecurrence" $ do 
     it "finds a recurrence" $ 
       getRecurRes 200 machineStuckMachine `shouldBe` Just (LinRecur 0 116)

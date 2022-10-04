@@ -259,7 +259,12 @@ fastLinRecurCheck state = (newFLRC, mbProof) where
   rsToAdd = (state ^. s_reverse_readshift_history . reverseReadShiftHist . ix 0)
   newRS = pastRS <> rsToAdd
   (curPh, curTape, curCount) = (state ^. s_phase, state ^. s_tape, state ^. s_counter)
-  mbProof = trace ("past,cur" <> showP pastCount <> ", " <> showP curCount <> " rs: " <> showP newRS <> " rsToAdd: " <> showP rsToAdd) 
+  mbProof = 
+    -- trace ("past,cur" <> showP pastCount <> ", " <> showP curCount <> 
+    -- " rs: " <> showP newRS <> " rsToAdd: " <> showP rsToAdd
+    -- <> "\npastconf: " <> showP (pastPh, pastTape) 
+    -- <> "\ncurconf:" <> showP (curPh, curTape) 
+    -- <> "\n") 
     checkForRecur (pastCount, curCount) (pastPh, pastTape) (curPh, curTape) newRS 
   nextCount = if pastCount > 0 then 2 * pastCount else 1 
   newFLRC = if curCount < nextCount then FastLRCheck pastPh pastTape newRS pastCount else 
