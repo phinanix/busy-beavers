@@ -1,0 +1,111 @@
+length assertTexts: 11
+m: 0 Bit False | 1 Bit True R
+0 Bit True | 2 Bit True L
+1 Bit False | 1 Bit True L
+1 Bit True | 2 Bit True L
+2 Bit False | 3 Bit True R
+2 Bit True | 0 Bit False L
+3 Bit False | Halt
+3 Bit True | 1 Bit False R
+TR1TL2TL1TL2TR3FL0TLHFR1
+
+lrWorked: False fastLRWorked: Truem: 0 Bit False | 1 Bit True R
+0 Bit True | 1 Bit True L
+1 Bit False | 1 Bit True L
+1 Bit True | 2 Bit True L
+2 Bit False | 3 Bit True R
+2 Bit True | 0 Bit False L
+3 Bit False | Halt
+3 Bit True | 1 Bit False R
+TR1TL1TL1TL2TR3FL0TLHFR1
+
+lrWorked: False fastLRWorked: Truem: 0 Bit False | 1 Bit True R
+0 Bit True | Halt
+1 Bit False | 1 Bit True L
+1 Bit True | 2 Bit False R
+2 Bit False | 1 Bit False R
+2 Bit True | 3 Bit True L
+3 Bit False | 2 Bit True R
+3 Bit True | 3 Bit False L
+TR1TLHTL1FR2FR1TL3TR2FL3
+
+lrWorked: False fastLRWorked: Truem: 0 Bit False | 1 Bit True R
+0 Bit True | Halt
+1 Bit False | 2 Bit True R
+1 Bit True | 1 Bit False L
+2 Bit False | 3 Bit False R
+2 Bit True | 1 Bit True L
+3 Bit False | 3 Bit True L
+3 Bit True | 2 Bit False R
+TR1TLHTR2FL1FR3TL1TL3FR2
+
+lrWorked: False fastLRWorked: Truem: 0 Bit False | 1 Bit True R
+0 Bit True | Halt
+1 Bit False | 2 Bit True L
+1 Bit True | 1 Bit False R
+2 Bit False | 3 Bit False L
+2 Bit True | 1 Bit True R
+3 Bit False | 3 Bit True R
+3 Bit True | 2 Bit False L
+TR1TLHTL2FR1FL3TR1TR3FL2
+
+lrWorked: False fastLRWorked: Truem: 0 Bit False | 1 Bit True R
+0 Bit True | 0 Bit False L
+1 Bit False | 2 Bit False R
+1 Bit True | Halt
+2 Bit False | 2 Bit True L
+2 Bit True | 3 Bit True L
+3 Bit False | 0 Bit False R
+3 Bit True | 3 Bit False L
+TR1FL0FR2TLHTL2TL3FR0FL3
+
+lrWorked: True fastLRWorked: Falsem: 0 Bit False | 1 Bit True R
+0 Bit True | 0 Bit False L
+1 Bit False | 2 Bit False R
+1 Bit True | 3 Bit False L
+2 Bit False | 0 Bit True L
+2 Bit True | 0 Bit True R
+3 Bit False | Halt
+3 Bit True | 0 Bit True L
+TR1FL0FR2FL3TL0TR0TLHTL0
+lrWorked: False fastLRWorked: Truem: 0 Bit False | 1 Bit True R
+0 Bit True | 0 Bit False L
+1 Bit False | 2 Bit False R
+1 Bit True | Halt
+2 Bit False | 3 Bit True R
+2 Bit True | 3 Bit False L
+3 Bit False | 0 Bit True L
+3 Bit True | 1 Bit True R
+TR1FL0FR2TLHTR3FL3TL0TR1
+
+lrWorked: False fastLRWorked: Truem: 0 Bit False | 1 Bit True R
+0 Bit True | Halt
+1 Bit False | 2 Bit False R
+1 Bit True | 3 Bit True L
+2 Bit False | 3 Bit True L
+2 Bit True | 0 Bit False L
+3 Bit False | 1 Bit True L
+3 Bit True | 1 Bit False L
+TR1TLHFR2TL3TL3FL0TL1FL1
+
+lrWorked: False fastLRWorked: Truem: 0 Bit False | 1 Bit True R
+0 Bit True | 0 Bit False L
+1 Bit False | 2 Bit False R
+1 Bit True | Halt
+2 Bit False | 3 Bit False R
+2 Bit True | 2 Bit True L
+3 Bit False | 3 Bit True L
+3 Bit True | 0 Bit False L
+TR1FL0FR2TLHFR3TL2TL3FL0
+
+lrWorked: False fastLRWorked: Truem: 0 Bit False | 1 Bit True R
+0 Bit True | 1 Bit False R
+1 Bit False | 2 Bit False L
+1 Bit True | 0 Bit True R
+2 Bit False | 0 Bit True R
+2 Bit True | 3 Bit False R
+3 Bit False | 1 Bit True L
+3 Bit True | Halt
+TR1FR1FL2TR0TR0FR3TL1TLH
+
+lrWorked: False fastLRWorked: True⏎      
