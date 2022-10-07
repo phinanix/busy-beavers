@@ -129,6 +129,7 @@ tacticVectors = M.fromList
   , ("basic", basicTacticVector)
   , ("constructive", constructiveVector)
   , ("noncon", nonconVector)
+  , ("abs", absVector)
   ]
 
 putMachinesInFile :: [Turing] -> String -> IO ()
@@ -156,11 +157,8 @@ processMachinesViaArgs = do
 
 main :: IO ()
 main = do
-  let assertTexts = checkFastLRAssertManyMachines 200 $ startMachine1 4
-  putText $ "length assertTexts: " <> show (length assertTexts) <> "\n"
-  for_ assertTexts putText
 
-    --processMachinesViaArgs
+  processMachinesViaArgs
 
   -- let results = Simulate.simulate 100 $ startMachine1 4
   -- simProgram dispTape results

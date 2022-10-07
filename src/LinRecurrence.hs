@@ -169,7 +169,7 @@ detectLinRecurrence hist@(TapeHist thList) rshist@(ReadShiftHist rshList)
         "\nfrom list\n" <> showP (slice i (j-1) rshList))
       else id
     in 
-    showMsg
+    --showMsg
      ans 
     where 
     startC = thList !! fromIntegral i

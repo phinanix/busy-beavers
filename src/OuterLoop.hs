@@ -28,6 +28,7 @@ import SimulateTwoBit (TwoBit)
 import Mystery
 import ExpTape
 import SimulateVecBit
+import AbstractInterpretation
 
 {- 7 June 22 overall state
 the tactics are coming along nicely, I'm super excited to have a TwoBit simulation tactic
@@ -173,6 +174,8 @@ outerLoop tacticList startMachine = loop [(startMachine, 0)] [] where
     Just (Simulation f) -> case f tm of
       (newTMs, newRes) -> loop (((,n+1) <$> newTMs) ++ todos) (newRes ++ curRes)
 
+mbProofOneShot :: (TapeSymbol s) => (Turing -> Maybe (HaltProof s)) -> Tactic
+mbProofOneShot f = oneShot (fmap (Right . ContinueForever) . f) 
 
 tacticBackwardSearch :: Tactic
 tacticBackwardSearch = oneShot @Bit (fmap (Right . ContinueForever) . backwardSearch)
@@ -314,6 +317,9 @@ bwSearchTacticVector = V.fromList [tacticBackwardSearch]
 
 nonconVector :: V.Vector Tactic
 nonconVector = V.fromList [tacticBackwardSearch]
+
+absVector :: V.Vector Tactic 
+absVector = V.fromList [mbProofOneShot @Bit $ forwardNearHeadInterp 5 5]
 
 everythingVector :: V.Vector Tactic
 everythingVector = nonconVector V.++ constructiveVector

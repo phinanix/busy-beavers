@@ -364,6 +364,11 @@ skelet_BL_2 = fromBBChallenge "1LC0RE_0LE---_1LD0LB_1RA0LA_0RA1RE"
 skelet_machines :: [Turing]
 skelet_machines = [skelet_Incremental_formula, skelet_Closed_position, skelet_Closed_transition_modulo, skelet_Collatz_like, skelet_Single_exone, skelet_Spec1_exone, skelet_Self_tuning_exone, skelet_Huffman, skelet_BL_1, skelet_BL_2]
 
+{-assert generated on oct4 of machines which were only proveable by 1 of the 2 lin recurrence methods
+-}
+linrecurdiff :: [Turing]
+linrecurdiff = unm <$> ["TR1TL2TL1TL2TR3FL0TLHFR1", "TR1TL1TL1TL2TR3FL0TLHFR1", "TR1TLHTL1FR2FR1TL3TR2FL3", "TR1TLHTR2FL1FR3TL1TL3FR2", "TR1TLHTL2FR1FL3TR1TR3FL2", "TR1FL0FR2TLHTL2TL3FR0FL3", "TR1FL0FR2FL3TL0TR0TLHTL0", "TR1FL0FR2TLHTR3FL3TL0TR1", "TR1TLHFR2TL3TL3FL0TL1FL1", "TR1FL0FR2TLHFR3TL2TL3FL0", "TR1FR1FL2TR0TR0FR3TL1TLH"]
+
 {-examples of machines for induction
 1) a completely vanilla binary counter
   counts to the left. 
