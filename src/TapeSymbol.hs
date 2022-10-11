@@ -14,6 +14,7 @@ import qualified Data.Set as S
 import Util
 import Count
 import Turing
+    ( Steps, Turing(Turing), Trans(..), Edge, Bit(..), Dir(..), Phase )
 import Skip
 import Notation (dispTuring)
 import Mystery
