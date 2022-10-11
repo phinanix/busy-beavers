@@ -9,8 +9,9 @@ A list of things which I would like to do in the project eventually.
 ### Deciders 
 [ ] Abstract interpretation
   [ ] nearby tape head 
-    [ ] unit test next config
-    [ ] integrate in outer loop 
+    [x] unit test next config
+    [x] integrate in outer loop 
+    [ ] fix the end of tape bug
   [ ] halting segment
   [ ] closed regular language deciders
 [ ] better derivation of rules for bouncer-in-bouncer and the like 

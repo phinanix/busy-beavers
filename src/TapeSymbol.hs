@@ -65,6 +65,8 @@ class (Ord s, Show s, Pretty s, Typeable s, NFData s) => TapeSymbol s where
   fromBits :: [Bit] -> ([s], [Bit]) --the second list is the one remaining
   --given a turing machine, how do you create a list of skips sufficient to 
   --cover all possible situations
+  --does not include chained skips, because sometimes you need the book without 
+  --without chained skips in it
   initBook :: Turing -> SkipBook s
   --given an edge which has just been defined in a given turing machine, take the 
   --skipbook before that edge was defined and give me the skipbook after the edge
@@ -83,6 +85,12 @@ oneStepSkip (p, b) q c d = Skip
   (SkipStepped q (Side d [(c, finiteCount 1)]))
   (finiteCount 1)
 
+haltSkip :: Edge -> Skip Count Bit 
+haltSkip (p, b) = Skip
+  (Config p [] b [])
+  (SkipHalt (Side L [(Bit True, finiteCount 1)]))
+  (finiteCount 1)
+
 --the skip that results from an atomic transition which transitions a phase to itself
 --writing the given bit and dir
 infiniteSkip :: Edge -> Bit -> Dir -> Skip Count Bit
@@ -99,14 +107,15 @@ infiniteSkip (p, b) c R = Skip
   (SkipStepped p (Side R [(c, One <> newBoundVar 0)]))
   (One <> newBoundVar 0)
 
+initOneSkip :: Edge -> Trans -> Skip Count Bit 
+initOneSkip e = \case 
+  Halt -> haltSkip e 
+  Step q c d -> oneStepSkip e q c d
+
 initTransSkip :: Edge -> Trans -> Set (Skip Count Bit)
---we need to modify this skip so that it's halt question is true
 --a halting machine is assumed to write True and go left 
 --(and not change phase, but conceptually it is now in "haltphase")
-initTransSkip (p, b) Halt = one $ Skip
-  (Config p [] b [])
-  (SkipHalt (Side L [(Bit True, finiteCount 1)]))
-  (finiteCount 1)
+initTransSkip e Halt = one $ haltSkip e
 initTransSkip e@(p, _b) (Step q c d) | p == q = fromList
   [ oneStepSkip e q c d
   , infiniteSkip e c d
@@ -125,6 +134,10 @@ addMultipleToBook xs book = foldr (uncurry addSkipToBook) book xs
 
 initBookBit :: Turing -> SkipBook Bit
 initBookBit (Turing _n trans) = appEndo (foldMap (Endo . addInitialSkipToBook) skips) Empty where
+  skips = uncurry initOneSkip <$> assocs trans
+
+initChainBookBit :: Turing -> SkipBook Bit 
+initChainBookBit (Turing _n trans) = appEndo (foldMap (Endo . addInitialSkipToBook) skips) Empty where
   skips = foldMap (uncurry initTransSkip) $ assocs trans
 
 varNotUsedInSkip :: Skip Count s -> BoundVar

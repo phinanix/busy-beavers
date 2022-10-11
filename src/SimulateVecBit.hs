@@ -121,7 +121,7 @@ makeVectorSkip t (startPh, startT) = Skip skipStart skipEnd hops
     Halts tape -> SkipHalt $ Middle $ unFlattenET tape
 
 initVectorBook :: forall v. (Vector v Bit, Ord (v Bit), Pretty (v Bit)) => Turing -> SkipBook (v Bit)
-initVectorBook t = addChainedToBook $ appEndo (foldMap (Endo . addInitialSkipToBook) skips) Empty where
+initVectorBook t = appEndo (foldMap (Endo . addInitialSkipToBook) skips) Empty where
   skips = first FinCount . makeVectorSkip t <$> allInitTapes (natVal (Proxy @(Dim v))) t
 
 --this pile of stuff is copied from the source code of fixed-vector and hacked together

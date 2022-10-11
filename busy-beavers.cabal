@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4367f63c0805e8567103c08dd20d29cf7b36632704b40491550bc1e9edf3ca2f
+-- hash: 1482519736409b8dcfc7a22caff8800c2df1f111f5f21573bd56ebd76b4bf2dd
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -44,6 +44,7 @@ library
       OuterLoop
       Parsing
       Results
+      Runner
       Scaffold
       ShortNames
       Simple.Display

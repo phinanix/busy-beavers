@@ -426,7 +426,7 @@ type SkipTape = ExpTape Bit InfCount
 
 skipStateFromPhTape :: (TapeSymbol s) 
   => Turing -> Phase -> ExpTape s InfCount  -> SimState s
-skipStateFromPhTape t ph tape = SimState ph tape (initBook t) 0 []
+skipStateFromPhTape t ph tape = SimState ph tape (addChainedToBook $ initBook t) 0 []
   (ReverseTapeHist [(ph, tape)]) (one ((Phase 0,tape), 0)) 0 0
   (ReverseDispHist [0]) (ReverseReadShiftHist [])
   (FastLRCheck (Phase 0) tape mempty 0)

@@ -86,7 +86,7 @@ forwardNearHeadInterp startK endK m
         Right (NoSuccess numNodes) -> Right $ NearHeadAI nextK numNodes 
         Left _msg -> Left False
         Right (Success _p) -> Left True 
-    doDFS k = dfs 1000 1000 (nearHeadGetNextConfigs k m skips) 
+    doDFS k = dfs 10000 10000 (nearHeadGetNextConfigs k m skips) 
       successCond (Just $ nearHeadInitialConfig k)
     skips = mapBook Base $ initBook @s m
     --we found what we were looking for if we find Nothing, since that means
@@ -111,7 +111,7 @@ nearHeadGetNextConfigs _ _ _  Nothing = error "next config nothing?"
 nearHeadGetNextConfigs k m skips (Just (ph, tape)) = case skipStep m skips ph tape of
   Unknown _e -> [Nothing]
   Stopped {} -> [Nothing]
-  Stepped _ newPh (ExpTape _ MultipleAny _) _ _ _ -> trace ("newph " <> show newPh) branchAndContinue
+  Stepped _ newPh (ExpTape _ MultipleAny _) _ _ _ -> branchAndContinue
   Stepped _ newPh newTape _ _ _ -> [Just (newPh, newTape)]
   NonhaltProven _hp -> []
   MachineStuck -> branchAndContinue

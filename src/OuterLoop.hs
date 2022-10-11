@@ -319,7 +319,7 @@ nonconVector :: V.Vector Tactic
 nonconVector = V.fromList [tacticBackwardSearch]
 
 absVector :: V.Vector Tactic 
-absVector = V.fromList [mbProofOneShot @Bit $ forwardNearHeadInterp 5 5]
+absVector = V.fromList [mbProofOneShot @Bit $ forwardNearHeadInterp 10 10]
 
 everythingVector :: V.Vector Tactic
 everythingVector = nonconVector V.++ constructiveVector
