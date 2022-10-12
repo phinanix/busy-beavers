@@ -13,6 +13,7 @@ import Config
 import Turing
 import Tape
 import Notation
+import Data.Aeson
 
 --the type of proofs that a TM will not halt
 -- - HaltUnreachable means the Halt state is never transitioned to from the current state
@@ -38,11 +39,15 @@ data HaltProof s
   | BackwardSearch
 --commenting out for now to fix a cyclic dependency, may need to move some things around
   | SkippedToInfinity Steps --(Skip Count s)
-  | LinRecur Steps Steps 
+  --(start, period, translate-distance)
+  | LinRecur Steps Steps Steps 
   --the width of the near head plus the size of the explored tree
   | NearHeadAI Int Int 
   deriving (Eq, Ord, Show, Generic, Functor, Foldable, Traversable)
 instance (NFData s) => NFData (HaltProof s)
+
+instance ToJSON (HaltProof s) where 
+  toEncoding = genericToEncoding defaultOptions
 
 mirrorHaltProof :: HaltProof s -> HaltProof s
 mirrorHaltProof (OffToInfinityN s d) = OffToInfinityN s $ mirrorDir d

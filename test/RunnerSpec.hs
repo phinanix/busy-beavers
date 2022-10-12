@@ -32,8 +32,13 @@ spec = do
     it "encodes a random trans" $
       encodeTrans 5 randomTrans `shouldBe`
         [True, True, False, False, True]
-  describe "encode decode law" $ do
     it "random transition" $ 
       decodeTrans 3 (encodeTrans 3 randomTrans) `shouldBe` randomTrans
+  describe "turing machine encode decode law" $ do
     it "words" $ do
       property (\(t@(Turing n _) :: Turing) -> decodeTM n (encodeTM t) `shouldBe` t)
+  describe "packing 4 word16s" $ do 
+    it "round trips" $ do 
+      property (\(w::Word64) -> packWord16Word64 (unpackWord64Word16 w) `shouldBe` w) 
+    it "other round trips" $ do 
+      property (\tup -> unpackWord64Word16 (packWord16Word64 tup) `shouldBe` tup)  

@@ -3,6 +3,7 @@ module Results where
 import Relude
 import Control.Lens
 import Prettyprinter
+import Data.Aeson 
 
 import Util
 import Turing
@@ -13,7 +14,7 @@ import ExpTape
 import Notation (dispTuring)
 
 -- s is symbol and a is the type of tape 
-data SimResult c s = Halted Steps (FinalTape c s) --this is steps taken and int is the total displacement
+data SimResult c s = Halted Steps (FinalTape c s) --this is steps taken
                | Continue Steps Phase (ExpTape s c) Int
                | ContinueForever (HaltProof s)
                --the reason this is still in, is that in proveByInd / induction in general 
@@ -22,6 +23,9 @@ data SimResult c s = Halted Steps (FinalTape c s) --this is steps taken and int 
                | MachineStuckRes
                deriving (Eq, Ord, Show, Generic)
 instance (NFData c, NFData s) => (NFData (SimResult c s))
+
+instance (ToJSON c, ToJSON s) => ToJSON (SimResult c s) 
+
 --this doesn't work for some bizarre reason, it gives some big kind error :c
 -- $(makePrisms ''SimResult)
 
@@ -123,7 +127,7 @@ addResult turing (ContinueForever proof) r =
     proof2lens (OffToInfinityN _ _) = infinityN
     proof2lens BackwardSearch = backwardSearches
     proof2lens (SkippedToInfinity _) = skipInfinity
-    proof2lens (LinRecur _ _) = linRecur
+    proof2lens (LinRecur _ _ _) = linRecur
     special BackwardSearch = --if r ^. backwardSearches > keepNum then id else
       backwardExamples %~ (:) turing
     special _ = id

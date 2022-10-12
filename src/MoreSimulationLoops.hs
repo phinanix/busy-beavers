@@ -220,7 +220,7 @@ genCountAdd (FinCount n, FinCount m) = case compare n m of
   GT -> let
     diff = n - m
     bvc = boundVarCount (BoundVar 0) 1
-    in
+    in 
       Just (bvc <> FinCount diff, bvc)
 genCountAdd (_, _) = Nothing
 {-
@@ -246,7 +246,7 @@ proveLRLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
 
 canProveLR :: Int -> Turing -> Bool
 canProveLR limit m = case proveLRLoop limit m of
-  (ContinueForever (LinRecur _ _), _ne) -> True
+  (ContinueForever (LinRecur {}), _ne) -> True
   (ContinueForever (SkippedToInfinity _), _ne) -> True
   _ -> False
 
@@ -256,7 +256,7 @@ fastLRLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
 
 canProveFastLR :: Int -> Turing -> Bool 
 canProveFastLR limit m = case fastLRLoop limit m of 
-  (ContinueForever (LinRecur _ _), _ne) -> True
+  (ContinueForever (LinRecur {}), _ne) -> True
   (ContinueForever (SkippedToInfinity _), _ne) -> True
   _ -> False
 

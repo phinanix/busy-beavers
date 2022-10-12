@@ -221,5 +221,5 @@ checkForRecur (i,j)
         -- trace ("lrRead: " <> show (lRead, rRead))
         guard $ rRead < lLive - s || lRead > rLive - s
         
-
-    pure $ LinRecur i j
+    --TODO: calculate offset
+    assert (j > i) $ pure $ LinRecur i (j-i) 0

@@ -13,6 +13,7 @@ import Turing
 import Count
 import Tape
 import Util
+import Data.Aeson
 
 data ExpTape s c = ExpTape
   { left :: [(s, c)]
@@ -20,6 +21,8 @@ data ExpTape s c = ExpTape
   , right :: [(s, c)]
   } deriving (Eq, Ord, Show, Generic, Functor)
 instance (NFData s, NFData c) => NFData (ExpTape s c)
+instance (ToJSON s, ToJSON c) => ToJSON (ExpTape s c) where 
+    toEncoding = genericToEncoding defaultOptions
 
 instance Bifunctor ExpTape where
   first :: (a -> b) -> ExpTape a c -> ExpTape b c

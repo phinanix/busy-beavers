@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5a96a5063a741758084ab8457371cea4a8b7b4dd8c4a66d193fa7845ae1beb83
+-- hash: 304769d7d4b1a21a2a42fbf04c2c824da7f514cf09dfafc22a5aef22c2113005
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -109,9 +109,9 @@ library
   ghc-options: -Wall -Wno-name-shadowing -Wno-unused-imports -Wcompat -Wredundant-constraints -Wincomplete-record-updates -Wincomplete-uni-patterns
   build-depends:
       QuickCheck
+    , aeson
     , base
     , bifunctors
-    , binary
     , constraints
     , containers
     , either

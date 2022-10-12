@@ -4,20 +4,28 @@ import Relude
 import Relude.Unsafe as Unsafe (init, last)
 import Relude.Extra.Bifunctor
 import qualified Text.Show
-import Control.Lens hiding ((<|))
+import Control.Lens hiding ((<|), (.=))
 import Control.Lens.Extras
 import Data.List.NonEmpty ((<|))
 import Prettyprinter
 import qualified Data.Map as M
+import Data.Aeson
+--import Notation
 
 
 --the Phase a turing machine is in, to not conflict with State
 newtype Phase = Phase { unPhase :: Int} deriving (Eq, Ord, Generic)
+instance ToJSON Phase where 
+    toEncoding = genericToEncoding defaultOptions
 instance Show Phase where
   show (Phase i) = "(Phase " <> show i <> ")"
 
 data Dir = L | R deriving (Eq, Ord, Show, Generic)
+instance ToJSON Dir where 
+    toEncoding = genericToEncoding defaultOptions
 newtype Bit = Bit Bool deriving (Eq, Ord, Show, Generic)
+instance ToJSON Bit where 
+  toEncoding = genericToEncoding defaultOptions
 type Edge = (Phase, Bit)
 data Trans = Halt | Step Phase Bit Dir deriving (Eq, Ord, Show, Generic)
 

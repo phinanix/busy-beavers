@@ -36,7 +36,7 @@ spec = do
       `shouldBe` 4
   describe "detectLinRecurrence" $ do 
     it "finds a recurrence" $ 
-      getRecurRes 200 machineStuckMachine `shouldBe` Just (LinRecur 0 116)
+      getRecurRes 200 machineStuckMachine `shouldBe` Just (LinRecur 0 116 0)
     it "doesn't find a recurrence for a halting machine" $ 
       getRecurRes 12 bb3 `shouldBe` Nothing
     it "doesn't find a recurrence for a counting machine" $

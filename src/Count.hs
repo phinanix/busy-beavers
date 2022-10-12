@@ -1,6 +1,5 @@
 module Count where
 
-import Turing (Bit, dispBit)
 import Relude hiding (filter, mapMaybe)
 import qualified Text.Show
 import qualified Relude.Unsafe as Unsafe (head)

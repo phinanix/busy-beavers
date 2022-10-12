@@ -13,7 +13,9 @@ import Prettyprinter
 import Safe.Exact
 import Control.Exception (assert)
 import Safe.Partial
-import Data.Binary
+
+import Data.ByteString.Builder 
+import Data.Bits
 
 import Util
 import Count
@@ -24,6 +26,8 @@ import TapeSymbol
 import HaltProof
 import SimulateSkip
 import Graphs
+import Results
+import Mystery
 
 
 {-
@@ -68,7 +72,7 @@ is 5 bits / transition, which is 50 bits for size 5 = 7 bytes, and 60 bits for
 size 6 = 8 bytes. you can get size 5 down to 6 bytes by ommitting 2 bits, for example you 
 could assume the first trans is ?RB which saves 4 bits. to save more bits, you 
 could also encode the halting transition as 3 bits (which of the 8 transitions is it,
-assuming it is neither the first nor the second transition) which puts you to 43 bits. 
+assuming it is neither the first nor the second transition) which puts you to 44 bits. 
 that gives you 5 bits to use for the tag, which takes us from 8 bytes to 6 per 
 machine+tag, but that seems overkill. 
 bitpacked: 
@@ -142,3 +146,56 @@ decodeTrans n bs = error $ "decodeTrans: " <> show n <> " " <> show bs
 
 threeBitsToInt :: (Bool, Bool, Bool) -> Int
 threeBitsToInt (a,b,c) = bitSum [a,b,c]
+
+packWord16Word64 :: (Word16, Word16, Word16, Word16) -> Word64 
+packWord16Word64 (w, x, y, z) = let [a,b,c,d] = fromIntegral <$> [w,x,y,z]
+ in a `shiftL` 48 + b `shiftL` 32 + c `shiftL` 16 + d 
+
+unpackWord64Word16 :: Word64 -> (Word16, Word16, Word16, Word16)
+unpackWord64Word16 inpWord = let [a,b,c,d] = extractBits <$> [48, 32, 16, 0] in 
+  (a,b,c,d) where 
+  extractBits :: Int -> Word16 
+  extractBits b = fromIntegral $ inpWord `shiftR` b
+
+{-the Word8 is a tag with the following meanings. 
+  the Word64 is extra data that each tag above can use for anything. 
+0 -> halted. word64 is one number encoding number of steps to halt
+1 -> translated cycler. word64 is 3 word16s encoding starts-by, period, offset, and a blank one. 
+2 -> undecided. word64 is empty
+3 -> decided infinite by other means. word64 is empty
+_ -> reserved for later use
+
+-}
+bitEncodeSimResult :: Mystery TapeSymbol (SimResult InfCount) -> (Word8, Word64)
+bitEncodeSimResult (Mystery res) = case res of
+  Halted n _ft -> (0, fromIntegral n)
+  ContinueForever (LinRecur s p t) 
+    -> assert (all (\x -> x >= 0 && x <= fromIntegral (maxBound :: Word16)) [s,p,t])
+    (1, packWord16Word64 (fromIntegral s, fromIntegral p, fromIntegral t, 0))
+  Continue {} -> (2, 0)
+  ContinueForever _hp -> (3, 0)
+  MachineStuckRes -> error "machine stuck bit encode"
+
+data BitSimResult = BHalt Word64 | BLinRecur Word16 Word16 Word16 
+  | BContinue | BOtherInfinite deriving (Eq, Ord, Show, Generic) 
+instance NFData BitSimResult 
+
+bitDecodeSimResult :: Word8 -> Word64 -> BitSimResult
+bitDecodeSimResult tag info = case tag of 
+  0 -> BHalt info 
+  1 -> let (s, p, t, z) = unpackWord64Word16 info in assert (z == 0) BLinRecur s p t 
+  2 -> BContinue 
+  3 -> BOtherInfinite
+  _ -> error $ "bitdecodesimresult invalid tag: " <> show tag
+
+packRes :: (Turing, Mystery TapeSymbol (SimResult InfCount)) -> Builder 
+packRes (t, res) = let (w8, w64) = bitEncodeSimResult res in 
+  word64BE (encodeTM t) <> word8 w8 <> word64BE w64 
+
+bitPackResults :: [(Turing, Mystery TapeSymbol (SimResult InfCount))] -> Builder 
+bitPackResults res = mconcat $ packRes <$> res 
+
+--a series of lines, each line is first a machine string and then a json blob 
+--containing the simulation result
+resultsToText :: [(Turing, Mystery TapeSymbol (SimResult InfCount))] -> Text 
+resultsToText res = undefined 

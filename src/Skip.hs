@@ -21,10 +21,14 @@ import Relude.Extra
 
 import Control.Exception
 import Safe.Partial (Partial)
+import Data.Aeson
 
 --when the machine halts, there are two ends of the tape plus a thing we push in the middle
 data FinalTape c s = FinalTape ([(s, c)], [(s, c)]) (TapePush c Bit)
   deriving (Eq, Ord, Show, Generic)
+instance (ToJSON s, ToJSON c) => ToJSON (FinalTape c s) where 
+    toEncoding = genericToEncoding defaultOptions
+
 instance (NFData s, NFData c) => NFData (FinalTape c s) 
 
 --TODO write a pretty version
@@ -64,6 +68,8 @@ data TapePush c s = Side Dir [(s, c)]
                   | Middle (ExpTape s c) 
                   deriving (Eq, Ord, Show, Generic) 
 instance (NFData c, NFData s) => (NFData (TapePush c s))
+instance (ToJSON s, ToJSON c) => ToJSON (TapePush c s) where 
+    toEncoding = genericToEncoding defaultOptions
 
 instance Functor (TapePush c) where 
   fmap f = \case 
