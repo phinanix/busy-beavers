@@ -33,6 +33,8 @@ import HaltProof (HaltProof(Cycle))
 import Data.Complex
 import SimulateTwoBit
 import Data.Vector.Fixed.Mutable (IVector (..), MVector (..))
+import Data.Aeson
+import qualified Data.Vector
 
 
 
@@ -167,6 +169,12 @@ dispVecBit v = "|" <> mconcat (dispBit <$> V.toList v) <> "|"
 
 instance Arity n => Pretty (Vec n Bit) where
     pretty = pretty . dispVecBit
+
+instance Arity n => ToJSON (Vec n Bit) where 
+  toJSON :: Vec n Bit -> Value 
+  toJSON = V.foldl helper (Array Empty) where 
+    helper :: Value -> Bit -> Value 
+    helper (Array a) (Bit b) = Array $ Data.Vector.snoc a (Bool b)
 
 instance (Arity n) => TapeSymbol (Vec n Bit) where
   blank = V.replicate (Bit False)

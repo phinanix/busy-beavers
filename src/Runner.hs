@@ -14,7 +14,7 @@ import Safe.Exact
 import Control.Exception (assert)
 import Safe.Partial
 
-import Data.ByteString.Builder 
+import Data.ByteString.Builder
 import Data.Bits
 
 import Util
@@ -28,6 +28,10 @@ import SimulateSkip
 import Graphs
 import Results
 import Mystery
+import Notation
+import Data.Aeson
+import Data.Text.Lazy.Builder (fromText, toLazyText)
+import Data.Aeson.Text
 
 
 {-
@@ -147,14 +151,14 @@ decodeTrans n bs = error $ "decodeTrans: " <> show n <> " " <> show bs
 threeBitsToInt :: (Bool, Bool, Bool) -> Int
 threeBitsToInt (a,b,c) = bitSum [a,b,c]
 
-packWord16Word64 :: (Word16, Word16, Word16, Word16) -> Word64 
+packWord16Word64 :: (Word16, Word16, Word16, Word16) -> Word64
 packWord16Word64 (w, x, y, z) = let [a,b,c,d] = fromIntegral <$> [w,x,y,z]
- in a `shiftL` 48 + b `shiftL` 32 + c `shiftL` 16 + d 
+ in a `shiftL` 48 + b `shiftL` 32 + c `shiftL` 16 + d
 
 unpackWord64Word16 :: Word64 -> (Word16, Word16, Word16, Word16)
-unpackWord64Word16 inpWord = let [a,b,c,d] = extractBits <$> [48, 32, 16, 0] in 
-  (a,b,c,d) where 
-  extractBits :: Int -> Word16 
+unpackWord64Word16 inpWord = let [a,b,c,d] = extractBits <$> [48, 32, 16, 0] in
+  (a,b,c,d) where
+  extractBits :: Int -> Word16
   extractBits b = fromIntegral $ inpWord `shiftR` b
 
 {-the Word8 is a tag with the following meanings. 
@@ -169,33 +173,49 @@ _ -> reserved for later use
 bitEncodeSimResult :: Mystery TapeSymbol (SimResult InfCount) -> (Word8, Word64)
 bitEncodeSimResult (Mystery res) = case res of
   Halted n _ft -> (0, fromIntegral n)
-  ContinueForever (LinRecur s p t) 
+  ContinueForever (LinRecur s p t)
     -> assert (all (\x -> x >= 0 && x <= fromIntegral (maxBound :: Word16)) [s,p,t])
     (1, packWord16Word64 (fromIntegral s, fromIntegral p, fromIntegral t, 0))
   Continue {} -> (2, 0)
   ContinueForever _hp -> (3, 0)
   MachineStuckRes -> error "machine stuck bit encode"
 
-data BitSimResult = BHalt Word64 | BLinRecur Word16 Word16 Word16 
-  | BContinue | BOtherInfinite deriving (Eq, Ord, Show, Generic) 
-instance NFData BitSimResult 
+data BitSimResult = BHalt Word64 | BLinRecur Word16 Word16 Word16
+  | BContinue | BOtherInfinite deriving (Eq, Ord, Show, Generic)
+instance NFData BitSimResult
 
 bitDecodeSimResult :: Word8 -> Word64 -> BitSimResult
-bitDecodeSimResult tag info = case tag of 
-  0 -> BHalt info 
-  1 -> let (s, p, t, z) = unpackWord64Word16 info in assert (z == 0) BLinRecur s p t 
-  2 -> BContinue 
+bitDecodeSimResult tag info = case tag of
+  0 -> BHalt info
+  1 -> let (s, p, t, z) = unpackWord64Word16 info in assert (z == 0) BLinRecur s p t
+  2 -> BContinue
   3 -> BOtherInfinite
   _ -> error $ "bitdecodesimresult invalid tag: " <> show tag
 
-packRes :: (Turing, Mystery TapeSymbol (SimResult InfCount)) -> Builder 
-packRes (t, res) = let (w8, w64) = bitEncodeSimResult res in 
-  word64BE (encodeTM t) <> word8 w8 <> word64BE w64 
+packRes :: (Turing, Mystery TapeSymbol (SimResult InfCount)) -> Builder
+packRes (t, res) = let (w8, w64) = bitEncodeSimResult res in
+  word64BE (encodeTM t) <> word8 w8 <> word64BE w64
 
-bitPackResults :: [(Turing, Mystery TapeSymbol (SimResult InfCount))] -> Builder 
-bitPackResults res = mconcat $ packRes <$> res 
+bitPackResults :: [(Turing, Mystery TapeSymbol (SimResult InfCount))] -> Builder
+bitPackResults res = mconcat $ packRes <$> res
 
 --a series of lines, each line is first a machine string and then a json blob 
 --containing the simulation result
-resultsToText :: [(Turing, Mystery TapeSymbol (SimResult InfCount))] -> Text 
-resultsToText res = undefined 
+resultsToText :: [(Turing, Mystery TapeSymbol (SimResult InfCount))] -> _
+resultsToText results = toLazyText $ foldMap mkLine results where
+  mkLine :: (Turing, Mystery TapeSymbol (SimResult InfCount)) -> _
+  mkLine (m, Mystery res)
+    = fromText (machineToNotation m <> " ") <> encodeToTextBuilder res
+
+{-
+draft overall runner loop
+so it's overall quite similar to "outerLoop"
+it takes tactics and a list of machines, and it outputs 
+3 files: bitpacked, json, and undecided machines as text. 
+it names these according to a scheme involving an "experiment name"
+and outputs them every X machines, for a given number X. 
+
+separately, there is a function which aggregates all the files from a run 
+into a single file, and a function which prints out run statistics in various 
+ways. 
+-}

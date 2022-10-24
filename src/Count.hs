@@ -16,6 +16,7 @@ import Util
 import Prettyprinter
 import Safe.Partial
 import Relude.Extra (bimapBoth)
+import Data.Aeson
 
 --a variable with logical type positive integer which is "undergoing universal
 -- generalization" - when you step inside the ∀x . Q(x), the x
@@ -24,6 +25,9 @@ newtype SymbolVar = SymbolVar Int
 getSymbol :: SymbolVar -> Int
 getSymbol (SymbolVar i) = i
 instance NFData SymbolVar
+instance ToJSONKey SymbolVar
+instance ToJSON SymbolVar where 
+  toEncoding = genericToEncoding defaultOptions
 
 --a variable with logical type positive integer which is (implicitly) quantified
 -- / bound by a forall quantifier at the beginning of the sentence
@@ -32,6 +36,9 @@ newtype BoundVar = BoundVar Int
 getBoundVar :: BoundVar -> Int
 getBoundVar (BoundVar i) = i
 instance NFData BoundVar
+instance ToJSONKey BoundVar
+instance ToJSON BoundVar where 
+  toEncoding = genericToEncoding defaultOptions
 
 --a variable with logical type "s", the type variable of symbols on the tape which
 --is implicitly forall quantified
@@ -63,6 +70,10 @@ data Count = Count
   , bound :: MMap BoundVar (Sum Natural)
   } deriving (Eq, Generic)
 instance NFData Count
+instance ToJSON a => ToJSON (Sum a) where
+  toEncoding = genericToEncoding defaultOptions
+instance ToJSON Count where 
+  toEncoding = genericToEncoding defaultOptions
 
 pattern One :: Count
 pattern One = Count 1 Empty Empty
@@ -125,6 +136,8 @@ instance Pretty Count where
 --infinity comes second so it's bigger than NotInfinity
 data InfCount = NotInfinity Count | Infinity deriving (Eq, Ord, Show, Generic)
 instance NFData InfCount
+instance ToJSON InfCount where 
+  toEncoding = genericToEncoding defaultOptions
 
 pattern IOne :: InfCount
 pattern IOne = NotInfinity One

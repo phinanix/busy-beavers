@@ -20,6 +20,7 @@ import Notation (dispTuring)
 import Mystery
 import Glue (Leftover (..), remainingLonger)
 import ExpTape (invariantifyList)
+import Data.Aeson
 
 
 
@@ -58,7 +59,7 @@ mapBook f book = M.mapKeys fKey $ fVal <$> book where
   fVal :: Map (Skip Count s) (SkipOrigin s) -> Map (Skip Count t) (SkipOrigin t)
   fVal = M.mapKeys (fmap f) . fmap (mapSO f)
 
-class (Ord s, Show s, Pretty s, Typeable s, NFData s) => TapeSymbol s where
+class (Ord s, Show s, Pretty s, Typeable s, NFData s, ToJSON s) => TapeSymbol s where
   blank :: s
   allSymbols :: [s]
   getPoint :: s -> Bit -- the thing under the machinehead at the point

@@ -20,6 +20,7 @@ import Simulate (TMState(..), PartialStepResult(..))
 import TapeSymbol
 import Tape
 import HaltProof (HaltProof(Cycle))
+import Data.Aeson
 {-
 because we're on the left of the twobit, we can split transitions into two groups:
 1) the transitions where we step left right away, where we need to make a skip for every
@@ -183,6 +184,8 @@ etTwoBitToBit (ExpTape lpairs (TwoBit p r) rpairs) = let
 
 data TwoBit = TwoBit Bit Bit deriving (Eq, Ord, Show, Generic)
 instance (NFData TwoBit)
+instance ToJSON TwoBit where 
+  toEncoding = genericToEncoding defaultOptions
 
 dispTwoBit :: TwoBit -> Text
 dispTwoBit (TwoBit x y) = "|" <> dispBit x <> dispBit y <> "|"
