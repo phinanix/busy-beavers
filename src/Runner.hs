@@ -14,9 +14,11 @@ import Safe.Exact
 import Control.Exception (assert)
 import Safe.Partial
 
-import Data.ByteString.Builder
+import Data.ByteString.Builder as BS
 import Data.Bits
 
+import qualified Data.Vector as V
+import qualified Data.Text.Lazy.IO as TIO
 import Util
 import Count
 import Skip
@@ -32,6 +34,8 @@ import Notation
 import Data.Aeson
 import Data.Text.Lazy.Builder (fromText, toLazyText)
 import Data.Aeson.Text
+import OuterLoop
+import System.IO (withBinaryFile)
 
 
 {-
@@ -207,6 +211,9 @@ resultsToText results = toLazyText $ foldMap mkLine results where
   mkLine (m, Mystery res)
     = fromText (machineToNotation m <> " ") <> encodeToTextBuilder res
 
+machinesToText :: [Turing] -> Text
+machinesToText = T.intercalate "\n" . fmap machineToNotation
+
 {-
 draft overall runner loop
 so it's overall quite similar to "outerLoop"
@@ -214,8 +221,57 @@ it takes tactics and a list of machines, and it outputs
 3 files: bitpacked, json, and undecided machines as text. 
 it names these according to a scheme involving an "experiment name"
 and outputs them every X machines, for a given number X. 
+NAME_i_bin.bin 
+NAME_i_json.json 
+NAME_i_undecided.txt 
+NAME_i_checkpoint.txt 
 
 separately, there is a function which aggregates all the files from a run 
 into a single file, and a function which prints out run statistics in various 
 ways. 
 -}
+
+--tactics, machines to run, experiment name (for filename), machines per "chunk"
+runnerDotPy :: V.Vector Tactic -> [Turing] -> Text -> Int -> IO ()
+runnerDotPy tacticList startMachines experimentName chunkSize 
+  = loop ((,0) <$> startMachines) [] 0
+  where
+  loop :: [(Turing, Int)]
+    -- results obtained so far 
+    -> [(Turing, Mystery TapeSymbol (SimResult InfCount))]
+    -- next file to output
+    -> Int
+    -> IO ()
+  loop [] res i = outputFiles i [] res
+  loop todos res@((>= chunkSize) . length -> True) i = do 
+    outputFiles i (fst <$> todos) res 
+    loop todos [] (i+1)
+  loop ((tm, n) : todos) curRes i
+    = --trace ("remTodo: " <> show (length todos)) $ -- <> " len res: " <> show (length curRes)) $ 
+    case tacticList V.!? n of
+    -- TODO: how to get a "we failed" result / let's do a better one than this
+    Nothing -> let newRes = Mystery $ Continue 0 (Phase 0) (initExpTape (Bit False)) 0 in
+      loop todos ((tm, newRes) : curRes) i
+    Just (OneShot f) -> case f tm of
+      Nothing -> loop ((tm, n+1): todos) curRes i
+      Just (Left e) -> let branchMachines = branchOnEdge e tm in
+        loop (((,n) <$> branchMachines) ++ todos) curRes i
+      Just (Right r) -> loop todos ((tm, r) : curRes) i
+    Just (Simulation f) -> case f tm of
+      (newTMs, newRes) -> loop (((,n+1) <$> newTMs) ++ todos) (newRes ++ curRes) i
+
+  outputFiles :: Int -> [Turing]
+    -> [(Turing, Mystery TapeSymbol (SimResult InfCount))] -> IO ()
+  outputFiles i todo results = do
+    --third line copied from bytestrings 0.11 since we have 0.10;
+    --should be written as "writeFile"
+    let binBuilder = bitPackResults results
+        binFileName = toString $ filePrefix <> "bin.bin"
+    withBinaryFile binFileName WriteMode (`hPutBuilder` binBuilder)
+    TIO.writeFile (toString $ filePrefix <> "json.json") $ resultsToText results
+    TIO.writeFile (toString $ filePrefix <> "undecided.txt") $
+      fromStrict $ machinesToText $ getContinues results
+    TIO.writeFile (toString $ filePrefix <> "checkpoint.txt") $
+      fromStrict $ machinesToText todo
+    where
+      filePrefix = experimentName <> "_" <> show i <> "_"
