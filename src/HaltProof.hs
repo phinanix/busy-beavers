@@ -34,6 +34,7 @@ import Data.Aeson
 --methods and contain more info and stuff
 data HaltProof s
   = HaltUnreachable Phase
+  --(start, period)
   | Cycle Steps Steps
   | OffToInfinityN Steps Dir
   | BackwardSearch

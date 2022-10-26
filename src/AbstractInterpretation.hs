@@ -24,9 +24,13 @@ import TapeSymbol
 import HaltProof
 import SimulateSkip
 import Graphs
+import Data.Aeson hiding (Success)
 
 data AbsAny s = Base !s | MultipleAny deriving (Eq, Ord, Show, Generic)
 instance (NFData s) => NFData (AbsAny s)
+
+instance ToJSON s => ToJSON (AbsAny s) where 
+  toEncoding = genericToEncoding defaultOptions
 
 dispAbsAny :: (Pretty s) => AbsAny s -> Text
 dispAbsAny = \case

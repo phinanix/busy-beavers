@@ -178,11 +178,14 @@ bitEncodeSimResult :: Mystery TapeSymbol (SimResult InfCount) -> (Word8, Word64)
 bitEncodeSimResult (Mystery res) = case res of
   Halted n _ft -> (0, fromIntegral n)
   ContinueForever (LinRecur s p t)
-    -> assert (all (\x -> x >= 0 && x <= fromIntegral (maxBound :: Word16)) [s,p,t])
-    (1, packWord16Word64 (fromIntegral s, fromIntegral p, fromIntegral t, 0))
+    -> packLR s p t
+  ContinueForever (Cycle s p) -> packLR s p 0
   Continue {} -> (2, 0)
   ContinueForever _hp -> (3, 0)
   MachineStuckRes -> error "machine stuck bit encode"
+  where 
+    packLR s p t = assert (all (\x -> x >= 0 && x <= fromIntegral (maxBound :: Word16)) [s,p,t])
+      (1, packWord16Word64 (fromIntegral s, fromIntegral p, fromIntegral t, 0))
 
 data BitSimResult = BHalt Word64 | BLinRecur Word16 Word16 Word16
   | BContinue | BOtherInfinite deriving (Eq, Ord, Show, Generic)
@@ -206,11 +209,20 @@ bitPackResults res = mconcat $ packRes <$> res
 --a series of lines, each line is first a machine string and then a json blob 
 --containing the simulation result
 resultsToText :: [(Turing, Mystery TapeSymbol (SimResult InfCount))] -> _
-resultsToText results = toLazyText $ foldMap mkLine results where
+resultsToText results = toLazyText $ foldMap mkLine $ filter (not . resIsBin . snd) results where
   mkLine :: (Turing, Mystery TapeSymbol (SimResult InfCount)) -> _
   mkLine (m, Mystery res)
-    = fromText (machineToNotation m <> " ") <> encodeToTextBuilder res
-
+    = fromText (machineToNotation m <> " ") <> encodeToTextBuilder res <> fromText "\n"
+  resIsBin :: Mystery TapeSymbol (SimResult InfCount) -> Bool 
+  resIsBin (Mystery res) = case res of
+    Halted{} -> True 
+    Continue{} -> True
+    ContinueForever hp -> case hp of 
+      LinRecur{} -> True
+      Cycle{} -> True
+      _ -> False 
+    MachineStuckRes -> error "machinestuck in resisbin"
+    
 machinesToText :: [Turing] -> Text
 machinesToText = T.intercalate "\n" . fmap machineToNotation
 
@@ -229,6 +241,16 @@ NAME_i_checkpoint.txt
 separately, there is a function which aggregates all the files from a run 
 into a single file, and a function which prints out run statistics in various 
 ways. 
+-}
+
+{-
+TODO: 
+make utility for running runnerDotPy from command line to make folder
+make scripts to aggregate files into 1 file
+make scripts to display files
+make a tactic whose job it is to split up the tree
+better rep for counts?
+make vec n decodable (somehow?)
 -}
 
 --tactics, machines to run, experiment name (for filename), machines per "chunk"
@@ -263,10 +285,13 @@ runnerDotPy tacticList startMachines experimentName chunkSize
   outputFiles :: Int -> [Turing]
     -> [(Turing, Mystery TapeSymbol (SimResult InfCount))] -> IO ()
   outputFiles i todo results = do
-    --third line copied from bytestrings 0.11 since we have 0.10;
-    --should be written as "writeFile"
+    let msg = "writing " <> show (length results) <> " to disk\n"
+          <> show (length todo) <> " machines remain to do, saved in checkpoint\n"
+    putText msg
     let binBuilder = bitPackResults results
         binFileName = toString $ filePrefix <> "bin.bin"
+    --line copied from bytestrings 0.11 since we have 0.10;
+    --should be written as "writeFile"
     withBinaryFile binFileName WriteMode (`hPutBuilder` binBuilder)
     TIO.writeFile (toString $ filePrefix <> "json.json") $ resultsToText results
     TIO.writeFile (toString $ filePrefix <> "undecided.txt") $

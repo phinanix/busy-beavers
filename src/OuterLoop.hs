@@ -238,6 +238,18 @@ basicSimLoop = let limit = 1999 in simulation $
     , runAtCount limit proveByIndV1
     ])
 
+simpleSimLoop :: Tactic
+simpleSimLoop = let limit = 150 in simulation $ 
+  simLoop (limit + 1) $ simulateStepPartial maxInt :| 
+    (liftOneToMulti <$> 
+    [checkSeenBefore @Bit 
+    , liftModifyState recordHist
+    , liftModifyState recordDispHist
+    , fastLRCheckAction
+    , runAtCount limit addSinglePairRule
+    , runAtCount limit proveSimply
+    ])
+
 oldtwoBitSimLoop :: Tactic
 oldtwoBitSimLoop = simulation @TwoBit $ simLoop 300 $ simulateStepPartial maxInt :| 
   (liftOneToMulti <$> [checkSeenBefore
@@ -302,6 +314,9 @@ fiveBitSimLoop = simulation @(Vec 5 Bit) baseSimLoop
 
 sixBitSimLoop :: Tactic
 sixBitSimLoop = simulation @(Vec 6 Bit) baseSimLoop
+
+fastTacticVector :: V.Vector Tactic
+fastTacticVector = V.fromList [simpleSimLoop]
 
 basicTacticVector :: V.Vector Tactic 
 basicTacticVector = V.fromList [basicSimLoop, twoBitSimLoop, threeBitSimLoop] --, tacticBackwardSearch]

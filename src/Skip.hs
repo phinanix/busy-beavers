@@ -335,7 +335,7 @@ matchTwoTapes (lsS, lsT) (rsS, rsT) = case (unsnoc lsS, unsnoc rsS) of
       let lRes = ESkipLeft $ skipLs ++ [(lSlastS, lSlastC)]
       rRes <- lastVarOneSide map (rSlastS, rSlastC) rTapeHead rTapeRest
       pure (lRes, rRes)
-    Equations (Right (map, (TapeLeft (lTapeHead :| lTapeRest), ESkipLeft skipRs))) -> trace ("hitem") $ do 
+    Equations (Right (map, (TapeLeft (lTapeHead :| lTapeRest), ESkipLeft skipRs))) -> do 
       lRes <- lastVarOneSide map (lSlastS, lSlastC) lTapeHead lTapeRest 
       let rRes = ESkipLeft $ skipRs ++ [(rSlastS, rSlastC)]
       pure (lRes, rRes)

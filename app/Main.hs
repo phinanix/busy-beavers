@@ -1,6 +1,7 @@
 module Main where
 
 import Relude
+import qualified Relude.Unsafe as U
 
 import Control.Lens
 import qualified Data.Text as T
@@ -31,8 +32,10 @@ import Scaffold
 
 import System.IO (openFile, hGetContents, hClose)
 import Control.Exception
+import Runner
+import Data.Char
 
-
+--interactive program that lets you display machines that are not solved 
 simProgram :: (Pretty s, Pretty c, Show s, Show c) => Results c s  -> IO ()
 simProgram results = do
   hSetBuffering stdout NoBuffering
@@ -58,47 +61,6 @@ simProgram results = do
                 putTextLn $ showOneMachine machine steps
                 interact r
 
-
---TODO:: test skip gluing logic
---TODO:: write skip-proves-infinity logic
---TODO:: fix end-of-tape detection issue --seraphina two months later doesn't remember what this is
---TODO:: make simple induction
---TODO:: make macro machine simulator
---TODO:: make database that stores results of machines, so that results can be compared between different runs
-
---above todos are old 
---planet — Today at 9:52 PM (3 Oct 2021)
---next Todos: 
---see if it can actually prove said inductions 
---add in logic to detect when an induction means a machine will run forever
---add in cycle checking
---that will leave the only size 3 machine that is unproven the checkerboard sweeper, I think
---
---next todos, rewritten: 
--- -- figure out how to make induction guesser guess things of the right length in/out
--- attempt to connect induction guesser to induction prover
--- when we prove new skips, add logic to detect when that skip proves a machine will run forever
--- -- make the simulateMultipleMachinesOuterLoop function
--- -- using the history feature, check if we ever cycle and use that as a proof of nonhalting 
--- 
--- add the monad that is used to generate fresh bound and symbol variables 
--- check the backwards search code works ok 
--- add backwards search to skip-based sim
--- -- add end-of-tape heuristic to skip-based sim (I think maybe glueing actually just accomplishes this)
---
--- more todos
--- -- add deflection to left and right tracking (added to skips, now just need to add to simstate / applyskip)
--- -- use deflection tracking to do the end of tape cycle guesser right
--- -- use deflection tracking to do the better induction guesser 
-
--- more todos 27 nov 
--- fix step and displacement tracking in induction guesser / prover
--- select between different successful inductions via total number of steps?
--- split bw search into DFS and graph-gen so it can be better tested
--- make induction guesser use the "guesswhathappensnext" feature to get unstuck
--- make induction guesser "finish the proof" once it is unstuck, 
---       so it can prove inductions with the same sig in and out
--- integrate induction guesser into overall simulation loop; tune it 
 
 readFile :: String -> IO String
 readFile filename = do
@@ -131,6 +93,7 @@ tacticVectors = M.fromList
   , ("constructive", constructiveVector)
   , ("noncon", nonconVector)
   , ("abs", absVector)
+  , ("fast", fastTacticVector)
   ]
 
 putMachinesInFile :: [Turing] -> String -> IO ()
@@ -138,6 +101,8 @@ putMachinesInFile ms fn = do
   let machineString = T.intercalate "\n" $ machineToNotation <$> ms
   TIO.writeFile fn machineString
 
+--interactive program which lets you read machines from a file, apply a named tactic, and write machiens
+--to another file which are not solved
 processMachinesViaArgs :: IO ()
 processMachinesViaArgs = do
   args <- getArgs
@@ -155,11 +120,60 @@ processMachinesViaArgs = do
   putText $ "finished with " <> show (length unprovenMachines) 
     <> " machines not proven, written to file\n"
 
+{-
+CLI for runnerDotPy
+experimentName
+tacticName 
+chunkSize 
+inputMachines --todo 
+
+inputMachines either ends with `.txt` in which case it is interpreted as a 
+plain text list of machines, one per line
+or does not, in which case it must be of the form seed_x_y where x is 0 or 1
+and y is a single digit. x is the symbol that the machine writes on the 
+first step, and y is the number of states to enumerate. 
+-}
+
+usageMessage :: Text 
+usageMessage = "usage: stack exec busy-beavers-exe experimentName tacticName chunkSize inputMachines" 
+  <> "\ninputMachines: either a .txt or seed_bit_stateCount\n" 
+
+getMachines :: String -> IO [Turing] 
+getMachines inputMachineString = if ".txt" == reverse (take 4 (reverse inputMachineString))
+  then loadMachinesFromFile inputMachineString
+  else case inputMachineString of 
+    ['s', 'e', 'e', 'd', '_', bit, '_', numStates] -> 
+      let machineFunc = case bit of 
+            '0' -> startMachine0 
+            '1' -> startMachine1 
+            _ -> invalidStr 
+      in 
+      pure [machineFunc (digitToInt numStates)]
+    _ -> invalidStr 
+    where 
+    invalidStr :: a 
+    invalidStr = error $ fromString $ inputMachineString <> " is not a valid machine string"
+
+runnerDotPyFromArgs :: IO () 
+runnerDotPyFromArgs = do 
+  args <- getArgs 
+  case args of 
+    [experimentName, tacticName, chunkSizeString, inputMachineString] -> do 
+        let chunkSize :: Int = U.read chunkSizeString
+            tacticVec = tacticVectors ^?! ix tacticName 
+        inputMachines <- getMachines inputMachineString
+        let inputMessage = "recieved " <> show (length inputMachines) 
+              <> " machines as input. running: " <> fromString tacticName
+              <> "\n"
+        putText inputMessage
+        runnerDotPy tacticVec inputMachines (fromString experimentName) chunkSize
+        putText inputMessage
+
+    _ -> putText usageMessage
 
 main :: IO ()
 main = do
-
-  processMachinesViaArgs
+  runnerDotPyFromArgs
 
   -- let results = Simulate.simulate 100 $ startMachine1 4
   -- simProgram dispTape results
