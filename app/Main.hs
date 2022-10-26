@@ -34,6 +34,7 @@ import System.IO (openFile, hGetContents, hClose)
 import Control.Exception
 import Runner
 import Data.Char
+import Data.List (isSuffixOf)
 
 --interactive program that lets you display machines that are not solved 
 simProgram :: (Pretty s, Pretty c, Show s, Show c) => Results c s  -> IO ()
@@ -139,7 +140,7 @@ usageMessage = "usage: stack exec busy-beavers-exe experimentName tacticName chu
   <> "\ninputMachines: either a .txt or seed_bit_stateCount\n" 
 
 getMachines :: String -> IO [Turing] 
-getMachines inputMachineString = if ".txt" == reverse (take 4 (reverse inputMachineString))
+getMachines inputMachineString = if ".txt" `isSuffixOf` inputMachineString
   then loadMachinesFromFile inputMachineString
   else case inputMachineString of 
     ['s', 'e', 'e', 'd', '_', bit, '_', numStates] -> 
@@ -168,6 +169,7 @@ runnerDotPyFromArgs = do
         putText inputMessage
         runnerDotPy tacticVec inputMachines (fromString experimentName) chunkSize
         putText inputMessage
+        aggregateFiles experimentName
 
     _ -> putText usageMessage
 

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 304769d7d4b1a21a2a42fbf04c2c824da7f514cf09dfafc22a5aef22c2113005
+-- hash: 3c7fcaa3669812404d75ec226d5ab97c3d00538afc3ca76811754eedc5542092
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -114,6 +114,7 @@ library
     , bifunctors
     , constraints
     , containers
+    , directory
     , either
     , fixed-vector
     , hspec

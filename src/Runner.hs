@@ -16,6 +16,7 @@ import Safe.Partial
 
 import Data.ByteString.Builder as BS
 import Data.Bits
+import qualified Data.ByteString.Lazy as BL 
 
 import qualified Data.Vector as V
 import qualified Data.Text.Lazy.IO as TIO
@@ -36,6 +37,8 @@ import Data.Text.Lazy.Builder (fromText, toLazyText)
 import Data.Aeson.Text
 import OuterLoop
 import System.IO (withBinaryFile)
+import System.Directory
+import Data.List (isSuffixOf)
 
 
 {-
@@ -183,7 +186,7 @@ bitEncodeSimResult (Mystery res) = case res of
   Continue {} -> (2, 0)
   ContinueForever _hp -> (3, 0)
   MachineStuckRes -> error "machine stuck bit encode"
-  where 
+  where
     packLR s p t = assert (all (\x -> x >= 0 && x <= fromIntegral (maxBound :: Word16)) [s,p,t])
       (1, packWord16Word64 (fromIntegral s, fromIntegral p, fromIntegral t, 0))
 
@@ -213,16 +216,16 @@ resultsToText results = toLazyText $ foldMap mkLine $ filter (not . resIsBin . s
   mkLine :: (Turing, Mystery TapeSymbol (SimResult InfCount)) -> _
   mkLine (m, Mystery res)
     = fromText (machineToNotation m <> " ") <> encodeToTextBuilder res <> fromText "\n"
-  resIsBin :: Mystery TapeSymbol (SimResult InfCount) -> Bool 
+  resIsBin :: Mystery TapeSymbol (SimResult InfCount) -> Bool
   resIsBin (Mystery res) = case res of
-    Halted{} -> True 
+    Halted{} -> True
     Continue{} -> True
-    ContinueForever hp -> case hp of 
+    ContinueForever hp -> case hp of
       LinRecur{} -> True
       Cycle{} -> True
-      _ -> False 
+      _ -> False
     MachineStuckRes -> error "machinestuck in resisbin"
-    
+
 machinesToText :: [Turing] -> Text
 machinesToText = T.intercalate "\n" . fmap machineToNotation
 
@@ -255,18 +258,19 @@ make vec n decodable (somehow?)
 
 --tactics, machines to run, experiment name (for filename), machines per "chunk"
 runnerDotPy :: V.Vector Tactic -> [Turing] -> Text -> Int -> IO ()
-runnerDotPy tacticList startMachines experimentName chunkSize 
+runnerDotPy tacticList startMachines experimentName chunkSize
   = loop ((,0) <$> startMachines) [] 0
   where
+  filePrefix i = experimentName <> "_" <> show i <> "_"
   loop :: [(Turing, Int)]
     -- results obtained so far 
     -> [(Turing, Mystery TapeSymbol (SimResult InfCount))]
     -- next file to output
     -> Int
     -> IO ()
-  loop [] res i = outputFiles i [] res
-  loop todos res@((>= chunkSize) . length -> True) i = do 
-    outputFiles i (fst <$> todos) res 
+  loop [] res i = outputFiles (filePrefix i) [] res
+  loop todos res@((>= chunkSize) . length -> True) i = do
+    outputFiles (filePrefix i) (fst <$> todos) res
     loop todos [] (i+1)
   loop ((tm, n) : todos) curRes i
     = --trace ("remTodo: " <> show (length todos)) $ -- <> " len res: " <> show (length curRes)) $ 
@@ -282,21 +286,54 @@ runnerDotPy tacticList startMachines experimentName chunkSize
     Just (Simulation f) -> case f tm of
       (newTMs, newRes) -> loop (((,n+1) <$> newTMs) ++ todos) (newRes ++ curRes) i
 
-  outputFiles :: Int -> [Turing]
-    -> [(Turing, Mystery TapeSymbol (SimResult InfCount))] -> IO ()
-  outputFiles i todo results = do
-    let msg = "writing " <> show (length results) <> " to disk\n"
-          <> show (length todo) <> " machines remain to do, saved in checkpoint\n"
-    putText msg
-    let binBuilder = bitPackResults results
-        binFileName = toString $ filePrefix <> "bin.bin"
-    --line copied from bytestrings 0.11 since we have 0.10;
-    --should be written as "writeFile"
-    withBinaryFile binFileName WriteMode (`hPutBuilder` binBuilder)
-    TIO.writeFile (toString $ filePrefix <> "json.json") $ resultsToText results
-    TIO.writeFile (toString $ filePrefix <> "undecided.txt") $
-      fromStrict $ machinesToText $ getContinues results
-    TIO.writeFile (toString $ filePrefix <> "checkpoint.txt") $
-      fromStrict $ machinesToText todo
-    where
-      filePrefix = experimentName <> "_" <> show i <> "_"
+outputFiles :: Text -> [Turing]
+  -> [(Turing, Mystery TapeSymbol (SimResult InfCount))] -> IO ()
+outputFiles filePrefix todo results = do
+  let msg = "writing " <> show (length results) <> " to disk\n"
+  putText msg
+  let binBuilder = bitPackResults results
+      binFileName = toString $ filePrefix <> "bin.bin"
+  --line copied from bytestrings 0.11 since we have 0.10;
+  --should be written as "writeFile"
+  withBinaryFile binFileName WriteMode (`hPutBuilder` binBuilder)
+  TIO.writeFile (toString $ filePrefix <> "json.json") $ resultsToText results
+  TIO.writeFile (toString $ filePrefix <> "undecided.txt") $
+    fromStrict $ machinesToText $ getContinues results
+  if not (null todo) then do
+      let chkptMessage = show (length todo) <> " machines remain to do, saved in checkpoint\n"
+      putText chkptMessage
+      TIO.writeFile (toString $ filePrefix <> "checkpoint.txt") $
+        fromStrict $ machinesToText todo
+    else pure ()
+  
+{-
+a utility which takes an experiment's name, for each file type collects all the
+files of that type and aggregates them into one file named with the prefix 
+NAME_all
+-}
+
+aggregateTextFiles :: [FilePath] -> FilePath -> IO () 
+aggregateTextFiles fnsIn fnOut = do 
+  allContents <- traverse TIO.readFile fnsIn
+  traverse_ (TIO.appendFile fnOut) allContents   
+  
+aggregateBinaryFiles :: [FilePath] -> FilePath -> IO () 
+aggregateBinaryFiles fnsIn fnOut = do 
+  allContents <- traverse BL.readFile fnsIn
+  traverse_ (BL.appendFile fnOut) allContents   
+
+aggregateFiles :: String -> IO ()
+aggregateFiles experimentName = do 
+  dirContents <- listDirectory "."
+  let toAggregate = filter (\s -> experimentName `isPrefixOf` s) dirContents  
+  let binaryFiles = filter (\s -> "bin.bin" `isSuffixOf` s) toAggregate
+  let jsonFiles = filter (\s -> "json.json" `isSuffixOf` s) toAggregate
+  let undecidedFiles = filter (\s -> "undecided.txt" `isSuffixOf` s) toAggregate
+  assert (length binaryFiles == length jsonFiles 
+    && length jsonFiles == length undecidedFiles) 
+    putText $ "aggregating " <> show (length binaryFiles) <> " files\n"
+  aggregateBinaryFiles binaryFiles $ experimentName <> "_all_bin.bin"
+  aggregateTextFiles jsonFiles $ experimentName <> "_all_json.json"
+  aggregateTextFiles undecidedFiles $ experimentName <> "_all_undecided.txt"
+
+
