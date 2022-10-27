@@ -13,13 +13,16 @@ import Prettyprinter
 import Safe.Exact
 import Control.Exception (assert)
 import Safe.Partial
+import Data.Binary.Get 
 
 import Data.ByteString.Builder as BS
 import Data.Bits
 import qualified Data.ByteString.Lazy as BL
 
 import qualified Data.Vector as V
-import qualified Data.Text.Lazy.IO as TIO
+import qualified Data.Text.Lazy.IO as TLIO
+import qualified Data.Text.IO as TIO
+
 import Util
 import Count
 import Skip
@@ -296,13 +299,13 @@ outputFiles filePrefix todo results = do
   --line copied from bytestrings 0.11 since we have 0.10;
   --should be written as "writeFile"
   withBinaryFile binFileName WriteMode (`hPutBuilder` binBuilder)
-  TIO.writeFile (toString $ filePrefix <> "json.json") $ resultsToText results
-  TIO.writeFile (toString $ filePrefix <> "undecided.txt") $
+  TLIO.writeFile (toString $ filePrefix <> "json.json") $ resultsToText results
+  TLIO.writeFile (toString $ filePrefix <> "undecided.txt") $
     fromStrict $ machinesToText $ getContinues results
   if not (null todo) then do
       let chkptMessage = show (length todo) <> " machines remain to do, saved in checkpoint\n"
       putText chkptMessage
-      TIO.writeFile (toString $ filePrefix <> "checkpoint.txt") $
+      TLIO.writeFile (toString $ filePrefix <> "checkpoint.txt") $
         fromStrict $ machinesToText todo
     else pure ()
 
@@ -314,8 +317,8 @@ NAME_all
 
 aggregateTextFiles :: [FilePath] -> FilePath -> IO ()
 aggregateTextFiles fnsIn fnOut = do
-  allContents <- traverse TIO.readFile fnsIn
-  traverse_ (TIO.appendFile fnOut) allContents
+  allContents <- traverse TLIO.readFile fnsIn
+  traverse_ (TLIO.appendFile fnOut) allContents
 
 aggregateBinaryFiles :: [FilePath] -> FilePath -> IO ()
 aggregateBinaryFiles fnsIn fnOut = do
@@ -338,4 +341,67 @@ aggregateFiles experimentName = do
   aggregateTextFiles jsonFiles $ experimentName <> "_all_json.json"
   aggregateTextFiles undecidedFiles $ experimentName <> "_all_undecided.txt"
 
+-- popWord64FromBS :: BL.ByteString -> Maybe (Word64, BL.ByteString)
+-- popWord64FromBS bs = if BL.null bs then Nothing else 
+--   Just $ first () $ iterate getWord ([], bs) U.!! 8 where 
+--     getWord :: ([Word8], BL.ByteString) -> ([Word8], BL.ByteString)
+--     getWord (words, bs) = case BL.uncons bs of 
+--       Nothing -> error "bytestring wrong length 3"
+--       Just (newWord, newBS) -> (newWord : words, newBS)
 
+getTMandResult :: Int -> Get (Turing, BitSimResult)
+getTMandResult numStates = do 
+  tmWord64 <- getWord64be
+  resWord8 <- getWord8
+  resWord64 <- getWord64be 
+  pure (decodeTM numStates tmWord64, 
+        bitDecodeSimResult resWord8 resWord64)
+       
+getManyItem :: Get a -> Get [a]
+getManyItem getOne = do 
+  consumedAll <- isEmpty 
+  if consumedAll 
+    then pure [] 
+    else do 
+      nextOne <- getOne 
+      (nextOne :) <$> getManyItem getOne 
+  
+
+-- popResultFromBS :: Int -> BL.ByteString 
+--   -> Maybe ((Turing, BitSimResult), BL.ByteString)
+-- popResultFromBS numStates bs = if BL.null bs then Nothing else
+--   case popWord64FromBS bs of 
+--   Nothing -> error "bs wrong length"
+--   Just (tmWord64, bs1) -> case BL.uncons bs1 of 
+--     Nothing -> error "bs wrong length 2"
+--     Just (fstResWord8, bs2) -> case popWord64FromBS bs2 of 
+--       Nothing -> error "bs wrong length 3"
+--       Just (sndResWord64, bsLeftover) 
+--         -> Just ((decodeTM numStates tmWord64, 
+--                   bitDecodeSimResult fstResWord8 sndResWord64),
+--                  bsLeftover)
+
+loadBinaryFile :: Int -> FilePath -> IO [(Turing, BitSimResult)]
+loadBinaryFile numStates fp = do
+  rawBytestring <- BL.readFile fp
+  --pure $ unfoldr (popResultFromBS numStates) rawBytestring
+  pure $ runGet (getManyItem (getTMandResult numStates)) rawBytestring
+
+loadJSONFile :: FilePath -> IO [(Turing, Mystery TapeSymbol (SimResult InfCount))]
+loadJSONFile fp = undefined 
+
+loadMachinesFromFile :: String -> IO [Turing]
+loadMachinesFromFile fn = do
+  fileContents <- TIO.readFile fn
+  pure $ unm <$> lines fileContents
+
+--bitpacked machines, json machines, and undecided machines
+loadAggregatedExperimentFiles :: Int -> String 
+  -> IO ([(Turing, BitSimResult)], 
+         [(Turing, Mystery TapeSymbol (SimResult InfCount))], 
+         [Turing])
+loadAggregatedExperimentFiles numStates experimentName = do 
+  bsrs <- loadBinaryFile numStates $ experimentName <> "_all_bin.bin"
+  jsons <- loadJSONFile $ experimentName <> "_all_json.json"
+  unfinished <- loadMachinesFromFile $ experimentName <> "_all_undecided.txt"
+  pure (bsrs, jsons, unfinished)

@@ -72,10 +72,6 @@ readFile filename = do
         hClose handle
         pure contents
 
-loadMachinesFromFile :: String -> IO [Turing]
-loadMachinesFromFile fn = do
-  fileContents <- TIO.readFile fn
-  pure $ unm <$> lines fileContents
 
 applyTactic :: Vector Tactic -> [Turing] -> [(Int, Turing)]
 applyTactic tac machines = let

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c8835b7148a0a14ff89ed666e2c895ae7a384262ad74b19f5b6900ead3aed505
+-- hash: 9366e78a00d9efa809d8b2044267b172f61229ad06c013a2d9b2e3c7e1d95a9e
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -112,6 +112,7 @@ library
     , aeson
     , base
     , bifunctors
+    , binary
     , constraints
     , containers
     , directory
