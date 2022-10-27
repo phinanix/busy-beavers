@@ -95,6 +95,7 @@ tacticVectors = M.fromList
   , ("noncon", nonconVector)
   , ("abs", absVector)
   , ("fast", fastTacticVector)
+  , ("splitter", splitterTacticVector)
   ]
 
 putMachinesInFile :: [Turing] -> String -> IO ()

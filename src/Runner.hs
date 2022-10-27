@@ -16,7 +16,7 @@ import Safe.Partial
 
 import Data.ByteString.Builder as BS
 import Data.Bits
-import qualified Data.ByteString.Lazy as BL 
+import qualified Data.ByteString.Lazy as BL
 
 import qualified Data.Vector as V
 import qualified Data.Text.Lazy.IO as TIO
@@ -227,11 +227,10 @@ resultsToText results = toLazyText $ foldMap mkLine $ filter (not . resIsBin . s
     MachineStuckRes -> error "machinestuck in resisbin"
 
 machinesToText :: [Turing] -> Text
-machinesToText = T.intercalate "\n" . fmap machineToNotation
+machinesToText = (<> "\n") . T.intercalate "\n" . fmap machineToNotation
 
 {-
-draft overall runner loop
-so it's overall quite similar to "outerLoop"
+runner loop is overall quite similar to "outerLoop"
 it takes tactics and a list of machines, and it outputs 
 3 files: bitpacked, json, and undecided machines as text. 
 it names these according to a scheme involving an "experiment name"
@@ -249,7 +248,6 @@ ways.
 {-
 TODO: 
 make utility for running runnerDotPy from command line to make folder
-make scripts to aggregate files into 1 file
 make scripts to display files
 make a tactic whose job it is to split up the tree
 better rep for counts?
@@ -305,32 +303,32 @@ outputFiles filePrefix todo results = do
       TIO.writeFile (toString $ filePrefix <> "checkpoint.txt") $
         fromStrict $ machinesToText todo
     else pure ()
-  
+
 {-
 a utility which takes an experiment's name, for each file type collects all the
 files of that type and aggregates them into one file named with the prefix 
 NAME_all
 -}
 
-aggregateTextFiles :: [FilePath] -> FilePath -> IO () 
-aggregateTextFiles fnsIn fnOut = do 
+aggregateTextFiles :: [FilePath] -> FilePath -> IO ()
+aggregateTextFiles fnsIn fnOut = do
   allContents <- traverse TIO.readFile fnsIn
-  traverse_ (TIO.appendFile fnOut) allContents   
-  
-aggregateBinaryFiles :: [FilePath] -> FilePath -> IO () 
-aggregateBinaryFiles fnsIn fnOut = do 
+  traverse_ (TIO.appendFile fnOut) allContents
+
+aggregateBinaryFiles :: [FilePath] -> FilePath -> IO ()
+aggregateBinaryFiles fnsIn fnOut = do
   allContents <- traverse BL.readFile fnsIn
-  traverse_ (BL.appendFile fnOut) allContents   
+  traverse_ (BL.appendFile fnOut) allContents
 
 aggregateFiles :: String -> IO ()
-aggregateFiles experimentName = do 
+aggregateFiles experimentName = do
   dirContents <- listDirectory "."
-  let toAggregate = filter (\s -> experimentName `isPrefixOf` s) dirContents  
+  let toAggregate = filter (\s -> experimentName `isPrefixOf` s) dirContents
   let binaryFiles = filter (\s -> "bin.bin" `isSuffixOf` s) toAggregate
   let jsonFiles = filter (\s -> "json.json" `isSuffixOf` s) toAggregate
   let undecidedFiles = filter (\s -> "undecided.txt" `isSuffixOf` s) toAggregate
-  assert (length binaryFiles == length jsonFiles 
-    && length jsonFiles == length undecidedFiles) 
+  assert (length binaryFiles == length jsonFiles
+    && length jsonFiles == length undecidedFiles)
     putText $ "aggregating " <> show (length binaryFiles) <> " files\n"
   aggregateBinaryFiles binaryFiles $ experimentName <> "_all_bin.bin"
   aggregateTextFiles jsonFiles $ experimentName <> "_all_json.json"

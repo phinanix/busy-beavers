@@ -238,6 +238,20 @@ basicSimLoop = let limit = 1999 in simulation $
     , runAtCount limit proveByIndV1
     ])
 
+{-how much is split, of size 5
+steps | machines
+3  |   116
+5  | ~9050
+10 | 
+-}
+splitterSimLoop :: Int -> Tactic
+splitterSimLoop n = simulation $ simLoop n
+  $ simulateStepPartial maxInt :| 
+    (liftOneToMulti <$> 
+    [checkSeenBefore @Bit 
+    , fastLRCheckAction
+    ])
+
 simpleSimLoop :: Tactic
 simpleSimLoop = let limit = 150 in simulation $ 
   simLoop (limit + 1) $ simulateStepPartial maxInt :| 
@@ -314,6 +328,9 @@ fiveBitSimLoop = simulation @(Vec 5 Bit) baseSimLoop
 
 sixBitSimLoop :: Tactic
 sixBitSimLoop = simulation @(Vec 6 Bit) baseSimLoop
+
+splitterTacticVector :: V.Vector Tactic 
+splitterTacticVector = V.fromList [splitterSimLoop 3, splitterSimLoop 10]
 
 fastTacticVector :: V.Vector Tactic
 fastTacticVector = V.fromList [simpleSimLoop]
