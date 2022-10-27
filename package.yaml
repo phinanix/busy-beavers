@@ -31,6 +31,7 @@ library:
   - constraints
   - directory
   - either 
+  - filepath
   - fixed-vector
   - hspec
   - lens
@@ -58,6 +59,8 @@ executables:
     dependencies:
     - busy-beavers
     - containers
+    - directory
+    - filepath
     - lens
     - prettyprinter
     - relude

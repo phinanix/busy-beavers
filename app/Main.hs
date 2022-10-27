@@ -35,6 +35,8 @@ import Control.Exception
 import Runner
 import Data.Char
 import Data.List (isSuffixOf)
+import System.Directory 
+import System.FilePath
 
 --interactive program that lets you display machines that are not solved 
 simProgram :: (Pretty s, Pretty c, Show s, Show c) => Results c s  -> IO ()
@@ -160,7 +162,8 @@ runnerDotPyFromArgs :: IO ()
 runnerDotPyFromArgs = do 
   args <- getArgs 
   case args of 
-    [experimentName, tacticName, chunkSizeString, inputMachineString] -> do 
+    [experimentName, tacticName, chunkSizeString, inputMachineString] -> do
+        createDirectoryIfMissing True $ takeDirectory experimentName 
         let chunkSize :: Int = U.read chunkSizeString
             tacticVec = tacticVectors ^?! ix tacticName 
         inputMachines <- getMachines inputMachineString

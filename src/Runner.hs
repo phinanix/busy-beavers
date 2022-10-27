@@ -39,6 +39,7 @@ import OuterLoop
 import System.IO (withBinaryFile)
 import System.Directory
 import Data.List (isSuffixOf)
+import System.FilePath
 
 
 {-
@@ -323,8 +324,10 @@ aggregateBinaryFiles fnsIn fnOut = do
 
 aggregateFiles :: String -> IO ()
 aggregateFiles experimentName = do
-  dirContents <- listDirectory "."
-  let toAggregate = filter (\s -> experimentName `isPrefixOf` s) dirContents
+  let experimentDirectory = takeDirectory experimentName
+  dirContents <- listDirectory experimentDirectory
+  let toAggregate = ((experimentDirectory <> "/") <>) <$> 
+        filter (\s -> takeFileName experimentName `isPrefixOf` s) dirContents
   let binaryFiles = filter (\s -> "bin.bin" `isSuffixOf` s) toAggregate
   let jsonFiles = filter (\s -> "json.json" `isSuffixOf` s) toAggregate
   let undecidedFiles = filter (\s -> "undecided.txt" `isSuffixOf` s) toAggregate
