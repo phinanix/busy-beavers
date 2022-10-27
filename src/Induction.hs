@@ -282,7 +282,7 @@ proveBySimulating limit t book (Skip start skipEnd _) = case skipEnd of
       --because we don't want to succeed in 101 steps if the limit is 100 steps
       | numSteps > limit = Left ("exceeded limit of " <> show limit <> " while simulating", Nothing)
       | indMatch p tape (ph, tp) = pure numSteps
-      | otherwise = case skipStep t book p tape of
+      | otherwise = case skipStep undefined t book p tape of
             Unknown e -> Left ("hit unknown edge" <> show e, Nothing)
             Stopped {} -> Left ("halted while simulating", Nothing)
             NonhaltProven {} -> Left ("went forever while simulating", Nothing)
@@ -351,7 +351,7 @@ getNextConfigs book curConfig = f ans
   choices :: [PartialStepResult InfCount s]
   --flip since sort gives smallest to largest by default but we want the largest skip first
   choices = sortBy (flip skipPrecedence)
-    $ snd <$> uncurry (getSkipsWhichApply book) (configToET $ first NotInfinity curConfig)
+    $ snd <$> uncurry (getSkipsWhichApply undefined book) (configToET $ first NotInfinity curConfig)
 
 --the text is why you failed, and the natural is how many big steps 
 simulateViaDFS :: (TapeSymbol s) => Int -> Int -> SkipBook s -> Skip Count s

@@ -127,9 +127,9 @@ spec = do
       -- at step 15, (T, 5) >F<
       -- both phase 1 
       makeIndGuess @Bit 1000 checkerboardSweeper `assertPrettySkip` Skip
-        (Config (Phase 1)
+        (Config (Phase 0)
             [(Bit True, Count 0 Empty (fromList [(BoundVar 0, Sum 1)])), (Bit False, c 1)] (Bit False) [(Bit False, c 1)])
-        (SkipStepped (Phase 1) $ Middle (ExpTape
+        (SkipStepped (Phase 0) $ Middle (ExpTape
              [(Bit True, Count 2 Empty (fromList [(BoundVar 0, Sum 1)]))] (Bit False) []))
         Empty
   describe "replaceSymbolVarInConfig" $ do

@@ -83,7 +83,7 @@ simOneFromStartLoop :: (TapeSymbol s) => NonEmpty (SimOneAction s) -> Turing -> 
 simOneFromStartLoop updateFuncs startMachine
   = simulateOneMachineOuterLoop updateFuncs startMachine (initSkipState startMachine)
 
-simulateManyMachinesOuterLoop :: forall s. (TapeSymbol s) 
+simulateManyMachinesOuterLoop :: forall s. (TapeSymbol s)
   => (Turing -> Maybe (HaltProof s))
   -> NonEmpty (SimMultiAction s)
   -> Turing
@@ -159,7 +159,7 @@ addSkipToStateOrInf :: (TapeSymbol s)
   -> SkipOrigin s
   -> SimState s
   -> Either (SimResult InfCount s) (SimState s)
-addSkipToStateOrInf skip origin state = if skipGoesForever skip && skipAppliedInHist skip 
+addSkipToStateOrInf skip origin state = if skipGoesForever skip && skipAppliedInHist skip
     (state ^. s_history)
   then Left (ContinueForever (SkippedToInfinity (state ^. s_steps)))
   else Right $ state & s_book %~ addSkipToBook skip origin
@@ -175,16 +175,16 @@ simulateStepOneMachine handleUnknown limit machine
   = if counter > limit
     then Left $ Continue steps ph tape curDisp
     else --trace ("steps:" <> show steps <> " p:" <> showP ph <> " t:" <> showP tape) $ 
-    case skipStep machine book ph tape of
-    Unknown e -> handleUnknown e state
-    MachineStuck -> Left MachineStuckRes
-    NonhaltProven hp -> Left $ ContinueForever hp
-    Stopped c newTape _skipUsed ->
-      Left $ Halted (steps + infCountToInt c) newTape
-    Stepped c newPh newTape skipUsed newDisp rs -> case c of
-      Infinity -> Left $ ContinueForever (SkippedToInfinity steps)
-      c -> Right $ SimState newPh newTape book (steps + infCountToInt c) (skipUsed : skipTrace)
-        hist histSet (counter + 1) (curDisp + fromJust newDisp) dispHist (addToRRSH rs rsHist) fastLRCheck
+    case skipStep steps machine book ph tape of
+      Unknown e -> handleUnknown e state
+      MachineStuck -> Left MachineStuckRes
+      NonhaltProven hp -> Left $ ContinueForever hp
+      Stopped c newTape _skipUsed ->
+        Left $ Halted (steps + infCountToInt c) newTape
+      Stepped c newPh newTape skipUsed newDisp rs -> case c of
+        Infinity -> Left $ ContinueForever (SkippedToInfinity steps)
+        c -> Right $ SimState newPh newTape book (steps + infCountToInt c) (skipUsed : skipTrace)
+          hist histSet (counter + 1) (curDisp + fromJust newDisp) dispHist (addToRRSH rs rsHist) fastLRCheck
 
 --this one essentially asserts there is no unknown edge, or otherwise crashes
 simulateStepTotalLoop :: (Partial, TapeSymbol s)
@@ -204,11 +204,11 @@ simulateStepPartial limit machine (SimState ph tape book steps skipTrace hist hi
   --trace ("stepping bigStep: " <> showP counter <> " smallStep: " <> showP steps) $
   if counter > limit
   then Result $ Continue steps ph tape curDisp
-  else 
+  else
     -- (if signatureComplexity (tapeSignature tape) > 40 then id 
     --   else trace ("step:" <> showP counter <> " smallstep: " <> showP steps 
     --           <> " phase: " <> showP ph <> " curTape: " <> showP tape)) $
-  case skipStep machine book ph tape of
+  case skipStep steps machine book ph tape of
     Unknown e -> UnknownEdge e
     MachineStuck -> error "machinestuck "
     NonhaltProven hp -> Result $ ContinueForever hp
@@ -254,21 +254,21 @@ seenBeforeProof state = case state ^. s_history_set . at histEnt of
   and compare the past to now. start k at 1 and replace it with 2 * k when we get there. 
 -}
 fastLinRecurCheck :: (TapeSymbol s) => SimState s -> (FastLRCheck s, Maybe (HaltProof s))
-fastLinRecurCheck state = (newFLRC, mbProof) where 
+fastLinRecurCheck state = (newFLRC, mbProof) where
   (FastLRCheck pastPh pastTape pastRS pastCount) = state ^. s_fast_lr
-  rsToAdd = (state ^. s_reverse_readshift_history . reverseReadShiftHist . ix 0)
+  rsToAdd = state ^. s_reverse_readshift_history . reverseReadShiftHist . ix 0
   newRS = pastRS <> rsToAdd
   (curPh, curTape, curCount) = (state ^. s_phase, state ^. s_tape, state ^. s_counter)
-  mbProof = 
+  mbProof =
     -- trace ("past,cur" <> showP pastCount <> ", " <> showP curCount <> 
     -- " rs: " <> showP newRS <> " rsToAdd: " <> showP rsToAdd
     -- <> "\npastconf: " <> showP (pastPh, pastTape) 
     -- <> "\ncurconf:" <> showP (curPh, curTape) 
     -- <> "\n") 
-    checkForRecur (pastCount, curCount) (pastPh, pastTape) (curPh, curTape) newRS 
-  nextCount = if pastCount > 0 then 2 * pastCount else 1 
-  newFLRC = if curCount < nextCount then FastLRCheck pastPh pastTape newRS pastCount else 
-    FastLRCheck curPh curTape mempty curCount 
+    checkForRecur (pastCount, curCount) (pastPh, pastTape) (curPh, curTape) newRS
+  nextCount = if pastCount > 0 then 2 * pastCount else 1
+  newFLRC = if curCount < nextCount then FastLRCheck pastPh pastTape newRS pastCount else
+    FastLRCheck curPh curTape mempty curCount
 
 updateHistSet :: (Ord s) => SimOneAction s
 updateHistSet _machine state = Right $ state & s_history_set . at histEnt ?~ curStepCount
@@ -286,14 +286,16 @@ checkSeenBefore _machine state = case seenBeforeProof state of
 {-# SPECIALISE checkSeenBefore :: SimOneAction Bit #-}
 {-# SPECIALISE checkSeenBefore :: SimOneAction TwoBit #-}
 
-fastLRCheckAction :: (TapeSymbol s) => SimOneAction s 
-fastLRCheckAction _m state = case fastLinRecurCheck state of 
-  (_, Just proof) -> Left $ ContinueForever proof 
-  (flr, Nothing) -> Right $ state & s_fast_lr .~ flr 
+fastLRCheckAction :: (TapeSymbol s) => SimOneAction s
+fastLRCheckAction _m state = case fastLinRecurCheck state of
+  (_, Just proof) -> Left $ ContinueForever proof
+  (flr, Nothing) -> Right $ state & s_fast_lr .~ flr
 
 --applies the skip to everything in the list, checks if any of them have just 
+--the undefined is not a todo, it just doesn't need to use that value so 
+--laziness causes it to never be evaluated
 skipAppliedInHist :: (TapeSymbol s) => Skip Count s -> TapeHist s InfCount -> Bool
-skipAppliedInHist skip hist = any (has _Just) $ applySkip skip <$> getTapeHist hist
+skipAppliedInHist skip hist = any (has _Just) $ applySkip undefined skip <$> getTapeHist hist
 
 --checks whether we've put an infinity in some place on the tape that is not the two ends
 --this is a hacky workaround to fix the fact that we currently don't know how to tell how 
@@ -310,14 +312,14 @@ skipAppliesForeverInHist skip hist = case forevers of
   --TODO the "idx" here is I think in big steps but it's sort of supposed to be in small steps
   (idx, _config, _res) : _xs -> Right $ SkippedToInfinity idx
   where
-  apps = let 
-    ans = mapMaybe (\(i, config) -> (i,config,) <$> applySkip skip config) 
+  apps = let
+    ans = mapMaybe (\(i, config) -> (i,config,) <$> applySkip undefined skip config)
                 (zip [0,1 ..] $ getTapeHist hist)
     in
     --trace ("apps len " <> show (length ans)) 
     ans
   forevers = filter (\(_i, config, res) -> -- trace ("skipRes " <> showP (res)) $ 
-    res ^? _Stepped . _1 == Just Infinity 
+    res ^? _Stepped . _1 == Just Infinity
     || maybe False tapePostInfinity (res ^? _Stepped . _3)
     || skipRunsForeverIfConsumesLiveTape skip && skipConsumesLiveTape skip config)
     apps
@@ -336,27 +338,27 @@ skipAppliesForeverInHist skip hist = case forevers of
   better algorithm: drop up to 1 thing from both ends of the input to the skip if they are blank
     then see if the output applies to the input
 -}
-skipRunsForeverIfConsumesLiveTape :: (TapeSymbol s) => Skip Count s -> Bool 
-skipRunsForeverIfConsumesLiveTape skip@(Skip (Config startPh startLs startP startRs) end _hops) 
-  = let ans = case end of 
-          SkipStepped endPh (Middle (ExpTape endLs endP endRs)) -> startPh == endPh && startP == endP && cond where 
-            cond = case getEquations $ 
-                matchTwoTapes (startLs, NotInfinity <$$> endLs) (startRs, NotInfinity <$$> endRs) 
-                of 
-              Just (ESkipLeft ls, ESkipLeft rs) -> 
+skipRunsForeverIfConsumesLiveTape :: (TapeSymbol s) => Skip Count s -> Bool
+skipRunsForeverIfConsumesLiveTape skip@(Skip (Config startPh startLs startP startRs) end _hops)
+  = let ans = case end of
+          SkipStepped endPh (Middle (ExpTape endLs endP endRs)) -> startPh == endPh && startP == endP && cond where
+            cond = case getEquations $
+                matchTwoTapes (startLs, NotInfinity <$$> endLs) (startRs, NotInfinity <$$> endRs)
+                of
+              Just (ESkipLeft ls, ESkipLeft rs) ->
                 --trace ("ls and rs were: " <> showP (ls ++ rs)) 
                 all (\(s, _) -> s == blank) $ ls ++ rs
               other -> --trace ("match Two returned: " <> show other) 
-                False 
-          _ -> False 
-  in 
+                False
+          _ -> False
+  in
     --trace ("livetape ans: " <> show ans <> "\nskip: " <> showP skip )
-    ans 
+    ans
 
-skipConsumesLiveTape :: (TapeSymbol s) => Skip Count s -> (Phase, ExpTape s InfCount) -> Bool 
+skipConsumesLiveTape :: (TapeSymbol s) => Skip Count s -> (Phase, ExpTape s InfCount) -> Bool
 skipConsumesLiveTape skip@(Skip (Config sPH _ _ _) _ _) (ph, tape) = (sPH == ph) &&
-  let ans = getEquations $ matchSkipTape skip tape  in case ans of 
-    Nothing -> False 
+  let ans = getEquations $ matchSkipTape skip tape  in case ans of
+    Nothing -> False
     Just (ls, rs) -> all (\(s, _) -> s == blank) $ ls ++ rs
 
 {-
@@ -473,7 +475,7 @@ simulateForTime time = simOneFromStartLoop actionList where
 getStateAfterTime :: (Partial, TapeSymbol s) => Int -> Turing -> SimState s
 getStateAfterTime time turing = last $ simulateForTime time turing ^. _2
 
-getTwoHistAfterTime :: (Partial, TapeSymbol s) 
+getTwoHistAfterTime :: (Partial, TapeSymbol s)
   => Int -> Turing -> (TapeHist s InfCount, ReadShiftHist)
 getTwoHistAfterTime stepCount turing
   = (guessingState ^. s_history, guessingState ^. s_readshift_history)

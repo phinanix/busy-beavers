@@ -242,7 +242,7 @@ basicSimLoop = let limit = 1999 in simulation $
 steps | machines
 3  |   116
 5  | ~9050
-10 | 
+10 | ?
 -}
 splitterSimLoop :: Int -> Tactic
 splitterSimLoop n = simulation $ simLoop n

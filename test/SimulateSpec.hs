@@ -110,7 +110,7 @@ spec = do
       getEquations (matchTape (simpleSkip^.start.rs) (right simpleTape))
       `shouldBe` Just (TapeLeft $ fromList (right simpleTape))
     it "applies a simple skip" $
-      applySkip simpleSkip (Phase 0, simpleTape)
+      applySkip undefined simpleSkip (Phase 0, simpleTape)
       `shouldBe` Just (Stepped 
           (NotInfinity $ num 5) 
           (Phase 1) 
@@ -119,7 +119,7 @@ spec = do
           (Just $ -8) 
           (Just $ ReadShift (-11) 0 (-8)))
     it "applies a more complex skip" $
-      applySkip exampleSkip (Phase 0, exampleTape)
+      applySkip undefined exampleSkip (Phase 0, exampleTape)
       `shouldBe` Just (Stepped 
           (NotInfinity $ num 10) 
           (Phase 1) 

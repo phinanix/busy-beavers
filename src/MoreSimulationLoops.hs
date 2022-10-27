@@ -277,6 +277,7 @@ proveEOTLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
 
 canProveEOT :: Int -> Turing -> Bool
 canProveEOT limit m = case proveEOTLoop limit m of
+  (ContinueForever (LinRecur _ _ _), _) -> True
   (ContinueForever (OffToInfinityN _ _), _) -> True
   (ContinueForever (SkippedToInfinity _), _ne) -> True
   _ -> False
@@ -288,6 +289,7 @@ proveOEOTLoop limit = simOneFromStartLoop $ simulateStepTotalLoop limit
 
 canProveOEOT :: Int -> Turing -> Bool
 canProveOEOT limit m = case proveOEOTLoop limit m of
+  (ContinueForever (LinRecur _ _ _), _) -> True
   (ContinueForever (OffToInfinityN _ _), _) -> True
   _ -> False
 
@@ -298,11 +300,9 @@ checkLRAssertOneMachine limit unfinishedM = if toAssert then Nothing else Just m
   cycleWorked = canProveCycle limit m
   eotWorked = canProveEOT limit m
   otherEotWorked = canProveOEOT limit m
-  notBothEot = not (eotWorked && otherEotWorked && not cycleWorked)
   lrComplementsWorked = cycleWorked || eotWorked || otherEotWorked
   lrIffComplements = lrWorked == lrComplementsWorked
-
-  toAssert = lrIffComplements && notBothEot
+  toAssert = lrIffComplements
   msg = "assert failed on:\n" <> showP m
     <> " " <> showP [lrWorked, cycleWorked, eotWorked, otherEotWorked]
 

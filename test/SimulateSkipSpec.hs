@@ -94,7 +94,7 @@ spec :: Spec
 spec = do
   describe "applySkip" $ do 
     it "does not apply a skip which would set a variable to zero" $ do 
-      applySkip skipEx tapeEx `shouldBe` Nothing 
+      applySkip undefined skipEx tapeEx `shouldBe` Nothing 
   -- the goal of this test is to make sure that simulating the machine with skips outputs the same thing 
   -- as simulating a machine without skips
   -- describe "simulateWithSkips" $ do 
@@ -124,7 +124,7 @@ spec = do
             (c 50)
           tapeEx2 = (Phase 0, ExpTape [(ft, ci 2), (tt, bvi 0 1), (ff, ci 1)] 
                                       ft [(ft, ci 1), (ff, ci 1 <> bvi 0 1)])                     
-      applySkip skipEx2 tapeEx2 `shouldSatisfy` has _Just
+      applySkip undefined skipEx2 tapeEx2 `shouldSatisfy` has _Just
   describe "matchTwoTapes" $ do
     it "applies a skip when a var is sent to two things" $ do 
       {-

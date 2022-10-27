@@ -5,7 +5,7 @@ import Control.Lens
 import Data.Map.Monoidal (MonoidalMap(..))
 import Data.List (maximumBy, foldl1)
 import qualified Data.List.NonEmpty as NE ((<|))
-import Data.Map.Strict (assocs, keysSet, unions)
+import Data.Map.Strict (assocs, keysSet, unions, elems)
 import Witherable
 import Prettyprinter
 import Control.Exception
@@ -89,16 +89,16 @@ data PartialStepResult c s = Unknown Edge
                         deriving (Eq, Ord, Show, Generic)
 instance (NFData c, NFData s) => NFData (PartialStepResult c s)
 
-dispPartialStepResult :: (Pretty s, Show s, Pretty c, Show c) => PartialStepResult c s -> Text 
-dispPartialStepResult = \case 
-  Unknown e -> "Unknown edge: " <> showP e 
-  Stopped ic ft skip -> "Stopped. took: " <> showP ic <> "hops\n" <> show ft <> "\n" <> showP skip 
-  Stepped ic ph et skip m_n m_rs -> "Stepped " <> showP ic <> " steps\n" <> showP ph <> " " <> showP et 
-      <> "\nusing: " <> showP skip 
-  NonhaltProven hp -> "Halt proven: " <> showP hp 
+dispPartialStepResult :: (Pretty s, Show s, Pretty c, Show c) => PartialStepResult c s -> Text
+dispPartialStepResult = \case
+  Unknown e -> "Unknown edge: " <> showP e
+  Stopped ic ft skip -> "Stopped. took: " <> showP ic <> "hops\n" <> show ft <> "\n" <> showP skip
+  Stepped ic ph et skip m_n m_rs -> "Stepped " <> showP ic <> " steps\n" <> showP ph <> " " <> showP et
+      <> "\nusing: " <> showP skip
+  NonhaltProven hp -> "Halt proven: " <> showP hp
   MachineStuck -> "MachineStuck"
 
-instance (Pretty s, Show s, Pretty c, Show c) => Pretty (PartialStepResult c s) where 
+instance (Pretty s, Show s, Pretty c, Show c) => Pretty (PartialStepResult c s) where
   pretty = prettyText . dispPartialStepResult
 
 --which of these newtypes your history is tracks whether the history is forwards (element 0 is the first thing that happend)
@@ -168,7 +168,7 @@ data SimState s = SimState
   , _s_displacement :: Int
   , _s_reverse_disp_history :: ReverseDispHist
   , _s_reverse_readshift_history :: ReverseReadShiftHist
-  , _s_fast_lr :: FastLRCheck s 
+  , _s_fast_lr :: FastLRCheck s
   } deriving (Eq, Ord, Show, Generic)
 instance (NFData s) => NFData (SimState s)
 
@@ -246,34 +246,48 @@ instance (Ord s, Pretty s) => Pretty (SkipBook s) where
             <> "which resulted from" <> line <> pretty o <> line <> line)
               $ assocs skipPile
 
+makeHaltProof :: (TapeSymbol s) => Int -> Skip Count s -> Map BoundVar InfCount
+  -> HaltProof s
+makeHaltProof curStep skip boundVs = case skip of
+  Skip (Config sPh [(b, c1@(OneVar n as k x))] b' [])
+    (SkipStepped ePh (Side L [(c, c2@(OneVar m bs j y))]))
+    stepCount -> 
+      assert (sPh == ePh)
+      assert (b == b')
+      assert (c1 <> One == c2)
+      --period is todo for now, it uses stepCount
+      LinRecur curStep 0 $ -1 * length (toBits b)
+  Skip (Config sPh [] b' [(b, c1@(OneVar n as k x))] )
+    (SkipStepped ePh (Side R [(b'', c2@(OneVar m bs j y))]))
+    stepCount ->
+      assert (sPh == ePh)
+      assert (b == b' && b' == b'')
+      assert (c1 <> One == c2)
+      --period is todo for now, it uses stepCount
+      LinRecur curStep 0 $ length (toBits b)
+  _ -> error $ "skip of wrong shape: " <> showP skip <> "\n" <> show boundVs
+
+
+
 --returns nothing if the skip is inapplicable, else returns the result
-applySkip :: forall s. (Eq s, Pretty s, Show s, NFData s, Partial) => Skip Count s -> (Phase, ExpTape s InfCount)
+applySkip :: forall s. (TapeSymbol s, Partial) 
+  => Int -> Skip Count s -> (Phase, ExpTape s InfCount)
   -> Maybe (PartialStepResult InfCount s)
-applySkip skip@(Skip s _ _) (p, tape)
+applySkip curStep skip@(Skip s _ _) (p, tape)
   = let ans = guard (s^.cstate == p) >> either (const Nothing) Just
-              (packageResult skip tape =<< runEquations (matchSkipTape skip tape))
+              (packageResult curStep skip tape 
+                =<< runEquations (matchSkipTape skip tape))
         msg = ("applying: " <> showP skip <> "\nto: " <> showP (p, tape))
-        f = id -- if has _Just ans then trace msg else id 
+        f = id --trace msg
     in
-    f ans 
-  -- = Skipped
-  --     (updateCountToInf boundVs hopCount)
-  --     (getSkipEndPhase e)
-  --     <$> getFinalET e (newLs, newRs)
-  --     --TODO : un-just-ified Just (currently fixed by laziness)
-  --     -- in other words, somtimes, there is an error inside the ReadShift / shift, 
-  --     -- but we don't force the thunk on those calls because we don't care about 
-  --     -- the result (actually, because there is no sensical result), without the 
-  --     -- "Just", "Skipped" is strict so we force the error, but with the Just, 
-  --     -- we lazily never force the error and so it is just discarded on the branch
-  --     -- we don't care about 
-  --     <*> pure (Just shift)
-  --     <*> pure (Just $ ReadShift (-startLLen) startRLen shift)
-packageResult :: forall s. (Eq s, Pretty s, Partial) => Skip Count s
+    f ans
+packageResult :: forall s. (TapeSymbol s, Partial) => Int
+  -> Skip Count s
   -> ExpTape s InfCount
   -> (Map BoundVar InfCount, ([(s, InfCount)], [(s, InfCount)]))
   -> Either Text (PartialStepResult InfCount s)
-packageResult skip@(Skip s e hopCount) tape (boundVs, tapeSides@(newLs, newRs))
+packageResult curStep skip@(Skip s e hopCount) tape 
+  (boundVs, tapeSides@(newLs, newRs))
   = case e of
     SkipHalt tp -> Right $ Stopped
       (updateCountToInf boundVs hopCount)
@@ -281,13 +295,20 @@ packageResult skip@(Skip s e hopCount) tape (boundVs, tapeSides@(newLs, newRs))
       skip
     SkipUnknownEdge e -> Right $ Unknown e
     SkipNonhaltProven hp -> Right $ NonhaltProven hp
-    SkipStepped ph tp -> Stepped
-      (updateCountToInf boundVs hopCount)
-      ph
-      <$> getFinalET tp tapeSides
-      <*> pure skip
-      <*> pure (Just shift)
-      <*> pure (Just $ ReadShift (-startLLen) startRLen shift)
+
+    SkipStepped ph tp ->
+      if elem Infinity $ elems boundVs
+        --todo: we need to somehow get a linrecur proof out of this when it is one
+        --and otherwise return "skip went to infinity" or something I guess?
+
+        then Right $ NonhaltProven $ makeHaltProof curStep skip boundVs 
+        else Stepped
+          (updateCountToInf boundVs hopCount)
+          ph
+          <$> getFinalET tp tapeSides
+          <*> pure skip
+          <*> pure (Just shift)
+          <*> pure (Just $ ReadShift (-startLLen) startRLen shift)
       where
       getFinalET :: Partial => TapePush Count s -> ([(s, InfCount)], [(s, InfCount)]) -> Either Text (ExpTape s InfCount)
       getFinalET (Middle (ExpTape ls p rs)) (remLs, remRs) = let
@@ -362,7 +383,7 @@ lookupSkips (p, s) book = keysSet $ book ^. atE (p, s)
 -- skipFarthest (_, res1) (_, res2) = compare (res1 ^. hopsTaken) (res2 ^. hopsTaken)
 
 --
-skipPrecedence :: (Ord s) 
+skipPrecedence :: (Ord s)
   => PartialStepResult InfCount s
   -> PartialStepResult InfCount s
   -> Ordering
@@ -373,40 +394,41 @@ skipPrecedence res1 res2 = case (res1, res2) of
   (MachineStuck, _) -> error "shouldn't be comparing a stuck"
   (_, MachineStuck) -> error "shouldn't be comparing a stuck"
   (NonhaltProven _, _) -> GT
-  (_, NonhaltProven _) -> LT 
+  (_, NonhaltProven _) -> LT
   (Stopped {}, _) -> GT
   (_, Stopped {}) -> LT
-  (res1@(Stepped c _ _ _ _ _), res2@(Stepped d _ _ _ _ _)) -> case compare c d of 
-    EQ -> compare res1 res2 
-    notEQ -> notEQ 
+  (res1@(Stepped c _ _ _ _ _), res2@(Stepped d _ _ _ _ _)) -> case compare c d of
+    EQ -> compare res1 res2
+    notEQ -> notEQ
   (Stepped {}, Unknown _) -> GT
   (Unknown _, Stepped {}) -> LT
   (Unknown e, Unknown f) -> compare e f
 
 --simulates one step of a TM using a skip-book
-skipStep :: (TapeSymbol s, HasCallStack) 
-  => Turing -> SkipBook s -> Phase -> ExpTape s InfCount
+skipStep :: (TapeSymbol s, HasCallStack)
+  => Int -> Turing -> SkipBook s -> Phase -> ExpTape s InfCount
   -> PartialStepResult InfCount s
-skipStep (Turing _ trans) book ph tape@(ExpTape _ls p _rs) =
+skipStep curStep (Turing _ trans) book ph tape@(ExpTape _ls p _rs) =
   let bit = getPoint p in
   case trans ^. at (ph, bit) of
     Nothing -> Unknown (ph, bit)
-    Just _ -> let ans = pickBestSkip $ getSkipsWhichApply book ph tape
+    Just _ -> let ans = pickBestSkip $ getSkipsWhichApply curStep book ph tape
       in
         --trace ("ans was: " <> show ans)
         ans
 
-getSkipsWhichApply :: (Ord s, Pretty s, Show s, NFData s, HasCallStack)
-  => SkipBook s
+getSkipsWhichApply :: (TapeSymbol s, HasCallStack)
+  => Int 
+  -> SkipBook s
   -> Phase
   -> ExpTape s InfCount
   -> [(Skip Count s, PartialStepResult InfCount s)]
-getSkipsWhichApply book p tape@(ExpTape _ls bit _rs)
+getSkipsWhichApply curStep book p tape@(ExpTape _ls bit _rs)
   = let
       --just tries applying all the skips. I think this will be ok, but is probably
       --too expensive and should be reworked for efficiency later
       skips = lookupSkips (p, bit) book
-      appliedSkips = mapMaybe (\s -> (s,) <$> applySkip s (p, tape)) $ toList skips
+      appliedSkips = mapMaybe (\s -> (s,) <$> applySkip curStep s (p, tape)) $ toList skips
       msg = "tape: " <> showP tape <> "\nskips which applied:\n" <> show appliedSkips
       in --trace msg 
         appliedSkips
@@ -424,7 +446,7 @@ pickBestSkip = \case
 
 type SkipTape = ExpTape Bit InfCount
 
-skipStateFromPhTape :: (TapeSymbol s) 
+skipStateFromPhTape :: (TapeSymbol s)
   => Turing -> Phase -> ExpTape s InfCount  -> SimState s
 skipStateFromPhTape t ph tape = SimState ph tape (addChainedToBook $ initBook t) 0 []
   (ReverseTapeHist [(ph, tape)]) (one ((Phase 0,tape), 0)) 0 0
@@ -439,22 +461,23 @@ simulateOneMachine :: Int -> Turing -> SimState Bit
 simulateOneMachine limit t = \case
   --SimState p tape _book steps@((>= limit) -> True) trace _hist _ _counter -> (trace, Right $ Continue steps p tape)
   state | state ^. s_steps >= limit -> (state ^. s_trace, Right $ Continue (state ^. s_steps) (state ^. s_phase) (state ^. s_tape) (state ^. s_displacement))
-  SimState p tape book steps trace hist histSet counter disp dispHist rsHist fastLRCheck -> case skipStep t book p tape of
-    MachineStuck -> error "machinestuck"
-    Unknown e -> (trace, Left e)
-    --TODO: maybe we're supposed to put the nonhaltproving skip on the trace?
-    NonhaltProven hp -> (trace, Right $ ContinueForever hp)
-    Stopped c finalTape skip ->
-      (skip : trace, Right $ Halted (steps + infCountToInt c) finalTape)
-    Stepped c newP newTape skip newDisp rs -> case c of
-      --TODO
-      Infinity -> (skip : trace, Right $ ContinueForever (OffToInfinityN steps L)) --(SkippedToInfinity steps skip))
-      c -> let newHist = hist & reverseTapeHist %~ ((p, tape) :)
-               newHistSet = histSet & at (p, tape) ?~ steps
-               newDispHist = dispHist & reverseDispHist %~ (disp :)
-        in
-        simulateOneMachine limit t $ SimState newP newTape book (steps + infCountToInt c) (skip : trace)
-           newHist newHistSet counter (disp + fromJust newDisp) newDispHist (addToRRSH rs rsHist) fastLRCheck
+  SimState p tape book steps trace hist histSet counter disp dispHist rsHist fastLRCheck
+    -> case skipStep steps t book p tape of
+      MachineStuck -> error "machinestuck"
+      Unknown e -> (trace, Left e)
+      --TODO: maybe we're supposed to put the nonhaltproving skip on the trace?
+      NonhaltProven hp -> (trace, Right $ ContinueForever hp)
+      Stopped c finalTape skip ->
+        (skip : trace, Right $ Halted (steps + infCountToInt c) finalTape)
+      Stepped c newP newTape skip newDisp rs -> case c of
+        --TODO
+        Infinity -> (skip : trace, Right $ ContinueForever (OffToInfinityN steps L)) --(SkippedToInfinity steps skip))
+        c -> let newHist = hist & reverseTapeHist %~ ((p, tape) :)
+                 newHistSet = histSet & at (p, tape) ?~ steps
+                 newDispHist = dispHist & reverseDispHist %~ (disp :)
+          in
+          simulateOneMachine limit t $ SimState newP newTape book (steps + infCountToInt c) (skip : trace)
+            newHist newHistSet counter (disp + fromJust newDisp) newDispHist (addToRRSH rs rsHist) fastLRCheck
 
 simulateOneTotalMachine :: Int -> Turing -> ([Skip Count Bit], SimResult InfCount Bit)
 simulateOneTotalMachine limit machine = (^?! _Right) <$> simulateOneMachine limit machine (initSkipState machine)

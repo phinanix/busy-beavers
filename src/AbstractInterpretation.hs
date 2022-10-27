@@ -112,7 +112,7 @@ nearHeadGetNextConfigs :: forall s. (TapeSymbol s)
   => Int -> Turing -> SkipBook (AbsAny s) -> Maybe (Phase, ExpTape (AbsAny s) InfCount) 
   -> [Maybe (Phase, ExpTape (AbsAny s) InfCount)]
 nearHeadGetNextConfigs _ _ _  Nothing = error "next config nothing?"
-nearHeadGetNextConfigs k m skips (Just (ph, tape)) = case skipStep m skips ph tape of
+nearHeadGetNextConfigs k m skips (Just (ph, tape)) = case skipStep undefined m skips ph tape of
   Unknown _e -> [Nothing]
   Stopped {} -> [Nothing]
   Stepped _ newPh (ExpTape _ MultipleAny _) _ _ _ -> branchAndContinue
