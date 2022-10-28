@@ -2,10 +2,11 @@ module Runner where
 
 
 import Relude
-import Control.Lens
+import Control.Lens hiding ((.=))
 import qualified Relude.Unsafe as U
 import qualified Data.Map as M
-import qualified Data.Text as T (concat, intercalate)
+import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
 import qualified Data.Set as S
 import qualified Data.List.NonEmpty as NE
 import Relude.Extra (bimapBoth)
@@ -13,17 +14,17 @@ import Prettyprinter
 import Safe.Exact
 import Control.Exception (assert)
 import Safe.Partial
-import Data.Binary.Get 
+import Data.Binary.Get
 
 import Data.ByteString.Builder as BS
 import Data.Bits
 import qualified Data.ByteString.Lazy as BL
-
+import Data.Vector.Fixed.Unboxed ( Vec )
 import qualified Data.Vector as V
 import qualified Data.Text.Lazy.IO as TLIO
 import qualified Data.Text.IO as TIO
 
-import Util
+import Util hiding ((.:))
 import Count
 import Skip
 import ExpTape
@@ -43,6 +44,9 @@ import System.IO (withBinaryFile)
 import System.Directory
 import Data.List (isSuffixOf)
 import System.FilePath
+import Data.Text.Encoding (encodeUtf8Builder)
+import Data.Typeable (typeOf, TypeRep, typeRep)
+import Data.Aeson.Types (Parser)
 
 
 {-
@@ -213,6 +217,50 @@ packRes (t, res) = let (w8, w64) = bitEncodeSimResult res in
 bitPackResults :: [(Turing, Mystery TapeSymbol (SimResult InfCount))] -> Builder
 bitPackResults res = mconcat $ packRes <$> res
 
+newtype SomeResult = SomeResult (Mystery TapeSymbol (SimResult InfCount))
+  deriving (Eq, Ord, Show, Generic)
+
+symbolTypeOfSomeResult :: forall c s. (TapeSymbol s)
+  => SimResult c s -> TypeRep
+symbolTypeOfSomeResult _res = typeRep (Proxy @s)
+
+symbolRepToText :: TypeRep -> Text
+symbolRepToText rep
+  | rep == typeRep (Proxy @Bit) = "Bit"
+  | rep == typeRep (Proxy @(Vec 2)) = "Vec 2"
+  | rep == typeRep (Proxy @(Vec 3)) = "Vec 3"
+  | rep == typeRep (Proxy @(Vec 4)) = "Vec 4"
+  | rep == typeRep (Proxy @(Vec 5)) = "Vec 5"
+  | rep == typeRep (Proxy @(Vec 6)) = "Vec 6"
+  | rep == typeRep (Proxy @(Vec 7)) = "Vec 7"
+  | otherwise = error $ "tried to print unknown rep:" <> show rep
+
+textToParseFunc :: Text -> Value -> Parser (Mystery TapeSymbol (SimResult InfCount))
+textToParseFunc typeName
+  | typeName == "Bit" = fmap Mystery . parseJSON @(SimResult InfCount Bit)
+  | typeName == "Vec 2" = fmap Mystery . parseJSON @(SimResult InfCount (Vec 2 Bit))
+  | typeName == "Vec 3" = fmap Mystery . parseJSON @(SimResult InfCount (Vec 3 Bit))
+  | typeName == "Vec 4" = fmap Mystery . parseJSON @(SimResult InfCount (Vec 4 Bit))
+  | typeName == "Vec 5" = fmap Mystery . parseJSON @(SimResult InfCount (Vec 5 Bit))
+  | typeName == "Vec 6" = fmap Mystery . parseJSON @(SimResult InfCount (Vec 6 Bit))
+  | typeName == "Vec 7" = fmap Mystery . parseJSON @(SimResult InfCount (Vec 7 Bit))
+  | otherwise = error $ "tried to parse unknown type: " <> show typeName
+
+instance ToJSON SomeResult where
+  toJSON :: SomeResult -> Value
+  toJSON (SomeResult (Mystery res)) = object [
+    "symty" .= symbolRepToText (symbolTypeOfSomeResult res),
+    "result" .= toJSON res]
+
+instance FromJSON SomeResult where
+  parseJSON :: Value -> Parser SomeResult
+  parseJSON = withObject "SomeResult" $ \v -> do
+    tyName <- v .: "symty"
+    let parseFunc = textToParseFunc tyName
+    resJSON <- v .: "result"
+    SomeResult <$> parseFunc resJSON
+    
+
 --a series of lines, each line is first a machine string and then a json blob 
 --containing the simulation result
 resultsToText :: [(Turing, Mystery TapeSymbol (SimResult InfCount))] -> _
@@ -329,7 +377,7 @@ aggregateFiles :: String -> IO ()
 aggregateFiles experimentName = do
   let experimentDirectory = takeDirectory experimentName
   dirContents <- listDirectory experimentDirectory
-  let toAggregate = ((experimentDirectory <> "/") <>) <$> 
+  let toAggregate = ((experimentDirectory <> "/") <>) <$>
         filter (\s -> takeFileName experimentName `isPrefixOf` s) dirContents
   let binaryFiles = filter (\s -> "bin.bin" `isSuffixOf` s) toAggregate
   let jsonFiles = filter (\s -> "json.json" `isSuffixOf` s) toAggregate
@@ -350,22 +398,22 @@ aggregateFiles experimentName = do
 --       Just (newWord, newBS) -> (newWord : words, newBS)
 
 getTMandResult :: Int -> Get (Turing, BitSimResult)
-getTMandResult numStates = do 
+getTMandResult numStates = do
   tmWord64 <- getWord64be
   resWord8 <- getWord8
-  resWord64 <- getWord64be 
-  pure (decodeTM numStates tmWord64, 
+  resWord64 <- getWord64be
+  pure (decodeTM numStates tmWord64,
         bitDecodeSimResult resWord8 resWord64)
-       
+
 getManyItem :: Get a -> Get [a]
-getManyItem getOne = do 
-  consumedAll <- isEmpty 
-  if consumedAll 
-    then pure [] 
-    else do 
-      nextOne <- getOne 
-      (nextOne :) <$> getManyItem getOne 
-  
+getManyItem getOne = do
+  consumedAll <- isEmpty
+  if consumedAll
+    then pure []
+    else do
+      nextOne <- getOne
+      (nextOne :) <$> getManyItem getOne
+
 
 -- popResultFromBS :: Int -> BL.ByteString 
 --   -> Maybe ((Turing, BitSimResult), BL.ByteString)
@@ -387,8 +435,21 @@ loadBinaryFile numStates fp = do
   --pure $ unfoldr (popResultFromBS numStates) rawBytestring
   pure $ runGet (getManyItem (getTMandResult numStates)) rawBytestring
 
-loadJSONFile :: FilePath -> IO [(Turing, Mystery TapeSymbol (SimResult InfCount))]
-loadJSONFile fp = undefined 
+loadResult :: Text -> (Turing, SomeResult)
+loadResult textIn = let
+  (tmText, jsonText) = T.breakOn " " textIn
+  in (unm tmText, fromJust . decode . toLazyByteString . encodeUtf8Builder $ jsonText)
+
+loadJSONFile :: FilePath -> IO [(Turing, SomeResult)]
+loadJSONFile fp = do
+  lazyFile <- TLIO.readFile fp
+  pure $ unfoldr parseNextLine lazyFile
+  where
+    parseNextLine :: TL.Text -> Maybe ((Turing, _), TL.Text)
+    parseNextLine txt = if TL.null txt then Nothing else let
+      (nextLine, remaining) = TL.span (/= ' ') txt
+      in Just (loadResult $ toStrict nextLine, TL.tail remaining)
+
 
 loadMachinesFromFile :: String -> IO [Turing]
 loadMachinesFromFile fn = do
@@ -396,11 +457,11 @@ loadMachinesFromFile fn = do
   pure $ unm <$> lines fileContents
 
 --bitpacked machines, json machines, and undecided machines
-loadAggregatedExperimentFiles :: Int -> String 
-  -> IO ([(Turing, BitSimResult)], 
-         [(Turing, Mystery TapeSymbol (SimResult InfCount))], 
+loadAggregatedExperimentFiles :: Int -> String
+  -> IO ([(Turing, BitSimResult)],
+         [(Turing, SomeResult)],
          [Turing])
-loadAggregatedExperimentFiles numStates experimentName = do 
+loadAggregatedExperimentFiles numStates experimentName = do
   bsrs <- loadBinaryFile numStates $ experimentName <> "_all_bin.bin"
   jsons <- loadJSONFile $ experimentName <> "_all_json.json"
   unfinished <- loadMachinesFromFile $ experimentName <> "_all_undecided.txt"

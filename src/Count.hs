@@ -28,6 +28,8 @@ instance NFData SymbolVar
 instance ToJSONKey SymbolVar
 instance ToJSON SymbolVar where 
   toEncoding = genericToEncoding defaultOptions
+instance FromJSONKey SymbolVar where 
+instance FromJSON SymbolVar where 
 
 --a variable with logical type positive integer which is (implicitly) quantified
 -- / bound by a forall quantifier at the beginning of the sentence
@@ -39,6 +41,8 @@ instance NFData BoundVar
 instance ToJSONKey BoundVar
 instance ToJSON BoundVar where 
   toEncoding = genericToEncoding defaultOptions
+instance FromJSONKey BoundVar where 
+instance FromJSON BoundVar where 
 
 --a variable with logical type "s", the type variable of symbols on the tape which
 --is implicitly forall quantified
@@ -72,8 +76,10 @@ data Count = Count
 instance NFData Count
 instance ToJSON a => ToJSON (Sum a) where
   toEncoding = genericToEncoding defaultOptions
+instance FromJSON a => FromJSON (Sum a) where
 instance ToJSON Count where 
   toEncoding = genericToEncoding defaultOptions
+instance FromJSON Count 
 
 pattern One :: Count
 pattern One = Count 1 Empty Empty
@@ -138,6 +144,7 @@ data InfCount = NotInfinity Count | Infinity deriving (Eq, Ord, Show, Generic)
 instance NFData InfCount
 instance ToJSON InfCount where 
   toEncoding = genericToEncoding defaultOptions
+instance FromJSON InfCount 
 
 pattern IOne :: InfCount
 pattern IOne = NotInfinity One

@@ -21,6 +21,7 @@ data ExpTape s c = ExpTape
   , right :: [(s, c)]
   } deriving (Eq, Ord, Show, Generic, Functor)
 instance (NFData s, NFData c) => NFData (ExpTape s c)
+instance (FromJSON s, FromJSON c) => FromJSON (ExpTape s c) 
 instance (ToJSON s, ToJSON c) => ToJSON (ExpTape s c) where 
     toEncoding = genericToEncoding defaultOptions
 

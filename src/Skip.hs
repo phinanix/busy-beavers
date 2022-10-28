@@ -28,7 +28,7 @@ data FinalTape c s = FinalTape ([(s, c)], [(s, c)]) (TapePush c Bit)
   deriving (Eq, Ord, Show, Generic)
 instance (ToJSON s, ToJSON c) => ToJSON (FinalTape c s) where 
     toEncoding = genericToEncoding defaultOptions
-
+instance (FromJSON s, FromJSON c) => FromJSON (FinalTape c s) 
 instance (NFData s, NFData c) => NFData (FinalTape c s) 
 
 --TODO write a pretty version
@@ -70,6 +70,7 @@ data TapePush c s = Side Dir [(s, c)]
 instance (NFData c, NFData s) => (NFData (TapePush c s))
 instance (ToJSON s, ToJSON c) => ToJSON (TapePush c s) where 
     toEncoding = genericToEncoding defaultOptions
+instance (FromJSON s, FromJSON c) => FromJSON (TapePush c s) 
 
 instance Functor (TapePush c) where 
   fmap f = \case 

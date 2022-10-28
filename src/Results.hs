@@ -25,6 +25,7 @@ data SimResult c s = Halted Steps (FinalTape c s) --this is steps taken
 instance (NFData c, NFData s) => (NFData (SimResult c s))
 
 instance (ToJSON c, ToJSON s) => ToJSON (SimResult c s) 
+instance (FromJSON c, FromJSON s) => FromJSON (SimResult c s) 
 
 --this doesn't work for some bizarre reason, it gives some big kind error :c
 -- $(makePrisms ''SimResult)

@@ -17,15 +17,18 @@ import Data.Aeson
 newtype Phase = Phase { unPhase :: Int} deriving (Eq, Ord, Generic)
 instance ToJSON Phase where 
     toEncoding = genericToEncoding defaultOptions
+instance FromJSON Phase where 
 instance Show Phase where
   show (Phase i) = "(Phase " <> show i <> ")"
 
 data Dir = L | R deriving (Eq, Ord, Show, Generic)
 instance ToJSON Dir where 
     toEncoding = genericToEncoding defaultOptions
+instance FromJSON Dir where 
 newtype Bit = Bit Bool deriving (Eq, Ord, Show, Generic)
 instance ToJSON Bit where 
   toEncoding = genericToEncoding defaultOptions
+instance FromJSON Bit 
 type Edge = (Phase, Bit)
 data Trans = Halt | Step Phase Bit Dir deriving (Eq, Ord, Show, Generic)
 

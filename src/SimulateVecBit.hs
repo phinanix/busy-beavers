@@ -20,7 +20,7 @@ import Data.Vector.Fixed hiding (toList, fromList, foldMap, Empty, length)
 import qualified Data.Vector.Fixed as V
 import Data.Vector.Fixed.Unboxed
 import qualified Data.Vector.Fixed.Primitive as P
-
+import qualified Data.Vector as ArbV
 import Util
 import Turing
 import ExpTape
@@ -35,6 +35,7 @@ import SimulateTwoBit
 import Data.Vector.Fixed.Mutable (IVector (..), MVector (..))
 import Data.Aeson
 import qualified Data.Vector
+import Data.Aeson.Types (Parser)
 
 
 
@@ -175,6 +176,17 @@ instance Arity n => ToJSON (Vec n Bit) where
   toJSON = V.foldl helper (Array Empty) where 
     helper :: Value -> Bit -> Value 
     helper (Array a) (Bit b) = Array $ Data.Vector.snoc a (Bool b)
+
+instance Arity n => FromJSON (Vec n Bit) where 
+  parseJSON :: Value -> Parser (Vec n Bit)
+  parseJSON (Array arr) = pure $ inner arr
+   where 
+    inner :: Array -> Vec n Bit 
+    inner arr = V.unfoldr (first (Bit . assertBool) . fromJust . ArbV.uncons) arr
+    assertBool = \case 
+      Bool b -> b 
+      notbool -> error $ "parse wasn't a bool: " <> show notbool
+  parseJSON v = error $ "tried to parse a non array as a Vec: " <> show v
 
 instance (Arity n) => TapeSymbol (Vec n Bit) where
   blank = V.replicate (Bit False)

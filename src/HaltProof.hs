@@ -49,7 +49,8 @@ instance (NFData s) => NFData (HaltProof s)
 
 instance ToJSON (HaltProof s) where 
   toEncoding = genericToEncoding defaultOptions
-
+instance FromJSON (HaltProof s) where 
+  
 mirrorHaltProof :: HaltProof s -> HaltProof s
 mirrorHaltProof (OffToInfinityN s d) = OffToInfinityN s $ mirrorDir d
 --mirrorHaltProof (OffToInfinitySimple s d) = OffToInfinitySimple s $ mirrorDir d
