@@ -94,7 +94,9 @@ tacticVectors = M.fromList
   , ("abs", absVector)
   , ("fast", fastTacticVector)
   , ("splitter", splitterTacticVector)
+  , ("splitfast", splitterTacticVector V.++ fastTacticVector)
   ]
+--sarah barrios thank god you introduced me to your sister
 
 putMachinesInFile :: [Turing] -> String -> IO ()
 putMachinesInFile ms fn = do

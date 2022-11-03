@@ -313,7 +313,7 @@ skipAppliesForeverInHist skip hist = case forevers of
   (idx, _config, _res) : _xs -> Right $ SkippedToInfinity idx
   where
   apps = let
-    ans = mapMaybe (\(i, config) -> (i,config,) <$> applySkip undefined skip config)
+    ans = mapMaybe (\(i, config) -> (i,config,) <$> applySkip i skip config)
                 (zip [0,1 ..] $ getTapeHist hist)
     in
     --trace ("apps len " <> show (length ans)) 

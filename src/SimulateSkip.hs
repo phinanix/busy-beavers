@@ -265,7 +265,8 @@ makeHaltProof curStep skip boundVs = case skip of
       assert (c1 <> One == c2)
       --period is todo for now, it uses stepCount
       LinRecur curStep 0 $ length (toBits b)
-  _ -> error $ "skip of wrong shape: " <> showP skip <> "\n" <> show boundVs
+  _ -> SkippedToInfinity curStep
+    --error $ "skip of wrong shape: " <> showP skip <> "\n" <> show boundVs
 
 
 

@@ -266,8 +266,8 @@ instance FromJSON SomeResult where
 resultsToText :: [(Turing, Mystery TapeSymbol (SimResult InfCount))] -> _
 resultsToText results = toLazyText $ foldMap mkLine $ filter (not . resIsBin . snd) results where
   mkLine :: (Turing, Mystery TapeSymbol (SimResult InfCount)) -> _
-  mkLine (m, Mystery res)
-    = fromText (machineToNotation m <> " ") <> encodeToTextBuilder res <> fromText "\n"
+  mkLine (m, res)
+    = fromText (machineToNotation m <> " ") <> encodeToTextBuilder (SomeResult res) <> fromText "\n"
   resIsBin :: Mystery TapeSymbol (SimResult InfCount) -> Bool
   resIsBin (Mystery res) = case res of
     Halted{} -> True
@@ -436,9 +436,10 @@ loadBinaryFile numStates fp = do
   pure $ runGet (getManyItem (getTMandResult numStates)) rawBytestring
 
 loadResult :: Text -> (Turing, SomeResult)
-loadResult textIn = let
+loadResult textIn = trace (toString $ "loading: " <> textIn) $ let
   (tmText, jsonText) = T.breakOn " " textIn
-  in (unm tmText, fromJust . decode . toLazyByteString . encodeUtf8Builder $ jsonText)
+  in trace (toString $ "jsontext: " <> jsonText) 
+    (unm tmText, fromJust . decode . toLazyByteString . encodeUtf8Builder $ jsonText)
 
 loadJSONFile :: FilePath -> IO [(Turing, SomeResult)]
 loadJSONFile fp = do
@@ -447,7 +448,7 @@ loadJSONFile fp = do
   where
     parseNextLine :: TL.Text -> Maybe ((Turing, _), TL.Text)
     parseNextLine txt = if TL.null txt then Nothing else let
-      (nextLine, remaining) = TL.span (/= ' ') txt
+      (nextLine, remaining) = TL.span (/= '\n') txt
       in Just (loadResult $ toStrict nextLine, TL.tail remaining)
 
 
