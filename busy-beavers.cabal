@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9fa524a74489c70c0d87446b47e39da40dd230670fe8e4c35f957633be8a6e53
+-- hash: f547a9f2ea302f60ec9a0957a00a75e88c0a60f086022f623d0164beda0f5519
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -201,6 +201,7 @@ test-suite busy-beavers-test
   main-is: Spec.hs
   other-modules:
       AbstractInterpretationSpec
+      AggregateSpec
       BackwardSearchSpec
       CountSpec
       GlueSpec

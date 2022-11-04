@@ -10,6 +10,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Set as S
 import qualified Data.List.NonEmpty as NE
+import qualified Text.Show 
 import Relude.Extra (bimapBoth)
 import Prettyprinter
 import Safe.Exact
@@ -33,9 +34,8 @@ data StatType a = Count | MaxKBy Int (a -> a -> Ordering) deriving Generic
 type Filter a = a -> Bool 
 data Statistic a = Statistic (Filter a) (StatType a) 
 
-data StatsResult a where 
-  CountRes :: Int -> StatsResult a 
-  MaxKByRes :: [a] -> StatsResult a 
+data StatsResult a = CountRes Int | MaxKByRes [a] deriving (Eq, Ord, Show, Generic) 
+instance (NFData a) => NFData (StatsResult a)
 
 initResult :: Statistic a -> StatsResult a 
 initResult (Statistic _filter statType) = case statType of 
