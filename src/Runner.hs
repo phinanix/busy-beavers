@@ -340,7 +340,8 @@ runnerDotPy tacticList startMachines experimentName chunkSize
         loop (((,n) <$> branchMachines) ++ todos) curRes i resCount
       Just (Right r) -> loop todos ((tm, r) : curRes) i resCount
     Just (Simulation f) -> case f tm of
-      (newTMs, newRes) -> loop (((,n+1) <$> newTMs) ++ todos) (newRes ++ curRes) i resCount
+      (newTMs, newRes) -> trace ("new tms: " <> show newTMs <> " newRes: " <> show newRes) $ 
+        loop (((,n+1) <$> newTMs) ++ todos) (newRes ++ curRes) i resCount
 
 outputFiles :: Text -> [Turing]
   --int parameter is previous count of results, int return val is next result count

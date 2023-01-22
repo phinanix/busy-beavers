@@ -264,7 +264,7 @@ makeHaltProof curStep skip boundVs = case skip of
       assert (b == b' && b' == b'')
       assert (c1 <> One == c2)
       --period is todo for now, it uses stepCount
-      LinRecur curStep 0 $ length (toBits b)
+      LinRecur curStep 0 $ length (toBits b)  
   _ -> SkippedToInfinity curStep
     --error $ "skip of wrong shape: " <> showP skip <> "\n" <> show boundVs
 
@@ -308,8 +308,8 @@ packageResult curStep skip@(Skip s e hopCount) tape
           ph
           <$> getFinalET tp tapeSides
           <*> pure skip
-          <*> pure (Just shift)
-          <*> pure (Just $ ReadShift (-startLLen) startRLen shift)
+          <*> pure shift
+          <*> pure (ReadShift <$> (negate <$> startLLen) <*> startRLen <*> shift)
       where
       getFinalET :: Partial => TapePush Count s -> ([(s, InfCount)], [(s, InfCount)]) -> Either Text (ExpTape s InfCount)
       getFinalET (Middle (ExpTape ls p rs)) (remLs, remRs) = let
@@ -331,8 +331,8 @@ packageResult curStep skip@(Skip s e hopCount) tape
         (point, remremRs) <- getNewPoint remRs
         pure $ ExpTape (finalizeList newLs `etApp` remLs) point remremRs
 
-      shiftL = endLLen - startLLen
-      shiftR = startRLen - endRLen
+      shiftL = (-) <$> endLLen <*> startLLen
+      shiftR = (-) <$> startRLen <*> endRLen
       shift = assert (let
         ans = shiftL == shiftR
         msg = ("failing assert: " <> show (shiftL, shiftR)
@@ -344,19 +344,19 @@ packageResult curStep skip@(Skip s e hopCount) tape
         shiftL
       (startLLen, startRLen) = configLens s
       (endLLen, endRLen) = tpLens tp
-      configLens :: Config Count s -> (Int, Int)
+      configLens :: Config Count s -> (Maybe Int, Maybe Int)
       configLens (Config _ph ls _p rs) = (getLen ls, getLen rs)
-      tapeLens :: ExpTape s Count -> (Int, Int)
+      tapeLens :: ExpTape s Count -> (Maybe Int, Maybe Int)
       tapeLens (ExpTape ls _p rs) = (getLen ls, getLen rs)
-      tpLens :: TapePush Count s -> (Int, Int)
+      tpLens :: TapePush Count s -> (Maybe Int, Maybe Int)
       tpLens = \case
       --TODO (XX) are these -1s totally insane
-        Side L ls -> (-1, getLen ls)
-        Side R rs -> (getLen rs, -1)
+        Side L ls -> (Just (-1), getLen ls)
+        Side R rs -> (getLen rs, Just (-1))
         Middle con -> tapeLens con
 
-      getLen :: [(s, Count)] -> Int
-      getLen xs = sum $ (\(_s, c) -> infCountToInt $ updateCountToInf boundVs c) <$> xs
+      getLen :: [(s, Count)] -> Maybe Int
+      getLen xs = sum <$> (\(_s, c) -> infCountToMaybeInt $ updateCountToInf boundVs c) <%> xs
 
       -- updatePoint :: Map BoundVar InfCount -> (s, Location Count) -> (s, Location InfCount)
       -- updatePoint bs = (_2. _Side . _1 %~ updateCount bs)
@@ -389,6 +389,7 @@ skipPrecedence :: (Ord s)
   -> PartialStepResult InfCount s
   -> Ordering
 skipPrecedence a b | a == b = EQ
+-- skipPrecedence a b = GT
 skipPrecedence res1 res2 = case (res1, res2) of
   (NonhaltProven _, Stopped {}) -> error "can't both run forever and halt"
   (Stopped {}, NonhaltProven _) -> error "can't both run forever and halt"

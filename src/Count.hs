@@ -159,6 +159,14 @@ dispInfCount (NotInfinity c) = dispCount c
 instance Pretty InfCount where
   pretty = pretty . dispInfCount
 
+countToMaybeInt :: Count -> Maybe Int
+countToMaybeInt (Count m Empty Empty) = Just $ fromIntegral m
+countToMaybeInt _c = Nothing 
+
+infCountToMaybeInt :: InfCount -> Maybe Int
+infCountToMaybeInt Infinity = Nothing 
+infCountToMaybeInt (NotInfinity c) = countToMaybeInt c
+
 countToInt :: HasCallStack => Count -> Int
 countToInt (Count m Empty Empty) = fromIntegral m
 countToInt c = error $ "tried to int-ify: " <> dispCount c
