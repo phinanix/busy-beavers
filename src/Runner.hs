@@ -20,6 +20,7 @@ import Data.ByteString.Builder as BS
 import Data.Bits
 import qualified Data.ByteString.Lazy as BL
 import Data.Vector.Fixed.Unboxed ( Vec )
+import Data.Vector (Vector)
 import qualified Data.Vector as V
 import qualified Data.Text.Lazy.IO as TLIO
 import qualified Data.Text.IO as TIO
@@ -47,6 +48,7 @@ import System.FilePath
 import Data.Text.Encoding (encodeUtf8Builder)
 import Data.Typeable (typeOf, TypeRep, typeRep)
 import Data.Aeson.Types (Parser)
+import Data.Char (digitToInt)
 
 
 {-
@@ -260,7 +262,7 @@ instance FromJSON SomeResult where
     let parseFunc = textToParseFunc tyName
     resJSON <- v .: "result"
     SomeResult <$> parseFunc resJSON
-    
+
 
 --a series of lines, each line is first a machine string and then a json blob 
 --containing the simulation result
@@ -321,9 +323,9 @@ runnerDotPy tacticList startMachines experimentName chunkSize
     -- total results output so far
     -> Int
     -> IO ()
-  loop [] res i resCount = outputFiles (filePrefix i) [] res resCount >> pure ()  
+  loop [] res i resCount = outputFiles (filePrefix i) [] res resCount >> pure ()
   loop todos res@((>= chunkSize) . length -> True) i resCount = do
-    newResCount <- outputFiles (filePrefix i) (fst <$> todos) res resCount 
+    newResCount <- outputFiles (filePrefix i) (fst <$> todos) res resCount
     loop todos [] (i+1) newResCount
   loop ((tm, n) : todos) curRes i resCount
     = -- trace ("remTodo: " <> show (length todos)) $ -- <> " len res: " <> show (length curRes)) $ 
@@ -331,20 +333,20 @@ runnerDotPy tacticList startMachines experimentName chunkSize
     case tacticList V.!? n of
     -- TODO: how to get a "we failed" result / let's do a better one than this
     Nothing -> let newRes = Mystery $ Continue 0 (Phase 0) (initExpTape (Bit False)) 0 in
-      loop todos ((tm, newRes) : curRes) i resCount 
+      loop todos ((tm, newRes) : curRes) i resCount
     Just (OneShot f) -> case f tm of
-      Nothing -> loop ((tm, n+1): todos) curRes i resCount 
+      Nothing -> loop ((tm, n+1): todos) curRes i resCount
       Just (Left e) -> let branchMachines = branchOnEdge e tm in
-        loop (((,n) <$> branchMachines) ++ todos) curRes i resCount 
-      Just (Right r) -> loop todos ((tm, r) : curRes) i resCount 
+        loop (((,n) <$> branchMachines) ++ todos) curRes i resCount
+      Just (Right r) -> loop todos ((tm, r) : curRes) i resCount
     Just (Simulation f) -> case f tm of
-      (newTMs, newRes) -> loop (((,n+1) <$> newTMs) ++ todos) (newRes ++ curRes) i resCount 
+      (newTMs, newRes) -> loop (((,n+1) <$> newTMs) ++ todos) (newRes ++ curRes) i resCount
 
 outputFiles :: Text -> [Turing]
   --int parameter is previous count of results, int return val is next result count
-  -> [(Turing, Mystery TapeSymbol (SimResult InfCount))] -> Int -> IO Int 
+  -> [(Turing, Mystery TapeSymbol (SimResult InfCount))] -> Int -> IO Int
 outputFiles filePrefix todo results prevResCount = do
-  let newResCount = prevResCount + length results 
+  let newResCount = prevResCount + length results
       msg = "writing " <> show (length results) <> " to disk\ntotal output so far: " <> show newResCount <> "\n"
   putText msg
   let binBuilder = bitPackResults results
@@ -361,7 +363,102 @@ outputFiles filePrefix todo results prevResCount = do
       TLIO.writeFile (toString $ filePrefix <> "checkpoint.txt") $
         fromStrict $ machinesToText todo
     else pure ()
-  pure newResCount 
+  pure newResCount
+
+applyTactic :: Vector Tactic -> [Turing] -> [(Int, Turing)]
+applyTactic tac machines = let
+    enumMachines = zip [0,1 ..] machines
+    runTactic = getContinues . outerLoop tac
+    runTacticPrint (i, m) = (i,) <$>
+      trace (toString $ "machine: " <> show i <> "\n" <> machineToNotation m)
+      runTactic m
+    unprovenMachines = bind runTacticPrint enumMachines
+  in
+    unprovenMachines
+
+tacticVectors :: (Ord a, IsString a) => Map a (Vector Tactic)
+tacticVectors = M.fromList
+  [ ("backward", bwSearchTacticVector)
+  , ("all", everythingVector)
+  , ("basic", basicTacticVector)
+  , ("constructive", constructiveVector)
+  , ("noncon", nonconVector)
+  , ("abs", absVector)
+  , ("fast", fastTacticVector)
+  , ("splitter", splitterTacticVector)
+  , ("splitfast", splitterTacticVector V.++ fastTacticVector)
+  , ("fewthings", splitterTacticVector V.++ basicTacticVector V.++ bwSearchTacticVector)
+  ]
+--sarah barrios thank god you introduced me to your sister
+
+usageMessage :: Text
+usageMessage = "usage: stack exec busy-beavers-exe experimentName tacticName chunkSize inputMachines"
+  <> "\ninputMachines: either a .txt or seed_bit_stateCount\n"
+
+extractCheckpointNumber :: String -> String -> Maybe Int
+extractCheckpointNumber experimentName s = do
+  let eFN = takeFileName experimentName <> "_"
+      chpt :: String = "_checkpoint.txt"
+  guard $ eFN `isPrefixOf` s
+    && chpt `isSuffixOf` s
+  let remS = drop (length eFN) s
+  let remRemS = reverse $ drop (length chpt) $ reverse remS
+  let intAns :: Int = U.read remRemS
+  pure intAns
+
+getMachines :: String -> String -> IO [Turing]
+getMachines experimentName inputMachineString
+  | ".txt" `isSuffixOf` inputMachineString
+    = loadMachinesFromFile inputMachineString
+  | inputMachineString == "resume" = do
+      let experimentDirectory = takeDirectory experimentName
+      dirContents <- listDirectory experimentDirectory
+      let checkpointFiles = mapMaybe
+            (\s -> (s,) <$> extractCheckpointNumber experimentName s)
+            dirContents
+      case sortOn snd checkpointFiles of 
+        [] -> error $ fromString $
+          "found no checkpoints in specified dir:" <> experimentDirectory
+        (c : cs) -> do 
+          let checkpoints = c :| cs 
+          let checkpointToUse = last checkpoints 
+          putTextLn $ "found checkpoints: " <> show (snd <$> checkpoints)
+          putTextLn $ "using checkpoint " <> show checkpointToUse
+          loadMachinesFromFile $ experimentDirectory <> "/" <> fst checkpointToUse
+  | otherwise = case inputMachineString of
+             ['s', 'e', 'e', 'd', '_', bit, '_', numStates] ->
+               let machineFunc = case bit of
+                     '0' -> startMachine0
+                     '1' -> startMachine1
+                     _ -> invalidStr
+               in
+               pure [machineFunc (digitToInt numStates)]
+             _ -> invalidStr
+  where
+      invalidStr :: a
+      invalidStr
+        = error
+            $ fromString
+                $ inputMachineString <> " is not a valid machine string"
+
+runnerDotPyFromArgs :: IO ()
+runnerDotPyFromArgs = do
+  args <- getArgs
+  case args of
+    [experimentName, tacticName, chunkSizeString, inputMachineString] -> do
+        createDirectoryIfMissing True $ takeDirectory experimentName
+        let chunkSize :: Int = U.read chunkSizeString
+            tacticVec = tacticVectors ^?! ix tacticName
+        inputMachines <- getMachines experimentName inputMachineString
+        let inputMessage = "recieved " <> show (length inputMachines)
+              <> " machines as input. running: " <> fromString tacticName
+              <> "\n"
+        putText inputMessage
+        runnerDotPy tacticVec inputMachines (fromString experimentName) chunkSize
+        putText inputMessage
+        aggregateFiles experimentName
+
+    _ -> putText usageMessage
 
 {-
 a utility which takes an experiment's name, for each file type collects all the
@@ -444,7 +541,7 @@ loadBinaryFile numStates fp = do
 loadResult :: Text -> (Turing, SomeResult)
 loadResult textIn = trace (toString $ "loading: " <> textIn) $ let
   (tmText, jsonText) = T.breakOn " " textIn
-  in trace (toString $ "jsontext: " <> jsonText) 
+  in trace (toString $ "jsontext: " <> jsonText)
     (unm tmText, fromJust . decode . toLazyByteString . encodeUtf8Builder $ jsonText)
 
 loadJSONFile :: FilePath -> IO [(Turing, SomeResult)]
@@ -460,8 +557,11 @@ loadJSONFile fp = do
 
 loadMachinesFromFile :: String -> IO [Turing]
 loadMachinesFromFile fn = do
+  putTextLn $ "loading machines from file: " <> fromString fn
   fileContents <- TIO.readFile fn
-  pure $ unm <$> lines fileContents
+  let machines = unm <$> lines fileContents
+  putTextLn $ "loaded " <> show (length machines) <> " machines" 
+  pure machines 
 
 --bitpacked machines, json machines, and undecided machines
 loadAggregatedExperimentFiles :: Int -> String

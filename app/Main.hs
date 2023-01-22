@@ -35,7 +35,7 @@ import Control.Exception
 import Runner
 import Data.Char
 import Data.List (isSuffixOf)
-import System.Directory 
+import System.Directory
 import System.FilePath
 
 --interactive program that lets you display machines that are not solved 
@@ -72,33 +72,6 @@ readFile filename = do
         hClose handle
         pure contents
 
-
-applyTactic :: Vector Tactic -> [Turing] -> [(Int, Turing)]
-applyTactic tac machines = let
-    enumMachines = zip [0,1 ..] machines
-    runTactic = getContinues . outerLoop tac
-    runTacticPrint (i, m) = (i,) <$> 
-      trace (toString $ "machine: " <> show i <> "\n" <> machineToNotation m) 
-      runTactic m
-    unprovenMachines = bind runTacticPrint enumMachines
-  in
-    unprovenMachines
-
-tacticVectors :: (Ord a, IsString a) => Map a (Vector Tactic)
-tacticVectors = M.fromList
-  [ ("backward", bwSearchTacticVector)
-  , ("all", everythingVector)
-  , ("basic", basicTacticVector)
-  , ("constructive", constructiveVector)
-  , ("noncon", nonconVector)
-  , ("abs", absVector)
-  , ("fast", fastTacticVector)
-  , ("splitter", splitterTacticVector)
-  , ("splitfast", splitterTacticVector V.++ fastTacticVector)
-  , ("fewthings", splitterTacticVector V.++ basicTacticVector V.++ bwSearchTacticVector)
-  ]
---sarah barrios thank god you introduced me to your sister
-
 putMachinesInFile :: [Turing] -> String -> IO ()
 putMachinesInFile ms fn = do
   let machineString = T.intercalate "\n" $ machineToNotation <$> ms
@@ -110,17 +83,17 @@ processMachinesViaArgs :: IO ()
 processMachinesViaArgs = do
   args <- getArgs
   let [tacticName, inputFile, outputFile] = assert (length args == 3) args
-      tacticVec = tacticVectors ^?! ix tacticName 
-  inputMachines <- loadMachinesFromFile inputFile 
-  let inputMessage = "read " <> show (length inputMachines) 
+      tacticVec = tacticVectors ^?! ix tacticName
+  inputMachines <- loadMachinesFromFile inputFile
+  let inputMessage = "read " <> show (length inputMachines)
        <> " machines as input. running: " <> fromString tacticName
        <> "\n"
   putText inputMessage
-  let unprovenMachinesWNums = applyTactic tacticVec inputMachines 
+  let unprovenMachinesWNums = applyTactic tacticVec inputMachines
       unprovenMachines = snd <$> unprovenMachinesWNums
-  putMachinesInFile unprovenMachines outputFile 
+  putMachinesInFile unprovenMachines outputFile
   putText inputMessage
-  putText $ "finished with " <> show (length unprovenMachines) 
+  putText $ "finished with " <> show (length unprovenMachines)
     <> " machines not proven, written to file\n"
 
 {-
@@ -136,45 +109,6 @@ or does not, in which case it must be of the form seed_x_y where x is 0 or 1
 and y is a single digit. x is the symbol that the machine writes on the 
 first step, and y is the number of states to enumerate. 
 -}
-
-usageMessage :: Text 
-usageMessage = "usage: stack exec busy-beavers-exe experimentName tacticName chunkSize inputMachines" 
-  <> "\ninputMachines: either a .txt or seed_bit_stateCount\n" 
-
-getMachines :: String -> IO [Turing] 
-getMachines inputMachineString = if ".txt" `isSuffixOf` inputMachineString
-  then loadMachinesFromFile inputMachineString
-  else case inputMachineString of 
-    ['s', 'e', 'e', 'd', '_', bit, '_', numStates] -> 
-      let machineFunc = case bit of 
-            '0' -> startMachine0 
-            '1' -> startMachine1 
-            _ -> invalidStr 
-      in 
-      pure [machineFunc (digitToInt numStates)]
-    _ -> invalidStr 
-    where 
-    invalidStr :: a 
-    invalidStr = error $ fromString $ inputMachineString <> " is not a valid machine string"
-
-runnerDotPyFromArgs :: IO () 
-runnerDotPyFromArgs = do 
-  args <- getArgs 
-  case args of 
-    [experimentName, tacticName, chunkSizeString, inputMachineString] -> do
-        createDirectoryIfMissing True $ takeDirectory experimentName 
-        let chunkSize :: Int = U.read chunkSizeString
-            tacticVec = tacticVectors ^?! ix tacticName 
-        inputMachines <- getMachines inputMachineString
-        let inputMessage = "recieved " <> show (length inputMachines) 
-              <> " machines as input. running: " <> fromString tacticName
-              <> "\n"
-        putText inputMessage
-        runnerDotPy tacticVec inputMachines (fromString experimentName) chunkSize
-        putText inputMessage
-        aggregateFiles experimentName
-
-    _ -> putText usageMessage
 
 main :: IO ()
 main = do

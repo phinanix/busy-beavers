@@ -5,7 +5,7 @@ import Relude
 import Control.Lens
 
 import Test.Hspec
-import Test.QuickCheck
+import Test.QuickCheck ( Testable(property) )
 import Control.Exception (evaluate)
 import qualified Data.Vector.Fixed as V
 
@@ -42,3 +42,8 @@ spec = do
       property (\(w::Word64) -> packWord16Word64 (unpackWord64Word16 w) `shouldBe` w) 
     it "other round trips" $ do 
       property (\tup -> unpackWord64Word16 (packWord16Word64 tup) `shouldBe` tup)  
+  describe "extractCheckpointNumber" $ do 
+    it "extracts a checkpoint" $ 
+      extractCheckpointNumber "size3" "size3_0_checkpoint.txt" `shouldBe` Just 0
+    it "returns Nothing on things that aren't a checkpoint" $ 
+      extractCheckpointNumber "size3" "size3_1_json.json" `shouldBe` Nothing

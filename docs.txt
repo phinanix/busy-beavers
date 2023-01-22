@@ -1,3 +1,11 @@
 Main usage: 
 stack exec busy-beavers-exe experimentName tacticName chunkSize inputMachines
-inputMachines: either a .txt or seed_bit_stateCount
+inputMachines: either a .txt or seed_bit_stateCount or resume 
+
+.txt should contain newline separated machine strings 
+
+seed_bit_stateCount (such as seed_1_4 for the bit 1 and the stateCount 4) 
+starts a new run on that machine seed 
+
+resume checks if that experiment already exists, and if so, resumes at the 
+last checkpoint
