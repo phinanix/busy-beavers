@@ -1,0 +1,3 @@
+Main usage: 
+stack exec busy-beavers-exe experimentName tacticName chunkSize inputMachines
+inputMachines: either a .txt or seed_bit_stateCount

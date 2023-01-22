@@ -95,6 +95,7 @@ tacticVectors = M.fromList
   , ("fast", fastTacticVector)
   , ("splitter", splitterTacticVector)
   , ("splitfast", splitterTacticVector V.++ fastTacticVector)
+  , ("fewthings", splitterTacticVector V.++ basicTacticVector V.++ bwSearchTacticVector)
   ]
 --sarah barrios thank god you introduced me to your sister
 

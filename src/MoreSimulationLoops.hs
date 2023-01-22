@@ -117,7 +117,7 @@ proveByIndV1 machine state =
 
 proveSimply :: (TapeSymbol s) => SimOneAction s
 proveSimply machine state = case mbProof of
-  Left txt -> trace (toString $ "provesimply failed because: " <> txt <> "\nEOM\n") $
+  Left txt -> --trace (toString $ "provesimply failed because: " <> txt <> "\nEOM\n") $
     Right state
   Right hp -> Left $ ContinueForever hp
   where

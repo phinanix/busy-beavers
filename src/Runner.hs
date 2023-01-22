@@ -186,6 +186,7 @@ _ -> reserved for later use
 
 -}
 bitEncodeSimResult :: Mystery TapeSymbol (SimResult InfCount) -> (Word8, Word64)
+
 bitEncodeSimResult (Mystery res) = case res of
   Halted n _ft -> (0, fromIntegral n)
   ContinueForever (LinRecur s p t)
@@ -227,12 +228,12 @@ symbolTypeOfSomeResult _res = typeRep (Proxy @s)
 symbolRepToText :: TypeRep -> Text
 symbolRepToText rep
   | rep == typeRep (Proxy @Bit) = "Bit"
-  | rep == typeRep (Proxy @(Vec 2)) = "Vec 2"
-  | rep == typeRep (Proxy @(Vec 3)) = "Vec 3"
-  | rep == typeRep (Proxy @(Vec 4)) = "Vec 4"
-  | rep == typeRep (Proxy @(Vec 5)) = "Vec 5"
-  | rep == typeRep (Proxy @(Vec 6)) = "Vec 6"
-  | rep == typeRep (Proxy @(Vec 7)) = "Vec 7"
+  | rep == typeRep (Proxy @(Vec 2 Bit)) = "Vec 2 Bit"
+  | rep == typeRep (Proxy @(Vec 3 Bit)) = "Vec 3 Bit"
+  | rep == typeRep (Proxy @(Vec 4 Bit)) = "Vec 4 Bit"
+  | rep == typeRep (Proxy @(Vec 5 Bit)) = "Vec 5 Bit"
+  | rep == typeRep (Proxy @(Vec 6 Bit)) = "Vec 6 Bit"
+  | rep == typeRep (Proxy @(Vec 7 Bit)) = "Vec 7 Bit"
   | otherwise = error $ "tried to print unknown rep:" <> show rep
 
 textToParseFunc :: Text -> Value -> Parser (Mystery TapeSymbol (SimResult InfCount))
@@ -309,7 +310,7 @@ make vec n decodable (somehow?)
 --tactics, machines to run, experiment name (for filename), machines per "chunk"
 runnerDotPy :: V.Vector Tactic -> [Turing] -> Text -> Int -> IO ()
 runnerDotPy tacticList startMachines experimentName chunkSize
-  = loop ((,0) <$> startMachines) [] 0
+  = loop ((,0) <$> startMachines) [] 0 0
   where
   filePrefix i = experimentName <> "_" <> show i <> "_"
   loop :: [(Turing, Int)]
@@ -317,30 +318,34 @@ runnerDotPy tacticList startMachines experimentName chunkSize
     -> [(Turing, Mystery TapeSymbol (SimResult InfCount))]
     -- next file to output
     -> Int
+    -- total results output so far
+    -> Int
     -> IO ()
-  loop [] res i = outputFiles (filePrefix i) [] res
-  loop todos res@((>= chunkSize) . length -> True) i = do
-    outputFiles (filePrefix i) (fst <$> todos) res
-    loop todos [] (i+1)
-  loop ((tm, n) : todos) curRes i
+  loop [] res i resCount = outputFiles (filePrefix i) [] res resCount >> pure ()  
+  loop todos res@((>= chunkSize) . length -> True) i resCount = do
+    newResCount <- outputFiles (filePrefix i) (fst <$> todos) res resCount 
+    loop todos [] (i+1) newResCount
+  loop ((tm, n) : todos) curRes i resCount
     = -- trace ("remTodo: " <> show (length todos)) $ -- <> " len res: " <> show (length curRes)) $ 
     --trace ("machine: " <> showP tm <> "\n") $ 
     case tacticList V.!? n of
     -- TODO: how to get a "we failed" result / let's do a better one than this
     Nothing -> let newRes = Mystery $ Continue 0 (Phase 0) (initExpTape (Bit False)) 0 in
-      loop todos ((tm, newRes) : curRes) i
+      loop todos ((tm, newRes) : curRes) i resCount 
     Just (OneShot f) -> case f tm of
-      Nothing -> loop ((tm, n+1): todos) curRes i
+      Nothing -> loop ((tm, n+1): todos) curRes i resCount 
       Just (Left e) -> let branchMachines = branchOnEdge e tm in
-        loop (((,n) <$> branchMachines) ++ todos) curRes i
-      Just (Right r) -> loop todos ((tm, r) : curRes) i
+        loop (((,n) <$> branchMachines) ++ todos) curRes i resCount 
+      Just (Right r) -> loop todos ((tm, r) : curRes) i resCount 
     Just (Simulation f) -> case f tm of
-      (newTMs, newRes) -> loop (((,n+1) <$> newTMs) ++ todos) (newRes ++ curRes) i
+      (newTMs, newRes) -> loop (((,n+1) <$> newTMs) ++ todos) (newRes ++ curRes) i resCount 
 
 outputFiles :: Text -> [Turing]
-  -> [(Turing, Mystery TapeSymbol (SimResult InfCount))] -> IO ()
-outputFiles filePrefix todo results = do
-  let msg = "writing " <> show (length results) <> " to disk\n"
+  --int parameter is previous count of results, int return val is next result count
+  -> [(Turing, Mystery TapeSymbol (SimResult InfCount))] -> Int -> IO Int 
+outputFiles filePrefix todo results prevResCount = do
+  let newResCount = prevResCount + length results 
+      msg = "writing " <> show (length results) <> " to disk\ntotal output so far: " <> show newResCount <> "\n"
   putText msg
   let binBuilder = bitPackResults results
       binFileName = toString $ filePrefix <> "bin.bin"
@@ -356,6 +361,7 @@ outputFiles filePrefix todo results = do
       TLIO.writeFile (toString $ filePrefix <> "checkpoint.txt") $
         fromStrict $ machinesToText todo
     else pure ()
+  pure newResCount 
 
 {-
 a utility which takes an experiment's name, for each file type collects all the

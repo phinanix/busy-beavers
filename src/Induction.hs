@@ -577,7 +577,7 @@ obtainCriticalIndicesConfigs (TapeHist hist) = do
   criticalConfig@(criticalPhase, _criticalSignature) <- guessCriticalConfiguration hist
   let
     configIndicesAndConfigs = let ans = obtainConfigIndices hist criticalConfig in
-      trace ("configs were:\n" <> showP ans)
+      --trace ("configs were:\n" <> showP ans)
       ans
   pure (criticalPhase, configIndicesAndConfigs)
 
@@ -591,12 +591,13 @@ guessInductionHypothesis th rsh = force $ do
       --this is hacky and bad but it used to be necessary to guess right on trickyChristmasTree so I'll try it for now
       --24 jul 22  update is that it is no longer necessary, so I got rid of it, but we'll see what 
       --happens in the future
-      Left msg -> trace (toString $ "ind m1: " <> msg)
+      --17 jan 23 I put it back and don't remember why
+      Left msg -> --trace (toString $ "ind m1: " <> msg)
         guessInductionHypWithIndices th rsh criticalPhase (Unsafe.tail $ Unsafe.tail configIndicesAndConfigs)
     msg = "guessed indhyp:\n" <> showP indGuess
     in
 
-     trace (toString msg) $
+     --trace (toString msg) $
      warnMsg ((thingContainsVar <$> indGuess) /= Right False) msg
      indGuess
 
@@ -644,8 +645,8 @@ generalizeNumberSquare :: ([NonEmpty (Count, Count)], [NonEmpty (Count, Count)])
   -> Either Text ([(Count, Count)], [(Count, Count)])
 generalizeNumberSquare ns = case bitraverseBoth (traverse generalizeFromCounts) ns of
   Right ans -> Right ans
-  Left _msg -> trace ("first generalized: " <> showP firstGeneralized) first U.head $ collectEithers 
-    $ collectAns . generalizeAllPairs . allEqualEverything <$> firstGeneralized
+  Left _msg -> --trace ("first generalized: " <> showP firstGeneralized) 
+    first U.head $ collectEithers $ collectAns . generalizeAllPairs . allEqualEverything <$> firstGeneralized
   where
   collectEithers :: [Either a b] -> Either [a] b 
   collectEithers = foldr (\new accum -> case accum of 
@@ -680,9 +681,10 @@ generalizeNumberSquare ns = case bitraverseBoth (traverse generalizeFromCounts) 
     -> (FunctionExamples, FunctionExamples)
   generalizeBitAgainstOtherBit inp@(lh@(fromCL, (Just fromIn, Just fromOut)),
                                        (toCL, (Nothing, mbToOut)))
-    = trace ("genrealizing: " <> showP fromCL <> "and" <> showP toCL) $
+    = --trace ("genrealizing: " <> showP fromCL <> "and" <> showP toCL) $
       case generalizeFromCounts (neZipExact (fst <$> fromCL) (fst <$> toCL)) of
-      Left msg -> trace (toString $ "failed: " <> msg) inp
+      Left msg -> --trace (toString $ "failed: " <> msg) 
+        inp
       Right (toFromCount, toCount) -> let
         ((newFromIn, newFromOut), (newToFrom,newToCount)) = squareUpPairs (fromIn, fromOut) (toFromCount, toCount)
         in
@@ -779,7 +781,7 @@ guessInductionHypWithIndices (TapeHist hist) (ReadShiftHist rsHist)
       ans
     indexPairs = zipExact (U.init configIndices) (U.tail configIndices)
     slicePairs = let ans = uncurry (getReadShiftSlicePair hist rsHist) <$> indexPairs in
-      trace ("slicepairs were:\n" <> showP ans)
+      --trace ("slicepairs were:\n" <> showP ans)
       ans
     allSigs = let ans = fmap (bimapBoth tapeSignature) slicePairs in
       --trace ("allsigs were: " <> showP ans) 
