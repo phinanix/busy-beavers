@@ -1,6 +1,10 @@
-TR1TL0FR2TL3TL0TR2___FR2 {"result":{"contents":{"contents":2404,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
-TR1TL0FR2TL3TL0TR2___TR2 {"result":{"contents":{"contents":9,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
-TR1___FR2TL3TL0FL0FL0TL3 {"result":{"contents":{"contents":6,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
-TR1TR0FR2TL3TL0___FR0TL3 {"result":{"contents":{"contents":7,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
-TR1TR0FR2TL3TL0___TR0TL3 {"result":{"contents":{"contents":6,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
-TR1___FR2TL3TL0FL0TL1TL3 {"result":{"contents":{"contents":7,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1___TR2TL3TL1TR2FL0TL3 {"result":{"contents":{"contents":5,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1TR0TR2TL3TL1___FR0TL3 {"result":{"contents":{"contents":6,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1TR0TR2TL3TL1___TR0TL3 {"result":{"contents":{"contents":5,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1___TR2TL3TL1TR2TL1TL3 {"result":{"contents":{"contents":6,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1___TR2TL3TL1TR2FR2TL3 {"result":{"contents":{"contents":6,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1___TR2TL3TL1TR2TL2TL3 {"result":{"contents":{"contents":7,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1TL0TR2TL3TL1___FL0TR3 {"result":{"contents":{"contents":7,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1TL0TR2TL3TL1___TL0TR3 {"result":{"contents":{"contents":7,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1TL1TR2TR3TL1TR2___TL0 {"result":{"contents":{"contents":8,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1___TR2TR3TL1FL1TL2FR2 {"result":{"contents":{"contents":19,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}

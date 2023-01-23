@@ -1,6 +1,8 @@
-TR1TL2FR2TR1TL3TL2TL0___ {"result":{"contents":{"contents":7,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
-TR1TR2FR2___TL3FL0TL0FL0 {"result":{"contents":{"contents":8,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
-TR1TR2FR2FL2TL3FR2TL0___ {"result":{"contents":{"contents":4,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
-TR1TR2FR2TR1TL3TL2TL0___ {"result":{"contents":{"contents":8,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
-TR1FL3FR2TR2TL3___TL0TR3 {"result":{"contents":{"contents":4,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
-TR1TL3FR2TR1TL3___TL0TL3 {"result":{"contents":{"contents":6,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1TL3TR2FR1TL0___TR3TL0 {"result":{"contents":{"contents":5,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1TL3TR2FR1TL0___TL3TL0 {"result":{"contents":{"contents":5,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1TL3TR2TL1TL0TR2___TL1 {"result":{"contents":{"contents":5,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1TL3TR2TR0TL0TR2___TL1 {"result":{"contents":{"contents":5,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1TL3TR2FR1TL0___TL3TR1 {"result":{"contents":{"contents":4,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1TL3TR2TL1TL0TR2___TR1 {"result":{"contents":{"contents":6,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1TL3TR2TL1TL0FL3___TR1 {"result":{"contents":{"contents":6,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1TL3TR2TR1TL0TL2___FL2 {"result":{"contents":{"contents":11,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
