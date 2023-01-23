@@ -9,3 +9,10 @@ starts a new run on that machine seed
 
 resume checks if that experiment already exists, and if so, resumes at the 
 last checkpoint
+
+
+Where stuff is: 
+Runner:
+  save and load to disk
+  tactic vector definitions
+  run several tactics in order 

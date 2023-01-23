@@ -3,7 +3,7 @@ module Util where
 import Relude
 import qualified Relude.Unsafe as U
 import Data.Map.Monoidal ( MonoidalMap )
-import qualified Data.Set as S 
+import qualified Data.Set as S
 
 import Control.Lens
 import Safe.Exact (takeExact, dropExact, splitAtExact)
@@ -73,7 +73,7 @@ atE i = at i . iso (fromMaybe Empty) Just
 -- TODO: Use Vector package?
 --inclusive of the endpoints 
 slice :: Partial => Int -> Int -> [a] -> [a]
-slice from to xs = if from > to then error ("from: " <> show from <> " to: " <> show to) else 
+slice from to xs = if from > to then error ("from: " <> show from <> " to: " <> show to) else
   takeExact (to - from + 1) (dropExact from xs)
 
 allEqual :: (Eq s) => [s] -> Bool
@@ -90,7 +90,7 @@ putPretty :: (Pretty a) => a -> IO ()
 putPretty = putText . show . pretty
 
 neZipExact :: Partial => NonEmpty a -> NonEmpty b -> NonEmpty (a, b)
-neZipExact as bs = assertMsg (length as == length bs) 
+neZipExact as bs = assertMsg (length as == length bs)
   ("lengths differ: " <> showP (length as, length bs))
    $ NE.zip as bs
 
@@ -126,30 +126,30 @@ firstT :: (Bitraversable t, Applicative f) => (a -> f c) -> t a d -> f (t c d)
 firstT f = bitraverse f pure
 
 secondT :: (Bitraversable t, Applicative f) => (b -> f d) -> t c b -> f (t c d)
-secondT = bitraverse pure 
+secondT = bitraverse pure
 
-intersectFold :: (Ord a, Foldable t) => t (Set a) -> Set a 
-intersectFold t = go $ toList t where 
-  go [] = Empty 
-  go (x : xs) = foldr S.intersection x xs 
+intersectFold :: (Ord a, Foldable t) => t (Set a) -> Set a
+intersectFold t = go $ toList t where
+  go [] = Empty
+  go (x : xs) = foldr S.intersection x xs
 
 third :: (a -> b) -> (x, y, a) -> (x, y, b)
 third f (x, y, a) = (x, y, f a)
 
-second3 :: (a -> b) -> (x, a, y) -> (x, b, y) 
+second3 :: (a -> b) -> (x, a, y) -> (x, b, y)
 second3 f (x, a, y) = (x, f a, y)
 
-(!!!) :: (Partial) => [a] -> Int -> a 
+(!!!) :: (Partial) => [a] -> Int -> a
 (!!!) list i = assert (i < length list) $ case (!!?) list i of
    Nothing -> error ("index " <> show i <> " list length " <> show (length list))
-   Just a -> a 
+   Just a -> a
 
-assertMsg :: Partial => Bool -> Text -> a -> a 
+assertMsg :: Partial => Bool -> Text -> a -> a
 assertMsg cond msg out = if cond then out else error  msg
 
-warnMsg :: Partial => Bool -> Text -> a -> a 
-warnMsg cond msg out = if cond then out else 
-  trace (toString $ "Warning:" <> msg) out 
+warnMsg :: Partial => Bool -> Text -> a -> a
+warnMsg cond msg out = if cond then out else
+  trace (toString $ "Warning:" <> msg) out
 
 (/\)
     :: (Functor f)
@@ -176,28 +176,28 @@ combineTraversal :: --Traversal' s a -> Traversal' s b -> Traversal' s (a,b)
   forall f a b s. (Applicative f)
   => (forall g. Applicative g => (a -> g a) -> s -> g s)
   -> (forall h. Applicative h => (b -> h b) -> s -> h s)
-  -> ((a,b) -> f (a,b)) -> s -> f s 
-combineTraversal ta tb = undefined where 
+  -> ((a,b) -> f (a,b)) -> s -> f s
+combineTraversal ta tb = undefined where
   helper :: (Applicative f) => (a -> f a) -> (b -> f b) -> ((a,b) -> f (a, b))
-  helper f g (a,b) = (,) <$> f a <*> g b 
+  helper f g (a,b) = (,) <$> f a <*> g b
   invHelper :: (Applicative f) => ((a,b) -> f (a, b)) -> (a -> f a, b -> f b)
   invHelper fg = undefined --((), ())
 
 --this is the unsafe lens that asserts the thing is there
-ixListLens :: Int -> Lens' [s] s 
-ixListLens i = lens get set where 
-  get :: [s] -> s 
+ixListLens :: Int -> Lens' [s] s
+ixListLens i = lens get set where
+  get :: [s] -> s
   get = flip (U.!!) i
   set :: [s] -> s -> [s]
-  set xs newX = case splitAtExact i xs of 
-    (pref, (_oldX:suf)) -> pref ++ (newX:suf)
+  set xs newX = case splitAtExact i xs of
+    (pref, _oldX:suf) -> pref ++ (newX:suf)
     _ -> error ("length: " <> show (length xs) <> " index: " <> show i)
 
 bitraverseBoth :: (Bitraversable p, Applicative f) => (a -> f b) -> p a a -> f (p b b)
 bitraverseBoth f = bitraverse f f
 
-neMConcat :: (Monoid m) => NonEmpty m -> m 
-neMConcat (m :| ms) = foldl' (<>) m ms 
+neMConcat :: (Monoid m) => NonEmpty m -> m
+neMConcat (m :| ms) = foldl' (<>) m ms
 
 sortVector :: Ord a => V.Vector a -> V.Vector a
 sortVector = V.modify Intro.sort

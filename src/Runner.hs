@@ -325,10 +325,10 @@ better rep for counts?
 make vec n decodable (somehow?)
 -}
 
---tactics, machines to run, experiment name (for filename), machines per "chunk"
-runnerDotPy :: V.Vector Tactic -> [Turing] -> Text -> Int -> IO ()
-runnerDotPy tacticList startMachines experimentName chunkSize
-  = loop ((,0) <$> startMachines) [] 0 0
+--tactics, machines to run, experiment name (for filename), machines per "chunk", start file num
+runnerDotPy :: V.Vector Tactic -> [Turing] -> Text -> Int -> Int -> IO ()
+runnerDotPy tacticList startMachines experimentName chunkSize startFileNum
+  = loop ((,0) <$> startMachines) [] startFileNum 0
   where
   filePrefix i = experimentName <> "_" <> show i <> "_"
   loop :: [(Turing, Int)]
@@ -358,6 +358,7 @@ runnerDotPy tacticList startMachines experimentName chunkSize
     Just (Simulation f) -> case f tm of
       (newTMs, newRes) -> --trace ("new tms: " <> show newTMs <> " newRes: " <> show newRes) $ 
         loop (((,n+1) <$> newTMs) ++ todos) (newRes ++ curRes) i resCount
+
 
 outputFiles :: Text -> [Turing]
   --int parameter is previous count of results, int return val is next result count
@@ -423,10 +424,11 @@ extractCheckpointNumber experimentName s = do
   let intAns :: Int = U.read remRemS
   pure intAns
 
-getMachines :: String -> String -> IO [Turing]
+--[turing] is list of machines. int is next file number to write
+getMachines :: String -> String -> IO ([Turing], Int)
 getMachines experimentName inputMachineString
   | ".txt" `isSuffixOf` inputMachineString
-    = loadMachinesFromFile inputMachineString
+    = (,0) <$> loadMachinesFromFile inputMachineString
   | inputMachineString == "resume" = do
       let experimentDirectory = takeDirectory experimentName
       dirContents <- listDirectory experimentDirectory
@@ -441,7 +443,8 @@ getMachines experimentName inputMachineString
           let checkpointToUse = last checkpoints 
           putTextLn $ "found checkpoints: " <> show (snd <$> checkpoints)
           putTextLn $ "using checkpoint " <> show checkpointToUse
-          loadMachinesFromFile $ experimentDirectory <> "/" <> fst checkpointToUse
+          machines <- loadMachinesFromFile $ experimentDirectory <> "/" <> fst checkpointToUse
+          pure (machines, 1+snd checkpointToUse)
   | otherwise = case inputMachineString of
              ['s', 'e', 'e', 'd', '_', bit, '_', numStates] ->
                let machineFunc = case bit of
@@ -449,7 +452,7 @@ getMachines experimentName inputMachineString
                      '1' -> startMachine1
                      _ -> invalidStr
                in
-               pure [machineFunc (digitToInt numStates)]
+               pure ([machineFunc (digitToInt numStates)], 0)
              _ -> invalidStr
   where
       invalidStr :: a
@@ -466,12 +469,12 @@ runnerDotPyFromArgs = do
         createDirectoryIfMissing True $ takeDirectory experimentName
         let chunkSize :: Int = U.read chunkSizeString
             tacticVec = tacticVectors ^?! ix tacticName
-        inputMachines <- getMachines experimentName inputMachineString
+        (inputMachines, startNum) <- getMachines experimentName inputMachineString
         let inputMessage = "recieved " <> show (length inputMachines)
               <> " machines as input. running: " <> fromString tacticName
-              <> "\n"
+              <> " starting recording at file number: " <> show startNum <> "\n"
         putText inputMessage
-        runnerDotPy tacticVec inputMachines (fromString experimentName) chunkSize
+        runnerDotPy tacticVec inputMachines (fromString experimentName) chunkSize startNum
         putText inputMessage
         aggregateFiles experimentName
 
