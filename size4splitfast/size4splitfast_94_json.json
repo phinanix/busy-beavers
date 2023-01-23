@@ -1,0 +1,5 @@
+TR1TR3TL2TR1TL0FR3___TL2 {"result":{"contents":{"contents":5,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1FR3TL2TR1TL0FR3___TL2 {"result":{"contents":{"contents":5,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1TL0TL2TR1TL0FR3___TL2 {"result":{"contents":{"contents":5,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1TL0TL2TR1TR0FR3___TL2 {"result":{"contents":{"contents":6,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1___TL2TL1TR2FR3TL0TL2 {"result":{"contents":{"contents":9,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}

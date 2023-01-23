@@ -1,0 +1,17 @@
+TR1TL0FL2TR1FL3TR2___TL0 {"result":{"contents":{"contents":12,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1TL0FL2TL2FL3TR2___TL0 {"result":{"contents":{"contents":11,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1TL0FL2TR2FL3TR2___TL0 {"result":{"contents":{"contents":16,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1___FL2FL1FL3TR2TR3TL1 {"result":{"contents":{"contents":8,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1___FL2TR1FL3TR2TL0TL3 {"result":{"contents":{"contents":6,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1___FL2TL2FL3TR2TL0TL3 {"result":{"contents":{"contents":6,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1___FL2TR2FL3TR2TL0TL3 {"result":{"contents":{"contents":12,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1TR0FL2___FL3TR2TR0TL3 {"result":{"contents":{"contents":12,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1TL2FL2___FL3TR2TR0TL3 {"result":{"contents":{"contents":7,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1TR2FL2___FL3TR2TR0TL3 {"result":{"contents":{"contents":14,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1___FL2TR1FL3TR2TR1TL3 {"result":{"contents":{"contents":11,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1___FL2TL2FL3TR2TR1TL3 {"result":{"contents":{"contents":7,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1___FL2TR2FL3TR2TR1TL3 {"result":{"contents":{"contents":14,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1___FL2___FL3TR2TR2TL3 {"result":{"contents":{"contents":9,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1___FL2TL2FR3TR2TL1FR1 {"result":{"contents":{"contents":16,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1___FL2FR1FR3TR2TL1FR1 {"result":{"contents":{"contents":30,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1___FL2___FR3TR2TL1FR3 {"result":{"contents":{"contents":14,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}

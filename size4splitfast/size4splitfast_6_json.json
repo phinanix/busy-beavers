@@ -1,0 +1,3 @@
+TR1___TL2TL1FR3FR2FL1TR3 {"result":{"contents":{"contents":10,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1___TL2TL1FR3FR2TL1TR3 {"result":{"contents":{"contents":5,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
+TR1___TL2TL1TR3FR2FL1TR3 {"result":{"contents":{"contents":6,"tag":"SkippedToInfinity"},"tag":"ContinueForever"},"symty":"Bit"}
