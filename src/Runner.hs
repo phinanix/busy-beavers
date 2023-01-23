@@ -24,6 +24,7 @@ import Data.Vector (Vector)
 import qualified Data.Vector as V
 import qualified Data.Text.Lazy.IO as TLIO
 import qualified Data.Text.IO as TIO
+import qualified Data.Ord
 
 import Util hiding ((.:))
 import Count
@@ -196,25 +197,25 @@ bitEncodeSimResult (Mystery res) = case res of
   ContinueForever _hp -> (3, 0)
   MachineStuckRes -> error "machine stuck bit encode"
   where
-    packLR s p t = assertMsg 
+    packLR s p t = assertMsg
       (all (\x -> x >= 0 && x <= fromIntegral (maxBound :: Word16)) [s,p])
       ("bitpacker failed! s,p,t: " <> show (s,p,t))
       (1, packWord16Word64 (fromIntegral s, fromIntegral p, safeEncodeIntWord16 t, 0))
 
-safeEncodeIntWord16 :: Partial => Int -> Word16 
-safeEncodeIntWord16 i = let 
+safeEncodeIntWord16 :: Partial => Int -> Word16
+safeEncodeIntWord16 i = let
   max16Int :: Int = fromIntegral (maxBound :: Word16)
-  half16 = (max16Int + 1) `div` 2 
+  half16 = (max16Int + 1) `div` 2
   negLim = (-half16) + 1
-  cond = i >= negLim && i <= half16 
+  cond = i >= negLim && i <= half16
   in assertMsg cond ("bitpacker, " <> show i <> " doesn't fit in two bytes")
-    fromIntegral i 
+    fromIntegral i
 
-safeDecodeIntWord16 :: Word16 -> Int 
-safeDecodeIntWord16 w = let 
+safeDecodeIntWord16 :: Word16 -> Int
+safeDecodeIntWord16 w = let
   max16Int :: Int = fromIntegral (maxBound :: Word16)
-  half16 = (max16Int + 1) `div` 2 
-  posAns :: Int = fromIntegral w 
+  half16 = (max16Int + 1) `div` 2
+  posAns :: Int = fromIntegral w
   in if posAns > half16 then posAns - (max16Int + 1) else posAns
 
 data BitSimResult = BHalt Word64 | BLinRecur Word16 Word16 Word16
@@ -359,6 +360,16 @@ runnerDotPy tacticList startMachines experimentName chunkSize startFileNum
       (newTMs, newRes) -> --trace ("new tms: " <> show newTMs <> " newRes: " <> show newRes) $ 
         loop (((,n+1) <$> newTMs) ++ todos) (newRes ++ curRes) i resCount
 
+--we use checkpoints with a checksum. the format is one short machine string per line, 
+--then a final line with a number corresponding to the number of machiens in the file, 
+--as a checksum to prevent bugs where the program is interrupted 
+outputCheckpoint :: Text -> [Turing] -> IO ()
+outputCheckpoint filePrefix machines = if null machines then pure () else do
+  let numMachines = length machines
+      chkptMessage = show numMachines <> " machines remain to do, saved in checkpoint\n"
+      chkptString = machinesToText machines <> show numMachines <> "\n"
+  TLIO.writeFile (toString $ filePrefix <> "checkpoint.txt") $ fromStrict chkptString
+  putText chkptMessage
 
 outputFiles :: Text -> [Turing]
   --int parameter is previous count of results, int return val is next result count
@@ -375,12 +386,7 @@ outputFiles filePrefix todo results prevResCount = do
   TLIO.writeFile (toString $ filePrefix <> "json.json") $ resultsToText results
   TLIO.writeFile (toString $ filePrefix <> "undecided.txt") $
     fromStrict $ machinesToText $ getContinues results
-  if not (null todo) then do
-      let chkptMessage = show (length todo) <> " machines remain to do, saved in checkpoint\n"
-      putText chkptMessage
-      TLIO.writeFile (toString $ filePrefix <> "checkpoint.txt") $
-        fromStrict $ machinesToText todo
-    else pure ()
+  outputCheckpoint filePrefix todo
   pure newResCount
 
 applyTactic :: Vector Tactic -> [Turing] -> [(Int, Turing)]
@@ -424,27 +430,71 @@ extractCheckpointNumber experimentName s = do
   let intAns :: Int = U.read remRemS
   pure intAns
 
+--the checkpoint filename to load. returns nothing if the checkpoint is not valid. 
+loadCheckpoint :: String -> IO (Maybe [Turing])
+loadCheckpoint fileName = do
+  putTextLn $ "trying checkpoint: " <> fromString fileName <> "\n"
+  fileContents <- TIO.readFile fileName
+  let fileLines = lines fileContents
+      mbMachinesAndNumber :: Either Text ([Turing], Int) = case fileLines of
+        [] -> Left "file empty"
+        (l : ls) -> do
+          let (lastLine :| otherLines) = NE.reverse (l :| ls)
+          let checksumReadFail = "last line of file was " <> lastLine <> " which is not an integer"
+          checkNumber :: Int <- maybeToRight checksumReadFail $ readMaybe $ toString lastLine
+          let machines = unm <$> reverse otherLines
+              checksumValidateFail = "checksum was " <> show checkNumber <> " but length machines was " <> show (length machines)
+          guardMsg (length machines == checkNumber) checksumValidateFail
+          pure (machines, checkNumber)
+  case mbMachinesAndNumber of
+    Left err -> do
+      putTextLn err
+      pure Nothing
+    Right (machines, checkNumber) -> do
+      putTextLn $ "validated " <> show checkNumber <> " machines were present in checkpoint " <> fromString fileName
+      pure $ Just machines
+
+-- (a -> Maybe b) -> [a] -> Maybe b 
+loadNewestCheckpoint :: String -> IO ([Turing], Int)
+loadNewestCheckpoint experimentName = do
+  dirContents <- listDirectory experimentDirectory
+  let checkpointFiles = mapMaybe
+        (\s -> (s,) <$> extractCheckpointNumber experimentName s)
+        dirContents
+      sortedCheckpointFiles = sortOn (Data.Ord.Down . snd) checkpointFiles
+  putTextLn $ "found checkpoints: " <> show (snd <$> sortedCheckpointFiles)
+  mbAns <- headMapMaybeM mbLoad sortedCheckpointFiles
+  case mbAns of
+    Nothing -> error "no checkpoint file was valid"
+    Just ans -> pure ans
+ where
+  experimentDirectory = takeDirectory experimentName
+  mbLoad (checkpointFn, checkpointNum) = (,checkpointNum) <$$> loadCheckpoint (experimentDirectory <> "/" <> checkpointFn)
+  thing :: (a -> Maybe b) -> [a] -> Maybe b
+  thing f ls = viaNonEmpty head $ mapMaybe f ls
+  headMapMaybeM :: (Monad m) => (a -> m (Maybe b)) -> [a] -> m (Maybe b)
+  headMapMaybeM f = \case
+    [] -> pure Nothing
+    (a : as) -> do
+      mb <- f a
+      case mb of
+        Nothing -> headMapMaybeM f as
+        Just b -> pure $ Just b
+  headMapMaybeM2 :: forall m a b. (Monad m) => (a -> m (Maybe b)) -> [a] -> m (Maybe b)
+  headMapMaybeM2 f = foldl' foldFunc (pure Nothing) where
+    foldFunc :: m (Maybe b) -> a -> m (Maybe b)
+    foldFunc mMb a = do
+      maybeB <- mMb
+      case maybeB of
+        Just b -> pure $ Just b
+        Nothing -> f a
+
 --[turing] is list of machines. int is next file number to write
 getMachines :: String -> String -> IO ([Turing], Int)
 getMachines experimentName inputMachineString
   | ".txt" `isSuffixOf` inputMachineString
     = (,0) <$> loadMachinesFromFile inputMachineString
-  | inputMachineString == "resume" = do
-      let experimentDirectory = takeDirectory experimentName
-      dirContents <- listDirectory experimentDirectory
-      let checkpointFiles = mapMaybe
-            (\s -> (s,) <$> extractCheckpointNumber experimentName s)
-            dirContents
-      case sortOn snd checkpointFiles of 
-        [] -> error $ fromString $
-          "found no checkpoints in specified dir:" <> experimentDirectory
-        (c : cs) -> do 
-          let checkpoints = c :| cs 
-          let checkpointToUse = last checkpoints 
-          putTextLn $ "found checkpoints: " <> show (snd <$> checkpoints)
-          putTextLn $ "using checkpoint " <> show checkpointToUse
-          machines <- loadMachinesFromFile $ experimentDirectory <> "/" <> fst checkpointToUse
-          pure (machines, 1+snd checkpointToUse)
+  | inputMachineString == "resume" = loadNewestCheckpoint experimentName
   | otherwise = case inputMachineString of
              ['s', 'e', 'e', 'd', '_', bit, '_', numStates] ->
                let machineFunc = case bit of
@@ -499,10 +549,10 @@ aggregateBinaryFiles fnsIn fnOut = do
 aggregateFiles :: String -> IO ()
 aggregateFiles experimentName = do
   let experimentDirectory = takeDirectory experimentName
-      experimentFN = takeFileName experimentName 
+      experimentFN = takeFileName experimentName
   dirContents <- listDirectory experimentDirectory
   let toAggregate = ((experimentDirectory <> "/") <>) <$>
-        filter (\s -> experimentFN `isPrefixOf` s && not ((experimentFN <> "_all") `isPrefixOf` s)) 
+        filter (\s -> experimentFN `isPrefixOf` s && not ((experimentFN <> "_all") `isPrefixOf` s))
         dirContents
   let binaryFiles = filter (\s -> "bin.bin" `isSuffixOf` s) toAggregate
   let jsonFiles = filter (\s -> "json.json" `isSuffixOf` s) toAggregate
@@ -583,8 +633,8 @@ loadMachinesFromFile fn = do
   putTextLn $ "loading machines from file: " <> fromString fn
   fileContents <- TIO.readFile fn
   let machines = unm <$> lines fileContents
-  putTextLn $ "loaded " <> show (length machines) <> " machines" 
-  pure machines 
+  putTextLn $ "loaded " <> show (length machines) <> " machines"
+  pure machines
 
 --bitpacked machines, json machines, and undecided machines
 loadAggregatedExperimentFiles :: Int -> String
