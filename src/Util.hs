@@ -11,6 +11,8 @@ import Safe.Partial
 import Prettyprinter
 import qualified Data.List.NonEmpty as NE
 import Control.Exception
+import qualified Data.Vector as V
+import qualified Data.Vector.Algorithms.Intro as Intro
 
 type MMap = MonoidalMap
 
@@ -196,3 +198,9 @@ bitraverseBoth f = bitraverse f f
 
 neMConcat :: (Monoid m) => NonEmpty m -> m 
 neMConcat (m :| ms) = foldl' (<>) m ms 
+
+sortVector :: Ord a => V.Vector a -> V.Vector a
+sortVector = V.modify Intro.sort
+
+sortUniqueVector :: Ord a => V.Vector a -> V.Vector a
+sortUniqueVector = V.uniq . sortVector

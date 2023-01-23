@@ -49,7 +49,6 @@ import Data.Text.Encoding (encodeUtf8Builder)
 import Data.Typeable (typeOf, TypeRep, typeRep)
 import Data.Aeson.Types (Parser)
 import Data.Char (digitToInt)
-import Data.IntCast
 
 {-
 this file contains the code responsible for actually running all of the different 
@@ -188,7 +187,6 @@ _ -> reserved for later use
 
 -}
 bitEncodeSimResult :: Mystery TapeSymbol (SimResult InfCount) -> (Word8, Word64)
-
 bitEncodeSimResult (Mystery res) = case res of
   Halted n _ft -> (0, fromIntegral n)
   ContinueForever (LinRecur s p t)

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ac3750a8ae9f082768da8886411ac949a3928fa8f9177d7050846c72f23250a0
+-- hash: 77650e41a5ab5faf721296e0700c7d34b9d65b15e6eb80cf8c8b044957cae090
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -133,6 +133,7 @@ library
     , safe
     , text
     , vector
+    , vector-algorithms
     , witherable
   default-language: Haskell2010
 
