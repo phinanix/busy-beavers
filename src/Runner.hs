@@ -480,9 +480,11 @@ aggregateBinaryFiles fnsIn fnOut = do
 aggregateFiles :: String -> IO ()
 aggregateFiles experimentName = do
   let experimentDirectory = takeDirectory experimentName
+      experimentFN = takeFileName experimentName 
   dirContents <- listDirectory experimentDirectory
   let toAggregate = ((experimentDirectory <> "/") <>) <$>
-        filter (\s -> takeFileName experimentName `isPrefixOf` s) dirContents
+        filter (\s -> experimentFN `isPrefixOf` s && not ((experimentFN <> "_all") `isPrefixOf` s)) 
+        dirContents
   let binaryFiles = filter (\s -> "bin.bin" `isSuffixOf` s) toAggregate
   let jsonFiles = filter (\s -> "json.json" `isSuffixOf` s) toAggregate
   let undecidedFiles = filter (\s -> "undecided.txt" `isSuffixOf` s) toAggregate
@@ -492,6 +494,7 @@ aggregateFiles experimentName = do
   aggregateBinaryFiles binaryFiles $ experimentName <> "_all_bin.bin"
   aggregateTextFiles jsonFiles $ experimentName <> "_all_json.json"
   aggregateTextFiles undecidedFiles $ experimentName <> "_all_undecided.txt"
+
 
 -- popWord64FromBS :: BL.ByteString -> Maybe (Word64, BL.ByteString)
 -- popWord64FromBS bs = if BL.null bs then Nothing else 
