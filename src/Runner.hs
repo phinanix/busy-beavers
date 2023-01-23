@@ -329,7 +329,7 @@ runnerDotPy tacticList startMachines experimentName chunkSize
     loop todos [] (i+1) newResCount
   loop ((tm, n) : todos) curRes i resCount
     = -- trace ("remTodo: " <> show (length todos)) $ -- <> " len res: " <> show (length curRes)) $ 
-    --trace ("machine: " <> showP tm <> "\n") $ 
+    -- trace ("machine: " <> showP tm <> "\n") $ 
     case tacticList V.!? n of
     -- TODO: how to get a "we failed" result / let's do a better one than this
     Nothing -> let newRes = Mystery $ Continue 0 (Phase 0) (initExpTape (Bit False)) 0 in

@@ -246,11 +246,11 @@ instance (Ord s, Pretty s) => Pretty (SkipBook s) where
             <> "which resulted from" <> line <> pretty o <> line <> line)
               $ assocs skipPile
 
-makeHaltProof :: (TapeSymbol s) => Int -> Skip Count s -> Map BoundVar InfCount
+makeHaltProof :: (TapeSymbol s, Partial) => Int -> Skip Count s -> Map BoundVar InfCount
   -> HaltProof s
 makeHaltProof curStep skip boundVs = case skip of
   Skip (Config sPh [(b, c1@(OneVar n as k x))] b' [])
-    (SkipStepped ePh (Side L [(c, c2@(OneVar m bs j y))]))
+    (SkipStepped ePh (Side L [(_c, c2@(OneVar m bs j y))]))
     stepCount -> 
       assert (sPh == ePh)
       assert (b == b')
@@ -258,12 +258,14 @@ makeHaltProof curStep skip boundVs = case skip of
       --period is todo for now, it uses stepCount
       LinRecur curStep 0 $ -1 * length (toBits b)
   Skip (Config sPh [] b' [(b, c1@(OneVar n as k x))] )
-    (SkipStepped ePh (Side R [(b'', c2@(OneVar m bs j y))]))
-    stepCount ->
-      assert (sPh == ePh)
-      assert (b == b' && b' == b'')
-      assert (c1 <> One == c2)
+    (SkipStepped ePh (Side R [(_c, c2@(OneVar m bs j y))]))
+    stepCount -> let 
+      assertion = (sPh == ePh) && (b == b') && (c1 <> One == c2)
+      msg = "haltProof assertion failed on skip: " <> showP skip 
+        <> " with data: " <> showP ((sPh, ePh), (b,b'), (c1, c2))
+      in 
       --period is todo for now, it uses stepCount
+      assert ((if not assertion then trace msg else id) assertion)
       LinRecur curStep 0 $ length (toBits b)  
   _ -> SkippedToInfinity curStep
     --error $ "skip of wrong shape: " <> showP skip <> "\n" <> show boundVs
