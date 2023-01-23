@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f547a9f2ea302f60ec9a0957a00a75e88c0a60f086022f623d0164beda0f5519
+-- hash: ac3750a8ae9f082768da8886411ac949a3928fa8f9177d7050846c72f23250a0
 
 name:           busy-beavers
 version:        0.1.0.0
@@ -121,6 +121,7 @@ library
     , filepath
     , fixed-vector
     , hspec
+    , int-cast
     , lens
     , monoidal-containers
     , mtl

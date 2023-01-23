@@ -47,3 +47,13 @@ spec = do
       extractCheckpointNumber "size3" "size3_0_checkpoint.txt" `shouldBe` Just 0
     it "returns Nothing on things that aren't a checkpoint" $ 
       extractCheckpointNumber "size3" "size3_1_json.json" `shouldBe` Nothing
+  describe "endecode IntWord16" $ do
+    it "round trips" $ 
+      property (\(w::Word16) -> 
+        safeEncodeIntWord16 (safeDecodeIntWord16 w) `shouldBe` w )
+    it "encodes 0" $ 
+      safeEncodeIntWord16 0 `shouldBe` 0
+    it "encodes 1" $ 
+      safeEncodeIntWord16 1 `shouldBe` 1
+    it "encodes -1" $ 
+      safeEncodeIntWord16 (-1) `shouldBe` maxBound

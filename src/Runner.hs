@@ -49,7 +49,7 @@ import Data.Text.Encoding (encodeUtf8Builder)
 import Data.Typeable (typeOf, TypeRep, typeRep)
 import Data.Aeson.Types (Parser)
 import Data.Char (digitToInt)
-
+import Data.IntCast
 
 {-
 this file contains the code responsible for actually running all of the different 
@@ -198,8 +198,26 @@ bitEncodeSimResult (Mystery res) = case res of
   ContinueForever _hp -> (3, 0)
   MachineStuckRes -> error "machine stuck bit encode"
   where
-    packLR s p t = assert (all (\x -> x >= 0 && x <= fromIntegral (maxBound :: Word16)) [s,p,t])
-      (1, packWord16Word64 (fromIntegral s, fromIntegral p, fromIntegral t, 0))
+    packLR s p t = assertMsg 
+      (all (\x -> x >= 0 && x <= fromIntegral (maxBound :: Word16)) [s,p])
+      ("bitpacker failed! s,p,t: " <> show (s,p,t))
+      (1, packWord16Word64 (fromIntegral s, fromIntegral p, safeEncodeIntWord16 t, 0))
+
+safeEncodeIntWord16 :: Partial => Int -> Word16 
+safeEncodeIntWord16 i = let 
+  max16Int :: Int = fromIntegral (maxBound :: Word16)
+  half16 = (max16Int + 1) `div` 2 
+  negLim = (-half16) + 1
+  cond = i >= negLim && i <= half16 
+  in assertMsg cond ("bitpacker, " <> show i <> " doesn't fit in two bytes")
+    fromIntegral i 
+
+safeDecodeIntWord16 :: Word16 -> Int 
+safeDecodeIntWord16 w = let 
+  max16Int :: Int = fromIntegral (maxBound :: Word16)
+  half16 = (max16Int + 1) `div` 2 
+  posAns :: Int = fromIntegral w 
+  in if posAns > half16 then posAns - (max16Int + 1) else posAns
 
 data BitSimResult = BHalt Word64 | BLinRecur Word16 Word16 Word16
   | BContinue | BOtherInfinite deriving (Eq, Ord, Show, Generic)

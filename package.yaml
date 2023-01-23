@@ -35,6 +35,7 @@ library:
   - filepath
   - fixed-vector
   - hspec
+  - int-cast
   - lens
   - monoidal-containers
   - mtl
