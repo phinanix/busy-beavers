@@ -17,6 +17,7 @@ import Skip
 import Simulate  
 import SimulateSkip
 import SimulateTwoBit
+import ShortNames
 
 --blindly assumes the Turing machine here is a total one 
 -- simulateBasicAndSkip :: Int -> Turing -> (SimResult Bit (Tape Bit), SimResult Bit SkipTape)
@@ -138,3 +139,8 @@ spec = do
           tape2 = [(Bit False, ci 2), (Bit True, ci 1), (Bit False, ci 3)]
           ansTape = (Bit False, ci 1) :| []
       getEquations (matchTwoTapes (tape1, tape2) ([], [])) `shouldBe` Just (TapeLeft ansTape, Perfect)
+  describe "getLen" $ do 
+    it "gets a simple len" $ 
+      getLen Empty [(tt, One <> One)] `shouldBe` Just 2 
+    -- it "fails to get a len it got wrong before" $ 
+    --   getLen EMpty 

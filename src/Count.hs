@@ -44,6 +44,11 @@ instance ToJSON BoundVar where
 instance FromJSONKey BoundVar where 
 instance FromJSON BoundVar where 
 
+dispBV :: (Semigroup a, IsString a) => BoundVar -> a
+dispBV (BoundVar i) = "x_" <> show i
+instance Pretty BoundVar where 
+  pretty = prettyText . dispBV 
+
 --a variable with logical type "s", the type variable of symbols on the tape which
 --is implicitly forall quantified
 newtype TapeVar = TapeVar Int
@@ -600,11 +605,13 @@ partiallyUpdateCount m (Count n as (MonoidalMap xs))
 
 updateCountToInf :: Map BoundVar InfCount -> Count -> InfCount
 updateCountToInf m (Count n as (MonoidalMap xs))
-  = NotInfinity (Count n as Empty) <> foldMap (updateVar m) (M.assocs xs) where
-  updateVar :: Map BoundVar InfCount -> (BoundVar, Sum Natural) -> InfCount
-  updateVar m (x, Sum n) = n `nTimes` getVar m x
-  getVar :: Map BoundVar InfCount -> BoundVar -> InfCount
-  getVar m x = case m^.at x of
-    Just c -> c
-    Nothing -> error $ show m <> "\n" <> show x
-      <> " a bound var wasn't mapped"
+  = NotInfinity (Count n as Empty) <> foldMap (updateVar m) (M.assocs xs) 
+
+updateVar :: Map BoundVar InfCount -> (BoundVar, Sum Natural) -> InfCount
+updateVar m (x, Sum n) = n `nTimes` getVar m x
+
+getVar :: Map BoundVar InfCount -> BoundVar -> InfCount
+getVar m x = case m^.at x of
+  Just c -> c
+  Nothing -> error $ show m <> "\n" <> show x
+    <> " a bound var wasn't mapped"

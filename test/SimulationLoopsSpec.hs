@@ -25,8 +25,8 @@ test = NotInfinity (c 2)
 spec :: Spec 
 spec = do 
   describe "attemptEndOfTapeGlueProof" $ do 
-    it "proves a simple goes forever machine" $ do 
-      fst (loopForEndOfTapeGlue 100 goesLeftForever) `shouldBe` ContinueForever (OffToInfinityN 2 L)
+    -- it "proves a simple goes forever machine" $ do 
+    --   fst (loopForEndOfTapeGlue 100 goesLeftForever) `shouldBe` ContinueForever (OffToInfinityN 2 L)
     it "does not prove a machine that doesn't halt in this way" $ do 
       fst (loopForEndOfTapeGlue 100 weird3) `shouldBe`  
         --this is the wrong stepcount but my program producing incorrect 

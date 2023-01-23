@@ -329,7 +329,7 @@ runnerDotPy tacticList startMachines experimentName chunkSize
     loop todos [] (i+1) newResCount
   loop ((tm, n) : todos) curRes i resCount
     = -- trace ("remTodo: " <> show (length todos)) $ -- <> " len res: " <> show (length curRes)) $ 
-    trace ("machine: " <> showP tm <> "\n") $ 
+    --trace ("machine: " <> showP tm <> "\n") $ 
     case tacticList V.!? n of
     -- TODO: how to get a "we failed" result / let's do a better one than this
     Nothing -> let newRes = Mystery $ Continue 0 (Phase 0) (initExpTape (Bit False)) 0 in
@@ -340,7 +340,7 @@ runnerDotPy tacticList startMachines experimentName chunkSize
         loop (((,n) <$> branchMachines) ++ todos) curRes i resCount
       Just (Right r) -> loop todos ((tm, r) : curRes) i resCount
     Just (Simulation f) -> case f tm of
-      (newTMs, newRes) -> trace ("new tms: " <> show newTMs <> " newRes: " <> show newRes) $ 
+      (newTMs, newRes) -> --trace ("new tms: " <> show newTMs <> " newRes: " <> show newRes) $ 
         loop (((,n+1) <$> newTMs) ++ todos) (newRes ++ curRes) i resCount
 
 outputFiles :: Text -> [Turing]

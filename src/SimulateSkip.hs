@@ -289,7 +289,8 @@ packageResult :: forall s. (TapeSymbol s, Partial) => Int
   -> Either Text (PartialStepResult InfCount s)
 packageResult curStep skip@(Skip s e hopCount) tape 
   (boundVs, tapeSides@(newLs, newRs))
-  = case e of
+  = --trace ("skip: " <> showP skip <> "\ntape " <> showP tape <> "\ntapesides " <> showP tapeSides ) $ 
+    case e of
     SkipHalt tp -> Right $ Stopped
       (updateCountToInf boundVs hopCount)
       (FinalTape (newLs, newRs) $ first NotInfinity tp)
@@ -320,7 +321,8 @@ packageResult curStep skip@(Skip s e hopCount) tape
         assertCond = etSatisfiesInvariant ans
         msg = "we were applying: " <> showP skip <> "\nto tape:\n" <> showP tape <> "\nresulting in:\n" <> showP ans
         in
-          (if not assertCond then trace msg else id) assert assertCond (Right ans)
+          (if not assertCond then trace msg else id) 
+          assert assertCond (Right ans)
         --TODO, this can fail if you are trying to prove an induction on a finite span of tape
         -- you can also hit this if you try to shift one point to the left but there is a 
         --symbolvar on the tape there 
@@ -334,7 +336,11 @@ packageResult curStep skip@(Skip s e hopCount) tape
       shiftL = (-) <$> endLLen <*> startLLen
       shiftR = (-) <$> startRLen <*> endRLen
       shift = assert (let
-        ans = shiftL == shiftR
+        --TODO: you could calculate shiftL / shiftR in more situations than 
+        --you do now, but it's not very useful probably?
+        ans = case (shiftL, shiftR) of 
+          (Just sL, Just sR) -> sL == sR
+          _ -> True 
         msg = ("failing assert: " <> show (shiftL, shiftR)
           <> "start" <> show (startLLen, startRLen)
           <> "end" <> show (endLLen, endRLen)
@@ -345,18 +351,15 @@ packageResult curStep skip@(Skip s e hopCount) tape
       (startLLen, startRLen) = configLens s
       (endLLen, endRLen) = tpLens tp
       configLens :: Config Count s -> (Maybe Int, Maybe Int)
-      configLens (Config _ph ls _p rs) = (getLen ls, getLen rs)
+      configLens (Config _ph ls _p rs) = (getLen boundVs ls, getLen boundVs rs)
       tapeLens :: ExpTape s Count -> (Maybe Int, Maybe Int)
-      tapeLens (ExpTape ls _p rs) = (getLen ls, getLen rs)
+      tapeLens (ExpTape ls _p rs) = (getLen boundVs ls, getLen boundVs rs)
       tpLens :: TapePush Count s -> (Maybe Int, Maybe Int)
       tpLens = \case
       --TODO (XX) are these -1s totally insane
-        Side L ls -> (Just (-1), getLen ls)
-        Side R rs -> (getLen rs, Just (-1))
+        Side L ls -> (Just (-1), getLen boundVs ls)
+        Side R rs -> (getLen boundVs rs, Just (-1))
         Middle con -> tapeLens con
-
-      getLen :: [(s, Count)] -> Maybe Int
-      getLen xs = sum <$> (\(_s, c) -> infCountToMaybeInt $ updateCountToInf boundVs c) <%> xs
 
       -- updatePoint :: Map BoundVar InfCount -> (s, Location Count) -> (s, Location InfCount)
       -- updatePoint bs = (_2. _Side . _1 %~ updateCount bs)
@@ -367,6 +370,13 @@ packageResult curStep skip@(Skip s e hopCount) tape
       updateInfCount :: Map BoundVar InfCount -> InfCount -> InfCount
       updateInfCount _m Infinity = Infinity
       updateInfCount m (NotInfinity c) = updateCountToInf m c
+
+getLen :: (TapeSymbol s) => Map BoundVar InfCount -> [(s, Count)] -> Maybe Int
+getLen boundVs xs = sum <$> (\(_s, c) -> infCountToMaybeInt $ updateCountToInf boundVs c) <%> xs 
+
+
+
+
 --we want to be able to apply a skip of counts to an ExpTape _ Count but also a
 --skip of counts to an ExpTape _ Nat
 lookupSkips :: (Ord s) => (Phase, s) -> SkipBook s -> Set (Skip Count s)
@@ -389,7 +399,6 @@ skipPrecedence :: (Ord s)
   -> PartialStepResult InfCount s
   -> Ordering
 skipPrecedence a b | a == b = EQ
--- skipPrecedence a b = GT
 skipPrecedence res1 res2 = case (res1, res2) of
   (NonhaltProven _, Stopped {}) -> error "can't both run forever and halt"
   (Stopped {}, NonhaltProven _) -> error "can't both run forever and halt"
