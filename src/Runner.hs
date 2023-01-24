@@ -340,9 +340,9 @@ runnerDotPy tacticList startMachines experimentName chunkSize startFileNum
     -- total results output so far
     -> Int
     -> IO ()
-  loop [] res i resCount = outputFiles (filePrefix i) [] res resCount >> pure ()
+  loop [] res i resCount = outputFiles (filePrefix i) experimentName i [] res resCount >> pure ()
   loop todos res@((>= chunkSize) . length -> True) i resCount = do
-    newResCount <- outputFiles (filePrefix i) (fst <$> todos) res resCount
+    newResCount <- outputFiles (filePrefix i) experimentName i (fst <$> todos) res resCount
     loop todos [] (i+1) newResCount
   loop ((tm, n) : todos) curRes i resCount
     = -- trace ("remTodo: " <> show (length todos)) $ -- <> " len res: " <> show (length curRes)) $ 
@@ -366,15 +366,15 @@ runnerDotPy tacticList startMachines experimentName chunkSize startFileNum
 outputCheckpoint :: Text -> [Turing] -> IO ()
 outputCheckpoint filePrefix machines = if null machines then pure () else do
   let numMachines = length machines
-      chkptMessage = show numMachines <> " machines remain to do, saved in checkpoint\n"
+      chkptMessage = show numMachines <> " machines remain to do, saved in checkpoint" <> filePrefix <> "\n"
       chkptString = machinesToText machines <> show numMachines <> "\n"
   TLIO.writeFile (toString $ filePrefix <> "checkpoint.txt") $ fromStrict chkptString
   putText chkptMessage
 
-outputFiles :: Text -> [Turing]
-  --int parameter is previous count of results, int return val is next result count
+--int parameter is previous count of results, int return val is next result count
+outputFiles :: Text -> Text -> Int -> [Turing]
   -> [(Turing, Mystery TapeSymbol (SimResult InfCount))] -> Int -> IO Int
-outputFiles filePrefix todo results prevResCount = do
+outputFiles filePrefix experimentName i todo results prevResCount = do
   let newResCount = prevResCount + length results
       msg = "writing " <> show (length results) <> " to disk\ntotal output so far: " <> show newResCount <> "\n"
   putText msg
@@ -387,6 +387,11 @@ outputFiles filePrefix todo results prevResCount = do
   TLIO.writeFile (toString $ filePrefix <> "undecided.txt") $
     fromStrict $ machinesToText $ getContinues results
   outputCheckpoint filePrefix todo
+  -- (checkpointMachines, checkpointNum) <- loadNewestCheckpoint (toString experimentName)
+  -- assertMsg 
+  --   (null todo || (checkpointMachines, checkpointNum) == (todo, i)) 
+  --   ("checkpoint failed! i, num:" <> show (i, checkpointNum) 
+  --     <> "todo:" <> showP todo <> "\ncheckpoint: " <> showP checkpointMachines)
   pure newResCount
 
 applyTactic :: Vector Tactic -> [Turing] -> [(Int, Turing)]
@@ -469,7 +474,7 @@ loadNewestCheckpoint experimentName = do
     Just ans -> pure ans
  where
   experimentDirectory = takeDirectory experimentName
-  mbLoad (checkpointFn, checkpointNum) = (,checkpointNum) <$$> loadCheckpoint (experimentDirectory <> "/" <> checkpointFn)
+  mbLoad (checkpointFn, checkpointNum) = (,checkpointNum+1) <$$> loadCheckpoint (experimentDirectory <> "/" <> checkpointFn)
   thing :: (a -> Maybe b) -> [a] -> Maybe b
   thing f ls = viaNonEmpty head $ mapMaybe f ls
   headMapMaybeM :: (Monad m) => (a -> m (Maybe b)) -> [a] -> m (Maybe b)
