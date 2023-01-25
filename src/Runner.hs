@@ -259,12 +259,12 @@ symbolRepToText rep
 textToParseFunc :: Text -> Value -> Parser (Mystery TapeSymbol (SimResult InfCount))
 textToParseFunc typeName
   | typeName == "Bit" = fmap Mystery . parseJSON @(SimResult InfCount Bit)
-  | typeName == "Vec 2" = fmap Mystery . parseJSON @(SimResult InfCount (Vec 2 Bit))
-  | typeName == "Vec 3" = fmap Mystery . parseJSON @(SimResult InfCount (Vec 3 Bit))
-  | typeName == "Vec 4" = fmap Mystery . parseJSON @(SimResult InfCount (Vec 4 Bit))
-  | typeName == "Vec 5" = fmap Mystery . parseJSON @(SimResult InfCount (Vec 5 Bit))
-  | typeName == "Vec 6" = fmap Mystery . parseJSON @(SimResult InfCount (Vec 6 Bit))
-  | typeName == "Vec 7" = fmap Mystery . parseJSON @(SimResult InfCount (Vec 7 Bit))
+  | typeName == "Vec 2 Bit" = fmap Mystery . parseJSON @(SimResult InfCount (Vec 2 Bit))
+  | typeName == "Vec 3 Bit" = fmap Mystery . parseJSON @(SimResult InfCount (Vec 3 Bit))
+  | typeName == "Vec 4 Bit" = fmap Mystery . parseJSON @(SimResult InfCount (Vec 4 Bit))
+  | typeName == "Vec 5 Bit" = fmap Mystery . parseJSON @(SimResult InfCount (Vec 5 Bit))
+  | typeName == "Vec 6 Bit" = fmap Mystery . parseJSON @(SimResult InfCount (Vec 6 Bit))
+  | typeName == "Vec 7 Bit" = fmap Mystery . parseJSON @(SimResult InfCount (Vec 7 Bit))
   | otherwise = error $ "tried to parse unknown type: " <> show typeName
 
 instance ToJSON SomeResult where
@@ -347,7 +347,7 @@ runnerDotPy tacticList startMachines experimentName chunkSize startFileNum
     loop todos [] (i+1) newResCount
   loop ((tm, n) : todos) curRes i resCount
     = -- trace ("remTodo: " <> show (length todos)) $ -- <> " len res: " <> show (length curRes)) $ 
-    -- trace ("machine: " <> showP tm <> "\n") $ 
+    trace ("machine: " <> showP tm <> "\n") $ 
     case tacticList V.!? n of
     -- TODO: how to get a "we failed" result / let's do a better one than this
     Nothing -> let newRes = Mystery $ Continue 0 (Phase 0) (initExpTape (Bit False)) 0 in
@@ -698,7 +698,7 @@ showExpStats :: Int -> Text -> IO ()
 showExpStats numStates experimentName = do
   putTextLn $ "analzing experiment " <> experimentName
   (bitres, someres, unsolved) <- loadAggregatedExperimentFiles numStates $ toString experimentName
-  putTextLn $ "loaded " <> show (length bitres) <> "machines "
+  putTextLn $ "loaded " <> show (length bitres) <> " machines "
   let tmmrs = makeMachineRes (bitres, someres, unsolved)
   putTextLn "made machine results"
   let statRes = runStats countStats tmmrs

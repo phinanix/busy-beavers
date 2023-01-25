@@ -284,6 +284,14 @@ twoBitDispLoop = simLoop 150 $ simulateStepPartial maxInt :|
   , liftModifyState recordDispHist
   ])
 
+lrCheckLoop :: (TapeSymbol s) => Int -> Turing -> ([Turing],[(Turing, SimResult InfCount s)])
+lrCheckLoop limit = simLoop (limit + 1) $ simulateStepPartial maxInt :| 
+  (liftOneToMulti <$> [checkSeenBefore
+  , liftModifyState recordHist
+  , liftModifyState recordDispHist
+  , fastLRCheckAction
+  ])
+
 baseSimLoop :: (TapeSymbol s) => Turing -> ([Turing],[(Turing, SimResult InfCount s)])
 baseSimLoop = let limit = 999 in simLoop (limit + 1) $ simulateStepPartial maxInt :| 
   (liftOneToMulti <$> [checkSeenBefore

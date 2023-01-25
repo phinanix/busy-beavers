@@ -598,7 +598,7 @@ guessInductionHypothesis th rsh = force $ do
     in
 
      --trace (toString msg) $
-     warnMsg ((thingContainsVar <$> indGuess) /= Right False) msg
+     assertMsg ((thingContainsVar <$> indGuess) /= Right False) msg
      indGuess
 
 type FunctionExamples = (NonEmpty (Count, Count), (Maybe Count, Maybe Count))
