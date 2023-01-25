@@ -27,7 +27,7 @@ import qualified Data.Text.IO as TIO
 import qualified Data.Ord
 
 import Util hiding ((.:))
-import Count
+import Count ( InfCount )
 import Skip
 import ExpTape
 import Turing
@@ -50,6 +50,7 @@ import Data.Text.Encoding (encodeUtf8Builder)
 import Data.Typeable (typeOf, TypeRep, typeRep)
 import Data.Aeson.Types (Parser)
 import Data.Char (digitToInt)
+import Aggregate
 
 {-
 this file contains the code responsible for actually running all of the different 
@@ -417,6 +418,7 @@ tacticVectors = M.fromList
   , ("splitter", splitterTacticVector)
   , ("splitfast", splitterTacticVector V.++ fastTacticVector)
   , ("fewthings", splitterTacticVector V.++ basicTacticVector V.++ bwSearchTacticVector)
+  , ("size6simplerules", splitterTacticVector V.++ size6simpleRuleVector)
   ]
 --sarah barrios thank god you introduced me to your sister
 
@@ -523,7 +525,9 @@ runnerDotPyFromArgs = do
     [experimentName, tacticName, chunkSizeString, inputMachineString] -> do
         createDirectoryIfMissing True $ takeDirectory experimentName
         let chunkSize :: Int = U.read chunkSizeString
-            tacticVec = tacticVectors ^?! ix tacticName
+            tacticVec = fromMaybe (error $ "could not find tactic called: " <> fromString tacticName) $ 
+              tacticVectors ^. at tacticName 
+              
         (inputMachines, startNum) <- getMachines experimentName inputMachineString
         let inputMessage = "recieved " <> show (length inputMachines)
               <> " machines as input. running: " <> fromString tacticName
@@ -612,26 +616,30 @@ getManyItem getOne = do
 
 loadBinaryFile :: Int -> FilePath -> IO [(Turing, BitSimResult)]
 loadBinaryFile numStates fp = do
+  putTextLn $ "loading binary machine results from file: " <> fromString fp
   rawBytestring <- BL.readFile fp
   --pure $ unfoldr (popResultFromBS numStates) rawBytestring
-  pure $ runGet (getManyItem (getTMandResult numStates)) rawBytestring
+  let ans = runGet (getManyItem (getTMandResult numStates)) rawBytestring
+  putTextLn $ "loaded " <> show (length ans) <> " results"
+  pure ans 
 
 loadResult :: Text -> (Turing, SomeResult)
-loadResult textIn = trace (toString $ "loading: " <> textIn) $ let
+loadResult textIn = let
   (tmText, jsonText) = T.breakOn " " textIn
-  in trace (toString $ "jsontext: " <> jsonText)
-    (unm tmText, fromJust . decode . toLazyByteString . encodeUtf8Builder $ jsonText)
+  in (unm tmText, fromJust . decode . toLazyByteString . encodeUtf8Builder $ jsonText)
 
 loadJSONFile :: FilePath -> IO [(Turing, SomeResult)]
 loadJSONFile fp = do
+  putTextLn $ "loading json machine results from file: " <> fromString fp
   lazyFile <- TLIO.readFile fp
-  pure $ unfoldr parseNextLine lazyFile
+  let ans = unfoldr parseNextLine lazyFile
+  putTextLn $ "loaded " <> show (length ans) <> " results"
+  pure ans
   where
     parseNextLine :: TL.Text -> Maybe ((Turing, _), TL.Text)
     parseNextLine txt = if TL.null txt then Nothing else let
       (nextLine, remaining) = TL.span (/= '\n') txt
       in Just (loadResult $ toStrict nextLine, TL.tail remaining)
-
 
 loadMachinesFromFile :: String -> IO [Turing]
 loadMachinesFromFile fn = do
@@ -651,3 +659,49 @@ loadAggregatedExperimentFiles numStates experimentName = do
   jsons <- loadJSONFile $ experimentName <> "_all_json.json"
   unfinished <- loadMachinesFromFile $ experimentName <> "_all_undecided.txt"
   pure (bsrs, jsons, unfinished)
+
+--stats type, S_ is for "stats"
+data MachineRes = S_Halt Int | S_LR Int Int Int | S_Unsolved | S_Solved SomeResult 
+  deriving (Eq, Ord, Show, Generic)
+$(makePrisms ''MachineRes)
+
+filters :: [(Text, MachineRes -> Bool)]
+filters = [ ("all", const True)
+          , ("halt", has _S_Halt)
+          , ("LR", has _S_LR)
+          , ("unsolved", has _S_Unsolved)
+          , ("solved", has _S_Solved)
+          ]
+
+countStats :: [Statistic (Turing, MachineRes)]
+countStats = (\(name, f)  -> Statistic name (filterPair f) Aggregate.Count) <$> filters where
+  filterPair f (_m, res) = f res
+
+makeMachineRes :: ([(Turing, BitSimResult)], [(Turing, SomeResult)], [Turing]) -> [(Turing, MachineRes)]
+makeMachineRes (bitres, someres, _unsolved) = convert <$> bitres where
+  someMap :: Map Turing SomeResult
+  someMap = fromList someres
+  convert (m, bsr) = (m,) $ case bsr of
+    BHalt s -> S_Halt $ fromIntegral s
+    BLinRecur s p t -> S_LR (fromIntegral s) (fromIntegral p) (safeDecodeIntWord16 t)
+    BContinue -> S_Unsolved
+    BOtherInfinite -> case someMap ^. at m of
+      Just sr -> S_Solved sr
+      Nothing -> error $ "tried to look up machine: " <> machineToNotation m
+
+dispStatRes :: (Show a) => Statistic a -> StatsResult a -> Text 
+dispStatRes stat res = case (stat, res) of 
+  (Statistic name _f Count, CountRes count) -> "count of " <> name <> ":" <> show count 
+  (Statistic name _f t, _) -> error $ "invalid stat res combo: " <> show (name, t, res)
+
+showExpStats :: Int -> Text -> IO ()
+showExpStats numStates experimentName = do
+  putTextLn $ "analzing experiment " <> experimentName
+  (bitres, someres, unsolved) <- loadAggregatedExperimentFiles numStates $ toString experimentName
+  putTextLn $ "loaded " <> show (length bitres) <> "machines "
+  let tmmrs = makeMachineRes (bitres, someres, unsolved)
+  putTextLn "made machine results"
+  let statRes = runStats countStats tmmrs
+  putTextLn "finished running stats"
+  for_ statRes (putTextLn . uncurry dispStatRes) 
+

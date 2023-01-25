@@ -31,8 +31,8 @@ spec = do
       insertMaxKBy 3 (flip compare) 2 prev `shouldBe` prev
   describe "runStats" $ do 
     it "aggregates some characters" $ let 
-      countLetters :: Statistic Char = Statistic isAlpha Count 
-      smallestDigits = Statistic isDigit (MaxKBy 2 compare) 
+      countLetters :: Statistic Char = Statistic "countletters" isAlpha Count 
+      smallestDigits = Statistic "biggestdigit" isDigit (MaxKBy 2 compare) 
       res :: [StatsResult Char] = [CountRes 35, MaxKByRes ['0', '0']]
       inStr :: String = "asdv98hasdfer890qweqw09qwe9vqy 0qw89ewq*W)(*R(*#)jfasdJ"
       in 

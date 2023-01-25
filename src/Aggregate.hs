@@ -32,13 +32,18 @@ computes the statistic on the subset that pass the filter
 
 data StatType a = Count | MaxKBy Int (a -> a -> Ordering) deriving Generic
 type Filter a = a -> Bool 
-data Statistic a = Statistic (Filter a) (StatType a) 
+data Statistic a = Statistic Text (Filter a) (StatType a) 
+
+instance Show (StatType a) where 
+  show t = case t of 
+    Count -> "CountStat" 
+    MaxKBy k _f -> "MaxKstat, k: " <> show k 
 
 data StatsResult a = CountRes Int | MaxKByRes [a] deriving (Eq, Ord, Show, Generic) 
 instance (NFData a) => NFData (StatsResult a)
 
 initResult :: Statistic a -> StatsResult a 
-initResult (Statistic _filter statType) = case statType of 
+initResult (Statistic _name _filter statType) = case statType of 
   Count -> CountRes 0 
   MaxKBy _ _ -> MaxKByRes []
 
@@ -53,7 +58,7 @@ runStats stats = foldl' addAll startVal
   startVal = (\stat -> (stat, initResult stat)) <$> stats  
   addAll prevList new = addOne new <$> prevList
   addOne :: a -> (Statistic a, StatsResult a) -> (Statistic a, StatsResult a)
-  addOne new same@(stat@(Statistic filter statOp), prevRes) = if filter new 
+  addOne new same@(stat@(Statistic _name filter statOp), prevRes) = if filter new 
     then case (statOp, prevRes) of 
       (Count, CountRes n) -> (stat, CountRes $ n+1)
       (MaxKBy k ord, MaxKByRes prevBest) -> (stat, MaxKByRes $ insertMaxKBy k ord new prevBest) 

@@ -313,6 +313,8 @@ indV1Loop = simLoop 400 $ simulateStepPartial maxInt :|
   , runAtCount 399 proveByIndV1
   ])  
 
+oneBitSimLoop :: Tactic 
+oneBitSimLoop = simulation @Bit baseSimLoop
 
 twoBitSimLoop :: Tactic
 twoBitSimLoop = simulation @(Vec 2 Bit) baseSimLoop
@@ -343,6 +345,9 @@ m3456TacticVector = V.fromList [threeBitSimLoop, fourBitSimLoop, fiveBitSimLoop,
 
 constructiveVector :: V.Vector Tactic
 constructiveVector = V.fromList [basicSimLoop, twoBitSimLoop, threeBitSimLoop, fourBitSimLoop, fiveBitSimLoop, sixBitSimLoop]
+
+size6simpleRuleVector :: V.Vector Tactic 
+size6simpleRuleVector = V.fromList [oneBitSimLoop, twoBitSimLoop, threeBitSimLoop, fourBitSimLoop, fiveBitSimLoop, sixBitSimLoop]
 
 bwSearchTacticVector :: V.Vector Tactic
 bwSearchTacticVector = V.fromList [tacticBackwardSearch]
