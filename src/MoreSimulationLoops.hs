@@ -27,11 +27,12 @@ import ExpTape
 import Scaffold
 import Relude.Extra (bimapBoth)
 import Safe.Exact
+import Notation
 
 attemptInductionGuess :: Turing -> SimState Bit
   -> Either (SimResult InfCount Bit) (SimState Bit)
 attemptInductionGuess machine state = trace "attempted" $
-  case guessInductionHypothesis hist rsHist of
+  case guessInductionHypothesis machine hist rsHist of
     Left msg -> traceShow msg $ Right state
     --try to prove the skip by induction 
     Right skip -> trace ("guessed a skip:\n" <> show (pretty skip)) $
@@ -52,7 +53,7 @@ indGuessLoop limit = simOneFromStartLoop $
 
 -- this function works though
 makeIndGuess :: forall s. (TapeSymbol s) => Int -> Turing -> Either Text (Skip Count s)
-makeIndGuess = uncurry guessInductionHypothesis .: getTwoHistAfterTime
+makeIndGuess time machine = uncurry (guessInductionHypothesis machine) $ getTwoHistAfterTime time machine
 
 getRecurRes :: Int -> Turing -> Maybe (HaltProof Bit)
 getRecurRes stepCount turing = detectLinRecurrence tapeHist rsHist where
@@ -101,7 +102,7 @@ proveByIndV1 machine state =
     hist = state ^. s_history
     rsHist = state ^. s_readshift_history
     mbProof = do
-      indGuess <- guessInductionHypothesis hist rsHist
+      indGuess <- guessInductionHypothesis machine hist rsHist
       (scaffoldSkip, scaffoldOrigin) <-
        proveByScaffold machine (state ^. s_book) hist rsHist
       let newBook = addSkipToBook scaffoldSkip scaffoldOrigin (state ^. s_book)
@@ -116,13 +117,16 @@ proveByIndV1 machine state =
       skipAppliesForeverInHist arbSkip hist
 
 proveSimply :: (TapeSymbol s) => SimOneAction s
-proveSimply machine state = case mbProof of
+proveSimply machine state = 
+  -- trace (toString $ "working on machine " <> machineToNotation machine <> 
+  -- " and have book " <> showP (state ^. s_book)) $ 
+  case mbProof of
   Left txt -> --trace (toString $ "provesimply failed because: " <> txt <> "\nEOM\n") $
     Right state
   Right hp -> Left $ ContinueForever hp
   where
   mbProof = do
-    indHyp <- guessInductionHypothesis (state ^. s_history) (state ^. s_readshift_history)
+    indHyp <- guessInductionHypothesis machine (state ^. s_history) (state ^. s_readshift_history)
     let tryProve skip = bimap fst (const skip) $
           proveSimLinearAndTree 100 100 machine (state ^. s_book) skip
         skipVar = case toList $ getAllVars indHyp of

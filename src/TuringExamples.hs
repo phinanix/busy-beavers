@@ -557,6 +557,18 @@ inductionExamples =
   , binaryCounterVariableWidth
   ]
 
+machinesWhichBreakIndGuess :: [Turing] 
+machinesWhichBreakIndGuess = unm <$> [
+  "TR1FL1TR2TR3TL0___FR1FR3",
+  "TR1___TL2FR3FL3FL2TL0TL2",
+  "TR1FL2FR2FR1TR3TR1TL0___",
+  "TR1___FL2FR2TL0TL3FL2FL3",
+  "TR1FR2FL2FL1TL3TL1TR0___",
+  "TR1___TR2FR3FL3FL2TL0TL2",
+  "TR1___TL2FR2TL0TL3FL2FL3",
+  "TR1___TL1FR2TL0TL3FL2FL3"
+  ] 
+  
 machineList :: [Turing]
 machineList = [weird3, almostweird3, fullsim_not_halt3, bb3, simple_sweeper, 
   checkerboardSweeper, goesLeftForever, binaryCounterTFTT, machineBreaksIndGuess, 

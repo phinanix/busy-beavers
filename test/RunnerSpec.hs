@@ -57,3 +57,14 @@ spec = do
       safeEncodeIntWord16 1 `shouldBe` 1
     it "encodes -1" $ 
       safeEncodeIntWord16 (-1) `shouldBe` maxBound
+    it "encodes 12345" $ 
+      safeEncodeIntWord16 12345 `shouldBe` 12345
+    describe "writefilecheck" $ do 
+      it "doesn't crash on a file which doesn't exist" $ do 
+        checkRes <- writeFileCheck "fileWhichDoesntExist" 
+        checkRes `shouldBe` ()
+      it "crashes on a file which exists" $ do 
+        writeFileCheck "fileWhichExists" `shouldThrow` anyErrorCall
+      it "crashes on a directory" $ do 
+        writeFileCheck "src" `shouldThrow` anyErrorCall
+      

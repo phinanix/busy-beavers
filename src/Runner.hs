@@ -51,6 +51,8 @@ import Data.Typeable (typeOf, TypeRep, typeRep)
 import Data.Aeson.Types (Parser)
 import Data.Char (digitToInt)
 import Aggregate
+import System.Random
+import Display
 
 {-
 this file contains the code responsible for actually running all of the different 
@@ -347,7 +349,7 @@ runnerDotPy tacticList startMachines experimentName chunkSize startFileNum
     loop todos [] (i+1) newResCount
   loop ((tm, n) : todos) curRes i resCount
     = -- trace ("remTodo: " <> show (length todos)) $ -- <> " len res: " <> show (length curRes)) $ 
-    trace ("machine: " <> showP tm <> "\n") $ 
+    --trace ("machine: " <> showP tm <> "\n") $ 
     case tacticList V.!? n of
     -- TODO: how to get a "we failed" result / let's do a better one than this
     Nothing -> let newRes = Mystery $ Continue 0 (Phase 0) (initExpTape (Bit False)) 0 in
@@ -361,6 +363,22 @@ runnerDotPy tacticList startMachines experimentName chunkSize startFileNum
       (newTMs, newRes) -> --trace ("new tms: " <> show newTMs <> " newRes: " <> show newRes) $ 
         loop (((,n+1) <$> newTMs) ++ todos) (newRes ++ curRes) i resCount
 
+--checks whether a file exists, if so, crashes, so we don't overwrite it
+writeFileCheck :: String -> IO ()
+writeFileCheck fileName = do
+  fileExists <- doesFileExist fileName
+  if fileExists
+    then error ("was writing to " <> fromString fileName <> "but it existed already!")
+    else pure ()
+  fileIsDirectory <- doesDirectoryExist fileName
+  if fileIsDirectory
+    then error ("was writing to " <> fromString fileName <> "but it is a directory!")
+    else pure ()
+
+appendTextToFile :: String -> Text -> IO ()
+appendTextToFile fileName addlText = do
+  undefined
+
 --we use checkpoints with a checksum. the format is one short machine string per line, 
 --then a final line with a number corresponding to the number of machiens in the file, 
 --as a checksum to prevent bugs where the program is interrupted 
@@ -369,8 +387,17 @@ outputCheckpoint filePrefix machines = if null machines then pure () else do
   let numMachines = length machines
       chkptMessage = show numMachines <> " machines remain to do, saved in checkpoint" <> filePrefix <> "\n"
       chkptString = machinesToText machines <> show numMachines <> "\n"
-  TLIO.writeFile (toString $ filePrefix <> "checkpoint.txt") $ fromStrict chkptString
+      fileName = toString $ filePrefix <> "checkpoint.txt"
+  writeFileCheck fileName
+  TLIO.writeFile fileName $ fromStrict chkptString
   putText chkptMessage
+
+--like outputfiles, but instead appends to a global master file, so we can compare for consistency 
+--later
+appendLogFiles :: Text -> Text -> Int -> [Turing]
+  -> [(Turing, Mystery TapeSymbol (SimResult InfCount))] -> Int -> IO Int
+appendLogFiles filePrefix experimentName i todo results prevResCount = do
+  undefined
 
 --int parameter is previous count of results, int return val is next result count
 outputFiles :: Text -> Text -> Int -> [Turing]
@@ -381,19 +408,26 @@ outputFiles filePrefix experimentName i todo results prevResCount = do
   putText msg
   let binBuilder = bitPackResults results
       binFileName = toString $ filePrefix <> "bin.bin"
+      jsonFileName = toString $ filePrefix <> "json.json"
+      undecidedFileName = toString $ filePrefix <> "undecided.txt"
+  writeFileCheck binFileName
   --line copied from bytestrings 0.11 since we have 0.10;
   --should be written as "writeFile"
   withBinaryFile binFileName WriteMode (`hPutBuilder` binBuilder)
-  TLIO.writeFile (toString $ filePrefix <> "json.json") $ resultsToText results
-  TLIO.writeFile (toString $ filePrefix <> "undecided.txt") $
+  writeFileCheck jsonFileName
+  TLIO.writeFile jsonFileName $ resultsToText results
+  writeFileCheck undecidedFileName
+  TLIO.writeFile undecidedFileName $
     fromStrict $ machinesToText $ getContinues results
   outputCheckpoint filePrefix todo
-  -- (checkpointMachines, checkpointNum) <- loadNewestCheckpoint (toString experimentName)
-  -- assertMsg 
-  --   (null todo || (checkpointMachines, checkpointNum) == (todo, i)) 
-  --   ("checkpoint failed! i, num:" <> show (i, checkpointNum) 
-  --     <> "todo:" <> showP todo <> "\ncheckpoint: " <> showP checkpointMachines)
-  pure newResCount
+  (checkpointMachines, checkpointNum) <- loadNewestCheckpoint (toString experimentName)
+  assertMsg
+    (null todo || (checkpointMachines, checkpointNum-1) == (todo, i))
+    ("checkpoint failed! i, num:" <> show (i, checkpointNum)
+      <> "todo:" <> dumpM todo <> "\ncheckpoint: " <> dumpM checkpointMachines)
+    pure newResCount
+  where
+    dumpM ms = mconcat (machineToNotation <$> ms)
 
 applyTactic :: Vector Tactic -> [Turing] -> [(Int, Turing)]
 applyTactic tac machines = let
@@ -419,6 +453,7 @@ tacticVectors = M.fromList
   , ("splitfast", splitterTacticVector V.++ fastTacticVector)
   , ("fewthings", splitterTacticVector V.++ basicTacticVector V.++ bwSearchTacticVector)
   , ("size6simplerules", splitterTacticVector V.++ size6simpleRuleVector)
+  , ("lrto1k", V.fromList [simulation @Bit $ lrCheckLoop 1000])
   ]
 --sarah barrios thank god you introduced me to your sister
 
@@ -525,9 +560,9 @@ runnerDotPyFromArgs = do
     [experimentName, tacticName, chunkSizeString, inputMachineString] -> do
         createDirectoryIfMissing True $ takeDirectory experimentName
         let chunkSize :: Int = U.read chunkSizeString
-            tacticVec = fromMaybe (error $ "could not find tactic called: " <> fromString tacticName) $ 
-              tacticVectors ^. at tacticName 
-              
+            tacticVec = fromMaybe (error $ "could not find tactic called: " <> fromString tacticName) $
+              tacticVectors ^. at tacticName
+
         (inputMachines, startNum) <- getMachines experimentName inputMachineString
         let inputMessage = "recieved " <> show (length inputMachines)
               <> " machines as input. running: " <> fromString tacticName
@@ -621,7 +656,7 @@ loadBinaryFile numStates fp = do
   --pure $ unfoldr (popResultFromBS numStates) rawBytestring
   let ans = runGet (getManyItem (getTMandResult numStates)) rawBytestring
   putTextLn $ "loaded " <> show (length ans) <> " results"
-  pure ans 
+  pure ans
 
 loadResult :: Text -> (Turing, SomeResult)
 loadResult textIn = let
@@ -649,6 +684,22 @@ loadMachinesFromFile fn = do
   putTextLn $ "loaded " <> show (length machines) <> " machines"
   pure machines
 
+nRandomNums :: Int -> Int -> Int -> Int -> [Int]
+nRandomNums lo hi n seed = fst $ foldl' foldF ([], initialGen) [1..n]  where
+  foldF (xs, g) _ = let
+    (num, newG) = getNum g
+    in
+      (num : xs, newG)
+  initialGen = mkStdGen seed
+  getNum = randomR (lo, hi)
+
+samplesFromFile :: Int -> Int -> Int -> String -> IO ()
+samplesFromFile n seed numSteps fileName = do
+  ms <- loadMachinesFromFile fileName
+  let nums = nRandomNums 0 (length ms - 1) n seed
+  let toPrint = (ms U.!!) <$> nums
+  for_ toPrint (`execMachine` numSteps)
+
 --bitpacked machines, json machines, and undecided machines
 loadAggregatedExperimentFiles :: Int -> String
   -> IO ([(Turing, BitSimResult)],
@@ -661,7 +712,7 @@ loadAggregatedExperimentFiles numStates experimentName = do
   pure (bsrs, jsons, unfinished)
 
 --stats type, S_ is for "stats"
-data MachineRes = S_Halt Int | S_LR Int Int Int | S_Unsolved | S_Solved SomeResult 
+data MachineRes = S_Halt Int | S_LR Int Int Int | S_Unsolved | S_Solved SomeResult
   deriving (Eq, Ord, Show, Generic)
 $(makePrisms ''MachineRes)
 
@@ -689,9 +740,9 @@ makeMachineRes (bitres, someres, _unsolved) = convert <$> bitres where
       Just sr -> S_Solved sr
       Nothing -> error $ "tried to look up machine: " <> machineToNotation m
 
-dispStatRes :: (Show a) => Statistic a -> StatsResult a -> Text 
-dispStatRes stat res = case (stat, res) of 
-  (Statistic name _f Count, CountRes count) -> "count of " <> name <> ":" <> show count 
+dispStatRes :: (Show a) => Statistic a -> StatsResult a -> Text
+dispStatRes stat res = case (stat, res) of
+  (Statistic name _f Count, CountRes count) -> "count of " <> name <> ":" <> show count
   (Statistic name _f t, _) -> error $ "invalid stat res combo: " <> show (name, t, res)
 
 showExpStats :: Int -> Text -> IO ()
@@ -703,5 +754,5 @@ showExpStats numStates experimentName = do
   putTextLn "made machine results"
   let statRes = runStats countStats tmmrs
   putTextLn "finished running stats"
-  for_ statRes (putTextLn . uncurry dispStatRes) 
+  for_ statRes (putTextLn . uncurry dispStatRes)
 

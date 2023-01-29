@@ -37,6 +37,7 @@ import SimulationLoops
 import Graphs
 import TapeSymbol
 import Data.Containers.ListUtils (nubOrd)
+import Notation
 
 {-
 27 Nov 21 
@@ -63,7 +64,7 @@ proveInductivelyIMeanIT :: (TapeSymbol s, HasCallStack) => Turing -> SkipBook s 
     -> TapeHist s InfCount -> ReadShiftHist
     -> (SkipBook s, Either Text (Skip Count s))
 proveInductivelyIMeanIT machine book curStep hist rsHist
-  = force $ let indGuess = guessInductionHypothesis hist rsHist in
+  = force $ let indGuess = guessInductionHypothesis machine hist rsHist in
   trace ("indGuess was: " <> showP indGuess) $ case indGuess of
     Left msg -> (book, Left $ "failed to guessIndHyp:\n" <> msg)
     Right indHyp -> let (newBook, tOrOrigin) = proveStrong 5 machine book indHyp (BoundVar 0) in
@@ -581,9 +582,9 @@ obtainCriticalIndicesConfigs (TapeHist hist) = do
       ans
   pure (criticalPhase, configIndicesAndConfigs)
 
-guessInductionHypothesis :: (TapeSymbol s) => TapeHist s InfCount -> ReadShiftHist
+guessInductionHypothesis :: (TapeSymbol s) => Turing -> TapeHist s InfCount -> ReadShiftHist
   -> Either Text (Skip Count s)
-guessInductionHypothesis th rsh = force $ do
+guessInductionHypothesis tm th rsh = force $ do
   (criticalPhase, configIndicesAndConfigs) <- obtainCriticalIndicesConfigs th
   let
     indGuess = case guessInductionHypWithIndices th rsh criticalPhase configIndicesAndConfigs of
@@ -594,11 +595,11 @@ guessInductionHypothesis th rsh = force $ do
       --17 jan 23 I put it back and don't remember why
       Left msg -> --trace (toString $ "ind m1: " <> msg)
         guessInductionHypWithIndices th rsh criticalPhase (Unsafe.tail $ Unsafe.tail configIndicesAndConfigs)
-    msg = "guessed indhyp:\n" <> showP indGuess
+    msg = "for machine: " <> machineToNotation tm <> "\nguessed indhyp:\n" <> showP indGuess
     in
 
      --trace (toString msg) $
-     assertMsg ((thingContainsVar <$> indGuess) /= Right False) msg
+     warnMsg ((thingContainsVar <$> indGuess) /= Right False) msg
      indGuess
 
 type FunctionExamples = (NonEmpty (Count, Count), (Maybe Count, Maybe Count))

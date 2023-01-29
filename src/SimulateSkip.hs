@@ -181,6 +181,7 @@ instance (Pretty s) => Pretty (SkipOrigin s) where
     <> show first <> " to " <> show second
   pretty InductionHypothesis = "a skip which is our current induction hypothesis"
   pretty (ChainedFrom x) = "a skip which was chained from this skip:\n" <> pretty x <> "\n-----\n"
+  pretty (PairGen f s steps) = "a skip we generalized from " <> show f <> " to " <> show s <> " in the history that takes " <> show steps <> " to prove"
 
 --displacement is measured in the count of "s", not in the count of atomic symbols
 -- data SkipResult s c = Skipped
