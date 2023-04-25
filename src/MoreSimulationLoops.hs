@@ -121,7 +121,7 @@ proveSimply machine state =
   -- trace (toString $ "working on machine " <> machineToNotation machine <> 
   -- " and have book " <> showP (state ^. s_book)) $ 
   case mbProof of
-  Left txt -> --trace (toString $ "provesimply failed because: " <> txt <> "\nEOM\n") $
+  Left txt -> trace (toString $ "provesimply failed because: " <> txt <> "\nEOM\n") $
     Right state
   Right hp -> Left $ ContinueForever hp
   where

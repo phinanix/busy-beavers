@@ -300,8 +300,8 @@ proveByLRLoop limit = simLoop (limit + 1) $ simulateStepPartial maxInt :|
   , runAtCount limit proveByLR
   ])
 
-baseSimLoop :: (TapeSymbol s) => Turing -> ([Turing],[(Turing, SimResult InfCount s)])
-baseSimLoop = let limit = 2999 in simLoop (limit + 1) $ simulateStepPartial maxInt :| 
+baseSimLoopLimit :: (TapeSymbol s) => Int -> Turing -> ([Turing],[(Turing, SimResult InfCount s)])
+baseSimLoopLimit limit = simLoop (limit + 1) $ simulateStepPartial maxInt :| 
   (liftOneToMulti <$> [checkSeenBefore
   , liftModifyState recordHist
   , liftModifyState recordDispHist
@@ -313,6 +313,8 @@ baseSimLoop = let limit = 2999 in simLoop (limit + 1) $ simulateStepPartial maxI
   --, runAtCount limit proveByIndV1
   ])
 
+baseSimLoop :: (TapeSymbol s) => Turing -> ([Turing], [(Turing, SimResult InfCount s)])
+baseSimLoop = baseSimLoopLimit 999
 {-# SPECIALISE baseSimLoop :: Turing -> ([Turing],[(Turing, SimResult InfCount Bit)]) #-}
 {-# SPECIALISE baseSimLoop :: Turing -> ([Turing],[(Turing, SimResult InfCount (Vec 2 Bit))]) #-}
 {-# SPECIALISE baseSimLoop :: Turing -> ([Turing],[(Turing, SimResult InfCount (Vec 3 Bit))]) #-}

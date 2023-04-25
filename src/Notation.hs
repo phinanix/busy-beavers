@@ -44,12 +44,36 @@ transToNotation = \case
     Just Halt -> "TLH"
     Just (Step ph b dir) -> dispBit b <> show dir <> show (unPhase ph)
 
+transToBBNotation :: Maybe Trans -> Text
+transToBBNotation = \case
+    Nothing -> "---"
+    Just Halt -> "1RH"
+    Just (Step ph (Bit b) dir) -> let 
+     bit = if b then '1' else '0'
+     ab = "ABCDEFG"
+     phaseLetter = ab U.!! unPhase ph
+     in 
+     fromString $ [bit] <> show dir <> [phaseLetter]
+    --dispBit b <> show dir <> show (unPhase ph)
+
 edgesOfLen :: Int -> [Edge]
 edgesOfLen n = bind (\x -> (x,) <$> [Bit False, Bit True]) (Phase <$> [0.. n-1])
 
 machineToNotation :: Turing -> Text
 machineToNotation (Turing n trans) = T.concat $ transToNotation <$> transes where
     transes = (\e -> trans ^. at e) <$> edgesOfLen n
+
+machineToBBNotation :: Turing -> Text
+machineToBBNotation (Turing n trans) = T.intercalate "_" $ concatPairs $ transToBBNotation <$> transes where
+    transes = (\e -> trans ^. at e) <$> edgesOfLen n
+    go next = \case 
+      (Nothing, xs) -> (Just next, xs)
+      (Just prev, xs) -> (Nothing, (next<>prev):xs)
+    package = \case 
+      (Nothing, xs) -> xs 
+      (Just _, xs) -> error "paired up an odd length list"
+    concatPairs :: [Text] -> [Text]
+    concatPairs = package . foldl' (flip go) (Nothing, [])
 
 parseBit' :: Char -> Either Text Bit
 parseBit' = \case

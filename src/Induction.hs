@@ -578,7 +578,7 @@ obtainCriticalIndicesConfigs (TapeHist hist) = do
   criticalConfig@(criticalPhase, _criticalSignature) <- guessCriticalConfiguration hist
   let
     configIndicesAndConfigs = let ans = obtainConfigIndices hist criticalConfig in
-      --trace ("configs were:\n" <> showP ans)
+      trace ("critical phase: " <> showP criticalPhase <> " configs were:\n" <> showP ans)
       ans
   pure (criticalPhase, configIndicesAndConfigs)
 
@@ -598,7 +598,7 @@ guessInductionHypothesis tm th rsh = force $ do
     msg = "for machine: " <> machineToNotation tm <> "\nguessed indhyp:\n" <> showP indGuess
     in
 
-     --trace (toString msg) $
+     trace (toString msg) $
      warnMsg ((thingContainsVar <$> indGuess) /= Right False) msg
      indGuess
 
