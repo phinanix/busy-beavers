@@ -64,7 +64,8 @@ machineToNotation (Turing n trans) = T.concat $ transToNotation <$> transes wher
     transes = (\e -> trans ^. at e) <$> edgesOfLen n
 
 machineToBBNotation :: Turing -> Text
-machineToBBNotation (Turing n trans) = T.intercalate "_" $ concatPairs $ transToBBNotation <$> transes where
+machineToBBNotation (Turing n trans) = trace (show thing) $ T.intercalate "_" $ concatPairs $ thing where
+    thing = transToBBNotation <$> transes
     transes = (\e -> trans ^. at e) <$> edgesOfLen n
     go next = \case 
       (Nothing, xs) -> (Just next, xs)
@@ -73,7 +74,7 @@ machineToBBNotation (Turing n trans) = T.intercalate "_" $ concatPairs $ transTo
       (Nothing, xs) -> xs 
       (Just _, xs) -> error "paired up an odd length list"
     concatPairs :: [Text] -> [Text]
-    concatPairs = package . foldl' (flip go) (Nothing, [])
+    concatPairs = package . foldr (go) (Nothing, [])
 
 parseBit' :: Char -> Either Text Bit
 parseBit' = \case

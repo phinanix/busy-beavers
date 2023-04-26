@@ -187,19 +187,114 @@ lastSize3 = unm "TR1___TL2TR0FR0FL2"
 
 {-
 takes O(n^2) time to increase the size of the tape by O(1)
-outer loop: 
-(T, n) >F<
-TT (F, n-2) >F<
+outer loop: (119, 143) (209, 237)
+ph1 F (T, n) >F<
+ph1 TT (F, n-1) >F<
 inner loop:
-FF (T, n) >F<
-F (T, n+1)>F<
+(149, 159) ()
+ph1 F (T, n) >F<
+ph1  (T, n+1)>F<
 and
-TT F (T, n) >F<
-(T, n+3) >F<
+ph TT F (T, n) >F<
+ph (T, n+3) >F<
 I discovered this machine when it made the "assert" in proveSimLinearAndTree fail; 
 uncovering the bug where DFS and proveBySimulating were doing different things because
 the sorting of skips was not unique - if two skips took the same number of steps, then
 they could be sorted in either order. 
+-}
+
+{-
+coming back to this machine on 25 Apr 2023 I think I might have gotten it wrong 
+it might be a counter in a bouncer?
+it is always in ph1 at the far right 
+it satisfies 
+F >F<
+T >F<
+and 
+FT >F<
+TT >F<
+and
+FTT >F< 
+TTT >F<  
+but then the pattern breaks. Next is 
+FTTT >F< 
+TTFF >F< 
+which becomes 
+TTTT >F< by above. 
+next is 
+F (T, 4) >F< 
+TT (F, 3) >F< 
+which becomes 
+(T, 5) >F< by above, again. 
+
+so I think my above analysis was correct, but incomplete. 
+the machine satisfies the rule A (455, 475)
+F  (T, n+2) >F< 
+TT (F, n+1) >F< via the proof 
+0  T>T< ---3 steps-->
+0 >T<T 
+giving 
+0 (T, n) >T<
+0 >T< (T, n)
+and the chain rule 
+1 >T< (T, n)
+1 (F, n) >T<
+plus direct simulation 
+the machine then also satisfies the rule B
+F (F, n) >F< 
+F (T, n) >F<
+maybe? 
+or before I said rule C
+FF (T, n)  >F<
+F (T, n+1) >F<
+which is . . . true, but why
+induction? 
+n = 1 and n = 2 we have directly
+so assuming n >= 3 we can apply the above rule A
+to get 
+F TT (F, n-1) >F< 
+which doesn't look so promising 
+so maybe trying to prove rule B instead 
+the base case holds 
+so let's try the inductive case 
+F (F, n+1) >F< 
+F F (T, n) >F< (ind hyp)
+FTT (F, n-1) >F< (rule A) 
+but we're basically having the same issue 
+
+I think this is some kind of counter maybe ???
+
+new tack. another rule D that is true of this machine: 
+F T T (F, n) >F<
+T T (F, n+1) >F< 
+base case(s) by direct simulation 
+
+
+okay this machine is definitely a counter-variant
+it has these live bits of TT 
+new ones are created when there is none: 
+FF >F< 
+TT >F< 
+then the TT repeatedly scoots over: 
+F TT (F, n) >F< 
+TT (F, n+1) >F< 
+via a process involving the creation of additional TT 
+and (recursively) scooting them over until one obtains 
+(T, n) >F< 
+which then takes the rule E (599, 635)
+F  (T, n)   >F< 
+TT (F, n-1) >F< 
+which starts the process all over again 
+
+so maybe the thing we need to induct upon is 
+(F, n+1) >F< 
+(T, n+1)>F< 
+a la other counters
+(F, n+1) >F<
+F (T, n) >F< (ind. hyp)
+TT (F, n-1) >F< E
+TT (T, n-1) >F< (ind. hyp)
+yep!
 -}
 bouncerInBouncer :: Turing
 bouncerInBouncer = unm "TR1FL2FL0FR1TR0TR3TL0___"
